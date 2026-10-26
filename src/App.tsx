@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
-  Activity, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Brain, BriefcaseBusiness,
+  Activity, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, BookMarked, Brain, BriefcaseBusiness,
   CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Clock3, Compass,
   FileText, Folder, Globe, GraduationCap, Grid2X2, Headphones, Image as ImageIcon, Inbox,
   LayoutDashboard, Library, Link2, ListChecks, LockKeyhole, MessageSquare, Mic,
