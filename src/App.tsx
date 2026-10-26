@@ -178,11 +178,11 @@ function WorkspacePanel({ view, panel, onPanelChange, onShowSessions, onShowBrow
   </div>{view === 'sessions' ? <SessionsWorkspace onNotify={onNotify} /> : panel === 'files' ? <ProjectDocument onNotify={onNotify} /> : <BrowserFrame onShowSessions={onShowSessions} onNotify={onNotify} />}</section>;
 }
 
-function ThreadPage({ view, panel, onPanelChange, conversationWidth, onResizeStart, selectedThread, initialPrompt, onConsumePrompt, onNotify, onShowSessions }: {
+function ThreadPage({ view, panel, onPanelChange, conversationWidth, onResizeStart, selectedThread, initialPrompt, onConsumePrompt, onNotify, onShowSessions, onShowBrowser }: {
   view: View; panel: Panel; onPanelChange: (panel: Panel) => void; conversationWidth: number; onResizeStart: () => void;
   selectedThread: string; initialPrompt: string; onConsumePrompt: () => void; onNotify: (message: string) => void; onShowSessions: () => void; onShowBrowser: () => void;
 }) {
-  return <main className="thread-layout"><div className="conversation-width" style={{ width: conversationWidth, flexBasis: conversationWidth }}><ThreadConversation title={selectedThread} initialPrompt={initialPrompt} onConsumePrompt={onConsumePrompt} onNotify={onNotify} /></div><button type="button" className="resize-handle" onMouseDown={onResizeStart} aria-label="Resize conversation panel"><span /></button><WorkspacePanel view={view} panel={panel} onPanelChange={onPanelChange} onShowSessions={onShowSessions} onNotify={onNotify} /></main>;
+  return <main className="thread-layout"><div className="conversation-width" style={{ width: conversationWidth, flexBasis: conversationWidth }}><ThreadConversation title={selectedThread} initialPrompt={initialPrompt} onConsumePrompt={onConsumePrompt} onNotify={onNotify} /></div><button type="button" className="resize-handle" onMouseDown={onResizeStart} aria-label="Resize conversation panel"><span /></button><WorkspacePanel view={view} panel={panel} onPanelChange={onPanelChange} onShowSessions={onShowSessions} onShowBrowser={onShowBrowser} onNotify={onNotify} /></main>;
 }
 
 function SettingsGroup({ title, count, icon }: { title: string; count: string; icon: ReactNode }) {
