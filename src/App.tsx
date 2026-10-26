@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   Activity, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Brain, BriefcaseBusiness,
   CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Clock3, Compass,
@@ -33,7 +33,7 @@ const capabilities = [
 
 function BrandMark() { return <span className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></span>; }
 function Brand() { return <div className="brand"><BrandMark /><span>Hyperagent</span></div>; }
-function IconButton({ children, label, onClick, className = '' }: { children: React.ReactNode; label: string; onClick?: () => void; className?: string }) {
+function IconButton({ children, label, onClick, className = '' }: { children: ReactNode; label: string; onClick?: () => void; className?: string }) {
   return <button type="button" className={'icon-button ' + className} aria-label={label} title={label} onClick={onClick}>{children}</button>;
 }
 
@@ -171,21 +171,21 @@ function ProjectDocument({ onNotify }: { onNotify: (message: string) => void }) 
     </div></div></div>;
 }
 
-function WorkspacePanel({ view, panel, onPanelChange, onShowSessions, onNotify }: { view: View; panel: Panel; onPanelChange: (panel: Panel) => void; onShowSessions: () => void; onNotify: (message: string) => void }) {
+function WorkspacePanel({ view, panel, onPanelChange, onShowSessions, onShowBrowser, onNotify }: { view: View; panel: Panel; onPanelChange: (panel: Panel) => void; onShowSessions: () => void; onShowBrowser: () => void; onNotify: (message: string) => void }) {
   return <section className="workspace-panel"><div className="workspace-toolbar"><div className="workspace-filter-pills"><button type="button" className="filter-pill active">All <span>5</span></button><button type="button" className="filter-pill" onClick={() => onNotify('Image filter selected')}><ImageIcon size={12} /> Images <span>4</span></button><button type="button" className="filter-pill" onClick={() => onPanelChange('files')}><FileText size={12} /> Documents <span>1</span></button></div>
     <div className="workspace-view-tools"><IconButton label="Split view"><PanelLeftClose size={14} /></IconButton><IconButton label="Grid view"><Grid2X2 size={14} /></IconButton><IconButton label="Workspace settings"><Settings2 size={14} /></IconButton></div>
-    <div className="workspace-mode-toggle"><button type="button" className={panel === 'browser' ? 'selected' : ''} onClick={() => { onPanelChange('browser'); if (view === 'sessions') onShowSessions(); }}><Globe size={12} /> Browser <span className="live-dot" /></button><button type="button" className={panel === 'files' ? 'selected' : ''} onClick={() => onPanelChange('files')}><FileText size={12} /> Files</button></div><IconButton label="Open workspace"><ArrowUpRight size={14} /></IconButton>
+    <div className="workspace-mode-toggle"><button type="button" className={panel === 'browser' ? 'selected' : ''} onClick={() => { onPanelChange('browser'); if (view === 'sessions') onShowBrowser(); }}><Globe size={12} /> Browser <span className="live-dot" /></button><button type="button" className={panel === 'files' ? 'selected' : ''} onClick={() => onPanelChange('files')}><FileText size={12} /> Files</button></div><IconButton label="Open workspace"><ArrowUpRight size={14} /></IconButton>
   </div>{view === 'sessions' ? <SessionsWorkspace onNotify={onNotify} /> : panel === 'files' ? <ProjectDocument onNotify={onNotify} /> : <BrowserFrame onShowSessions={onShowSessions} onNotify={onNotify} />}</section>;
 }
 
 function ThreadPage({ view, panel, onPanelChange, conversationWidth, onResizeStart, selectedThread, initialPrompt, onConsumePrompt, onNotify, onShowSessions }: {
   view: View; panel: Panel; onPanelChange: (panel: Panel) => void; conversationWidth: number; onResizeStart: () => void;
-  selectedThread: string; initialPrompt: string; onConsumePrompt: () => void; onNotify: (message: string) => void; onShowSessions: () => void;
+  selectedThread: string; initialPrompt: string; onConsumePrompt: () => void; onNotify: (message: string) => void; onShowSessions: () => void; onShowBrowser: () => void;
 }) {
   return <main className="thread-layout"><div className="conversation-width" style={{ width: conversationWidth, flexBasis: conversationWidth }}><ThreadConversation title={selectedThread} initialPrompt={initialPrompt} onConsumePrompt={onConsumePrompt} onNotify={onNotify} /></div><button type="button" className="resize-handle" onMouseDown={onResizeStart} aria-label="Resize conversation panel"><span /></button><WorkspacePanel view={view} panel={panel} onPanelChange={onPanelChange} onShowSessions={onShowSessions} onNotify={onNotify} /></main>;
 }
 
-function SettingsGroup({ title, count, icon }: { title: string; count: string; icon: React.ReactNode }) {
+function SettingsGroup({ title, count, icon }: { title: string; count: string; icon: ReactNode }) {
   return <button type="button" className="settings-group collapsed"><ChevronRight size={12} /><span className="settings-group-icon">{icon}</span><strong>{title}</strong><span className="settings-count">{count}</span><Settings2 size={13} /></button>;
 }
 function AgentSettingsPanel() {
@@ -250,7 +250,7 @@ export default function App() {
   const notify = (message: string) => setToast(message);
   return <div className="app-shell">
     <Sidebar view={view} selectedThread={selectedThread} onNavigate={(next) => { setView(next); if (next === 'home') setInitialPrompt(''); }} onSelectThread={openThread} onSearch={() => setSearchOpen(true)} />
-    <div className="app-main">{view === 'home' && <HomePage onStart={startPrompt} onOpenAgent={() => setView('agent')} onOpenThread={openThread} />}{view === 'agent' && <CreateAgentPage onCreate={createAgent} onNotify={notify} />}{(view === 'thread' || view === 'sessions') && <ThreadPage view={view} panel={panel} onPanelChange={setPanel} conversationWidth={conversationWidth} onResizeStart={() => setIsResizing(true)} selectedThread={selectedThread} initialPrompt={initialPrompt} onConsumePrompt={() => setInitialPrompt('')} onNotify={notify} onShowSessions={() => setView('sessions')} />}</div>
+    <div className="app-main">{view === 'home' && <HomePage onStart={startPrompt} onOpenAgent={() => setView('agent')} onOpenThread={openThread} />}{view === 'agent' && <CreateAgentPage onCreate={createAgent} onNotify={notify} />}{(view === 'thread' || view === 'sessions') && <ThreadPage view={view} panel={panel} onPanelChange={setPanel} conversationWidth={conversationWidth} onResizeStart={() => setIsResizing(true)} selectedThread={selectedThread} initialPrompt={initialPrompt} onConsumePrompt={() => setInitialPrompt('')} onNotify={notify} onShowSessions={() => setView('sessions')} onShowBrowser={() => setView('thread')} />}</div>
     {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} onOpenThread={openThread} />}{toast && <div className="toast"><CheckCircle2 size={15} /><span>{toast}</span></div>}
   </div>;
 }
