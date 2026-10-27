@@ -42,7 +42,8 @@ Reference: the authenticated desktop browser observations from 2026-10-27, recor
 
 ## Verification
 
-- Eight new Playwright scenarios cover model gating, local menu state, nested execution controls, starter-agent search, workspace search, new-tab shortcuts, sidebar flyouts and narrow-view submenu width.
+- Ten new Playwright scenarios cover model gating, local menu state, nested execution controls, starter-agent search, workspace search, new-tab shortcuts, sidebar flyouts and narrow-view submenu width.
 - Batch 1's GitHub Actions check passed before this work started.
 - Local dependency installation remains blocked by HTTP 403 from the npm registry (yallist tarball; standalone formatter metadata is also denied). No local build/Playwright/formatter success is claimed.
-- Static patch checks and remote file verification are reported separately from runtime tests. The existing PR CI must validate this new commit before merge.
+- Static patch checks and remote file verification are reported separately from runtime tests. The first batch-2 CI run identified an out-of-scope avatar variable in a legacy room component; it was corrected. The latest CI must validate all follow-up fixes before merge.
+- A read-only review also prompted submenu focus restoration, keyboard entry into nested choices, viewport collision handling, and removal of the old mobile forced-left offset.

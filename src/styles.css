@@ -2619,9 +2619,6 @@ select {
   .modal-footer {
     padding: 12px 17px;
   }
-  .shell-menu {
-    left: 60px !important;
-  }
   .shell-menu.learning {
     bottom: 150px;
   }

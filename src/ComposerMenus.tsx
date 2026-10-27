@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
   Brain, Gauge, GitBranch, Blocks, Plug, ArrowUpRight, ChevronRight,
   Check, Search, PencilLine, Sparkles, Bot, Zap,
@@ -45,35 +45,75 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
     setSub("");
     setAgentQuery("");
     if (menu && menu !== previousMenu.current) {
-      root.current?.querySelector<HTMLElement>("input, [role=menuitem]")?.focus();
+      const first = root.current?.querySelector<HTMLElement>("input")
+        || root.current?.querySelector<HTMLElement>('[role^="menuitem"][aria-checked="true"]')
+        || root.current?.querySelector<HTMLElement>('[role^="menuitem"]');
+      first?.focus();
     }
     previousMenu.current = menu;
   }, [menu]);
+  useLayoutEffect(() => {
+    const position = () => {
+      const el = root.current;
+      if (!el) return;
+      el.style.transform = "none";
+      el.style.maxHeight = `${Math.max(80, innerHeight - 16)}px`;
+      const rect = el.getBoundingClientRect();
+      const dx = Math.max(8 - rect.left, Math.min(0, innerWidth - 8 - rect.right));
+      const dy = Math.max(8 - rect.top, Math.min(0, innerHeight - 8 - rect.bottom));
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+      const panel = el.querySelector<HTMLElement>(".composer-submenu");
+      if (panel) {
+        panel.style.transform = "none";
+        panel.style.maxHeight = `${Math.max(80, Math.min(400, innerHeight - 16))}px`;
+        const bounds = panel.getBoundingClientRect();
+        const x = Math.max(8 - bounds.left, Math.min(0, innerWidth - 8 - bounds.right));
+        const y = Math.max(8 - bounds.top, Math.min(0, innerHeight - 8 - bounds.bottom));
+        panel.style.transform = `translate(${x}px, ${y}px)`;
+      }
+    };
+    position();
+    window.addEventListener("resize", position);
+    window.addEventListener("scroll", position, true);
+    return () => {
+      window.removeEventListener("resize", position);
+      window.removeEventListener("scroll", position, true);
+    };
+  }, [menu, sub, agentQuery]);
+  const closeSub = (key = sub) => {
+    setSub("");
+    requestAnimationFrame(() => root.current?.querySelector<HTMLElement>(`[data-submenu="${key}"]`)?.focus());
+  };
+  const openSub = (key: string, enter = false) => {
+    setSub(key);
+    if (enter) requestAnimationFrame(() => {
+      const panel = root.current?.querySelector<HTMLElement>(".composer-submenu");
+      (panel?.querySelector<HTMLElement>('[role^="menuitem"][aria-checked="true"]')
+        || panel?.querySelector<HTMLElement>('[role^="menuitem"]'))?.focus();
+    });
+  };
+  const closeMenu = () => {
+    const label = menu === "model" ? "Model settings" : menu === "mode" ? "Execution mode" : "Use an agent";
+    close();
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[aria-label="${label}"]`)?.focus());
+  };
   const go = (path: string) => { close(); navigate(path); };
   const settings = (section: string) => go(location.pathname + "?settings=" + section);
   const keyboard = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Escape") {
       e.preventDefault(); e.stopPropagation();
-      if (sub) {
-        root.current?.querySelector<HTMLElement>(`[data-submenu="${sub}"]`)?.focus();
-        setSub("");
-      } else {
-        close();
-        const label = menu === "model" ? "Model settings" : menu === "mode" ? "Execution mode" : "Use an agent";
-        document.querySelector<HTMLElement>(`[aria-label="${label}"]`)?.focus();
-      }
+      if (sub) closeSub();
+      else closeMenu();
       return;
     }
     if (e.key === "ArrowLeft" && sub) {
       e.preventDefault(); e.stopPropagation();
-      root.current?.querySelector<HTMLElement>(`[data-submenu="${sub}"]`)?.focus();
-      setSub(""); return;
+      closeSub(); return;
     }
     if (e.key === "ArrowRight") {
       const key = (document.activeElement as HTMLElement)?.dataset.submenu;
       if (key) {
-        e.preventDefault(); setSub(key);
-        requestAnimationFrame(() => root.current?.querySelector<HTMLElement>(".composer-submenu [role^=menuitem]")?.focus());
+        e.preventDefault(); openSub(key, true);
       }
       return;
     }
@@ -91,7 +131,7 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
   const row = (key: string, label: string, value: string, Icon: typeof Brain) => (
     <button type="button" role="menuitem" data-submenu={key} aria-haspopup="menu" aria-expanded={sub === key}
       className={sub === key ? "submenu-open" : ""}
-      onMouseEnter={() => setSub(key)} onClick={() => setSub(key)}>
+      onMouseEnter={() => setSub(key)} onClick={e => openSub(key, e.detail === 0)}>
       <Icon size={16} /><span>{label}</span><span className="menu-current">{value}</span><ChevronRight size={14} />
     </button>
   );
@@ -111,12 +151,12 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
           <span className="unlock-icon"><Sparkles size={18} /></span>
           <span><strong>Unlock every model</strong><small>Subscribe to a plan to pick more powerful models</small></span><ChevronRight size={14} />
         </button>}
-        {sub === "effort" && ["Low", "Medium", "High"].map(value => <button type="button" role="menuitemradio" aria-checked={effort === value} key={value} onClick={() => { setEffort(value); setSub(""); }}>
+        {sub === "effort" && ["Low", "Medium", "High"].map(value => <button type="button" role="menuitemradio" aria-checked={effort === value} key={value} onClick={() => { setEffort(value); closeSub("effort"); }}>
           <span>{value}</span>{effort === value && <Check size={14} />}
         </button>)}
         {sub === "provider" && <>
           <small className="menu-local-note">Local preview choices</small>
-          {["Any", "OpenAI", "Anthropic", "Google"].map(value => <button type="button" role="menuitemradio" aria-checked={provider === value} key={value} onClick={() => { setProvider(value); setSub(""); }}>
+          {["Any", "OpenAI", "Anthropic", "Google"].map(value => <button type="button" role="menuitemradio" aria-checked={provider === value} key={value} onClick={() => { setProvider(value); closeSub("provider"); }}>
             <span>{value}</span>{provider === value && <Check size={14} />}
           </button>)}
         </>}
@@ -135,19 +175,19 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
   );
   if (menu === "mode") return (
     <div ref={root} className="popover fidelity-mode-menu" role="menu" aria-label="Execution mode menu" onKeyDown={keyboard}>
-      <button type="button" role="menuitemradio" aria-checked={mode === "Plan first"} onMouseEnter={() => setSub("")} onClick={() => { setMode("Plan first"); close(); }}>
+      <button type="button" role="menuitemradio" aria-checked={mode === "Plan first"} onMouseEnter={() => setSub("")} onClick={() => { setMode("Plan first"); closeMenu(); }}>
         <span className="mode-check">{mode === "Plan first" && <Check size={15} />}</span>
         <span><strong>Plan first</strong><small>Think through an approach and get user clarification before taking action</small></span>
       </button>
       <div className="execute-menu-row">
-        <button type="button" role="menuitemradio" aria-checked={mode === "Execute"} onClick={() => { setMode("Execute"); close(); }}>
+        <button type="button" role="menuitemradio" aria-checked={mode === "Execute"} onClick={() => { setMode("Execute"); closeMenu(); }}>
           <span className="mode-check">{mode === "Execute" && <Check size={15} />}</span>
           <span><strong>Execute</strong><small>Act immediately without a plan</small></span>
         </button>
-        <button type="button" className="execution-policy" role="menuitem" data-submenu="policy" aria-label="Execution policy: Auto" aria-haspopup="menu" aria-expanded={sub === "policy"} onMouseEnter={() => setSub("policy")} onClick={() => setSub("policy")}>Auto<ChevronRight size={14} /></button>
+        <button type="button" className="execution-policy" role="menuitem" data-submenu="policy" aria-label="Execution policy: Auto" aria-haspopup="menu" aria-expanded={sub === "policy"} onMouseEnter={() => setSub("policy")} onClick={e => openSub("policy", e.detail === 0)}>Auto<ChevronRight size={14} /></button>
       </div>
       {sub === "policy" && <div className="popover composer-submenu" role="menu" aria-label="Execution policy options">
-        <button type="button" role="menuitemradio" aria-checked="true" onClick={() => setSub("")}><Zap size={15} />Auto<Check size={14} /></button>
+        <button type="button" role="menuitemradio" aria-checked="true" onClick={() => closeSub("policy")}><Zap size={15} />Auto<Check size={14} /></button>
         <small className="menu-local-note">Only the observed Auto state is shown. Execution is not connected.</small>
       </div>}
     </div>
@@ -156,7 +196,7 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
     const query = agentQuery.trim().toLowerCase();
     const starters = starterAgents.filter(([name, description]) => (name + " " + description).toLowerCase().includes(query));
     const saved = agents.filter(name => name.toLowerCase().includes(query));
-    const choose = (name: string) => { setAgent(name); close(); };
+    const choose = (name: string) => { setAgent(name); closeMenu(); };
     return <div ref={root} className="popover fidelity-agent-menu" role="menu" aria-label="Agent picker" onKeyDown={keyboard}>
       <label className="agent-picker-search"><Search size={16} /><input aria-label="Search agents" placeholder="Search agents..." value={agentQuery} onChange={e => setAgentQuery(e.target.value)} /></label>
       <div className="agent-picker-list">

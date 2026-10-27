@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, useRef, type ReactNode } from "react";
 import {
   Search,
   Inbox,
@@ -117,6 +117,23 @@ export default function App() {
   useEffect(() => {
     if (menu) shellMenuRef.current?.querySelector<HTMLElement>("button")?.focus();
   }, [menu]);
+  useLayoutEffect(() => {
+    if (!menu) return;
+    const position = () => {
+      const el = shellMenuRef.current;
+      if (!el) return;
+      el.style.maxHeight = `${Math.max(80, innerHeight - 16)}px`;
+      const rect = el.getBoundingClientRect();
+      el.style.left = `${Math.max(8, Math.min(rect.left, innerWidth - rect.width - 8))}px`;
+      if (rect.top < 8 || rect.bottom > innerHeight - 8) {
+        el.style.bottom = "auto";
+        el.style.top = `${Math.max(8, Math.min(rect.top, innerHeight - rect.height - 8))}px`;
+      }
+    };
+    position();
+    window.addEventListener("resize", position);
+    return () => window.removeEventListener("resize", position);
+  }, [menu, menuPosition, workspace.state.workspaces.length]);
   const mainRef = useRef<HTMLElement>(null);
   const query = new URLSearchParams(url.split("?")[1] || "");
   const path = url.split("?")[0];
@@ -1311,7 +1328,7 @@ function RoomPage({
           </button>
         </div>
         <div className="card room-member">
-          <span className="avatar">{profileInitials}</span>
+          <span className="avatar">D</span>
           <div>
             <strong>You</strong>
             <p className="muted">Room manager</p>

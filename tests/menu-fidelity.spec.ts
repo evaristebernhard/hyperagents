@@ -133,3 +133,30 @@ test("nested model menu stays within the narrow viewport horizontally", async ({
   expect(rect!.x).toBeGreaterThanOrEqual(0);
   expect(rect!.x + rect!.width).toBeLessThanOrEqual(390);
 });
+
+test("keyboard submenu selection returns focus to its parent row", async ({ page }) => {
+  await page.goto("/threads/new");
+  await page.getByRole("button", { name: "Model settings", exact: true }).click();
+  const menu = page.getByRole("menu", { name: "Model settings menu", exact: true });
+  await page.keyboard.press("ArrowDown");
+  await expect(menu.locator('[data-submenu="effort"]')).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("menuitemradio", { name: "Medium", exact: true })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(menu.locator('[data-submenu="effort"]')).toBeFocused();
+  await expect(menu.locator('[data-submenu="effort"]')).toContainText("High");
+});
+
+test("compact composer submenu is constrained to the viewport vertically", async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 700 });
+  await page.goto("/thread/small-business");
+  await page.getByRole("button", { name: "Model settings", exact: true }).click();
+  const menu = page.getByRole("menu", { name: "Model settings menu", exact: true });
+  await menu.locator('[data-submenu="tools"]').hover();
+  const sub = page.getByRole("menu", { name: "tools options", exact: true });
+  await expect(sub).toBeVisible();
+  const rect = await sub.boundingBox();
+  expect(rect!.y).toBeGreaterThanOrEqual(7);
+  expect(rect!.y + rect!.height).toBeLessThanOrEqual(693);
+});
