@@ -449,15 +449,15 @@ select {
   height: 23px;
 }
 .workspace-switch {
-  height: 35px;
+  height: 34px;
   display: flex;
   align-items: center;
   gap: 7px;
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  margin: 4px 0 16px;
-  font-size: 13px;
+  margin: -2px 0 16px;
+  font-size: 14px;
   text-align: left;
 }
 .workspace-switch > svg {
@@ -498,7 +498,8 @@ select {
   padding: 7px 15px;
   width: 100%;
   text-align: left;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 20px;
   margin-bottom: 1px;
   color: var(--ink);
 }
@@ -744,12 +745,30 @@ select {
   line-height: 1;
   letter-spacing: -2.2px;
   font-weight: 600;
-  margin: 12px 0 28px;
+  margin: 12px 0 24px;
+}
+@media (min-width: 761px) {
+  .home-hero .composer-bar .pill,
+  .home-hero .execution {
+    font-size: 14px;
+    line-height: 20px;
+  }
+}
+.home-recent .thread-card {
+  min-height: 132px;
+}
+.home-recent .thread-card h3 {
+  font-size: 20px;
+  line-height: 28px;
+}
+.home-recent .thread-card p {
+  font-size: 14px;
+  line-height: 20px;
 }
 .composer {
   position: relative;
   border: 1px solid var(--line);
-  border-radius: 17px;
+  border-radius: 14px;
   box-shadow: 0 2px 4px #00000012;
   text-align: left;
   background: var(--bg);
@@ -2447,10 +2466,15 @@ select {
     font-size: 11px;
     padding: 6px 8px;
   }
-  .composer-bar-left .pill:first-of-type {
-    max-width: 150px;
+  .composer-bar-left [aria-label="Model settings"] {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    justify-content: center;
   }
-  .composer-bar-left .pill:nth-of-type(2) {
+  .composer-bar-left .model-chip-label,
+  .composer-bar-left .model-chip-chevron,
+  .composer-bar-left [aria-label="Use an agent"] {
     display: none;
   }
   .composer textarea {
@@ -2599,9 +2623,6 @@ select {
   }
   .modal-footer {
     padding: 12px 17px;
-  }
-  .shell-menu {
-    left: 60px !important;
   }
   .shell-menu.learning {
     bottom: 150px;
