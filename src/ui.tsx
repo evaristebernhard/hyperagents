@@ -245,8 +245,8 @@ export function Composer({
             onClick={() => toggle("model")}
           >
             <SlidersHorizontal size={14} />
-            {!compact && model}
-            {!compact && <ChevronDown size={12} />}
+            {!compact && <span className="model-chip-label">{model}</span>}
+            {!compact && <ChevronDown className="model-chip-chevron" size={12} />}
           </button>
           {!compact && (
             <button className="pill" aria-label="Use an agent" aria-haspopup="menu" aria-expanded={menu === "agents"} onClick={() => toggle("agents")}>

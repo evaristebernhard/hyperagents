@@ -2466,10 +2466,15 @@ select {
     font-size: 11px;
     padding: 6px 8px;
   }
-  .composer-bar-left .pill:first-of-type {
-    max-width: 150px;
+  .composer-bar-left [aria-label="Model settings"] {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    justify-content: center;
   }
-  .composer-bar-left .pill:nth-of-type(2) {
+  .composer-bar-left .model-chip-label,
+  .composer-bar-left .model-chip-chevron,
+  .composer-bar-left [aria-label="Use an agent"] {
     display: none;
   }
   .composer textarea {
