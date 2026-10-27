@@ -34,6 +34,9 @@ import {
 import type { DemoThread, Navigate } from "./types";
 import { Composer, IconButton, Modal, Mark } from "./ui";
 import { asset } from "./data";
+import { useWorkspace, download, safeImage } from "./workspace";
+import { uid, now } from "./local-model";
+import { ArtifactView, exportArtifact } from "./LibraryManager";
 export default function Thread({
   thread,
   update,
@@ -49,20 +52,28 @@ export default function Thread({
   settingsPanel: boolean;
   agents: string[];
 }) {
+  const workspace = useWorkspace();
+  const [projectTarget, setProjectTarget] = useState(thread.project || ""),
+    [liveInstructions, setLiveInstructions] = useState(""),
+    [liveCadence, setLiveCadence] = useState("day");
   const [selected, setSelected] = useState("notes"),
     [layout, setLayout] = useState("Carousel"),
-    [filter, setFilter] = useState("All 6"),
+    [filter, setFilter] = useState("All"),
     [menu, setMenu] = useState(""),
     [modal, setModal] = useState(""),
     [canvas, setCanvas] = useState(true),
     [detailsTab, setDetailsTab] = useState("Configuration"),
     [notes, setNotes] = useState(
-      "Build a clear, frontend-only workspace.\n\nKeep the page structure, menus, and navigation faithful to the reference.\n\nNo LLM, browser runtime, or external tools are connected.",
+      workspace.data.artifacts.find(
+        (a) => a.threadId === thread.id && a.kind === "Document",
+      )?.content ||
+        thread.notes ||
+        "Build a clear, frontend-only workspace.\n\nKeep the page structure, menus, and navigation faithful to the reference.\n\nNo LLM, browser runtime, or external tools are connected.",
     ),
     [renamed, setRenamed] = useState(thread.title),
     [log, setLog] = useState(false),
     [ratio, setRatio] = useState(48),
-    [version, setVersion] = useState("v1");
+    [version, setVersion] = useState("current");
   const split = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const bottom = useRef<HTMLDivElement>(null);
@@ -115,107 +126,105 @@ export default function Thread({
     });
     setFollow(true);
   };
-  const artifacts = [
-    { id: "notes", title: "Working notes", type: "Documents" },
-    { id: "website", title: "Local potential, redesigned", type: "Webpages" },
-    { id: "campaign", title: "campaign-preview.png", type: "Images" },
-    { id: "property", title: "property-preview.png", type: "Images" },
-    { id: "hiring", title: "hiring-preview.png", type: "Images" },
-    { id: "brand", title: "brand-preview.png", type: "Images" },
-  ];
+  const linkedArtifacts = workspace.data.artifacts.filter(
+    (a) => !a.archived && a.threadId === thread.id,
+  );
+  const artifacts = (
+    linkedArtifacts.length
+      ? linkedArtifacts
+      : [
+          {
+            id: "thread-notes-" + thread.id,
+            title: "Working notes",
+            kind: "Document" as const,
+            content: thread.notes || notes,
+            threadId: thread.id,
+            versions: [],
+            createdAt: now(),
+            updatedAt: now(),
+          },
+        ]
+  ).map((a) => ({
+    ...a,
+    type:
+      a.kind === "Document"
+        ? "Documents"
+        : a.kind === "Webpage"
+          ? "Webpages"
+          : a.kind === "Image"
+            ? "Images"
+            : "Files",
+  }));
   const visible = artifacts.filter(
-    (a) => filter === "All 6" || a.type === filter,
+    (a) => filter.startsWith("All") || a.type === filter,
   );
   const selectedArtifact =
     artifacts.find((a) => a.id === selected) || artifacts[0];
+  useEffect(() => {
+    setNotes(selectedArtifact.content);
+    setVersion("current");
+  }, [selectedArtifact.id]);
+  const saveNotes = () => {
+    if (selectedArtifact.content === notes) return;
+    if (workspace.data.artifacts.some((a) => a.id === selectedArtifact.id))
+      workspace.updateArtifact(selectedArtifact.id, notes);
+    else
+      workspace.set("artifacts", (aa) => [
+        ...aa,
+        { ...selectedArtifact, content: notes, updatedAt: now() },
+      ]);
+    update({ ...thread, notes });
+  };
   const setPanel = (open: boolean) =>
     navigate("/thread/" + thread.id + (open ? "?panel=settings" : ""));
-  const artifactBody = (id: string) =>
-    id === "notes" ? (
+  const artifactBody = (_id: string) => {
+    const a = selectedArtifact;
+    if (version !== "current" && a.versions[Number(version)])
+      return (
+        <>
+          <button
+            className="btn small"
+            onClick={() => {
+              workspace.updateArtifact(
+                a.id,
+                a.versions[Number(version)].content,
+              );
+              setVersion("current");
+              setNotes(a.versions[Number(version)].content);
+            }}
+          >
+            Restore this version
+          </button>
+          <ArtifactView
+            artifact={{ ...a, content: a.versions[Number(version)].content }}
+          />
+        </>
+      );
+    return a.kind === "Document" ? (
       <article className="notes-document">
-        <h1>Working notes</h1>
+        <h1>{a.title}</h1>
         <p className="muted">
-          What the agent keeps for this thread: its plan, the numbers, and the
-          facts it must not forget.
+          What the agent keeps for this thread: its plan, numbers, and facts.
         </p>
         <h2>Notes</h2>
         <textarea
           aria-label="Working notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
+          onBlur={saveNotes}
         />
-        <h2>Plan Overview</h2>
-        <p>
-          Create a practical workspace where research, decisions, and finished
-          work remain in view.
-        </p>
-        <h2>Plan Tasks</h2>
-        {[
-          "Map the main pages and routes",
-          "Capture the important UI states",
-          "Build the local interaction flows",
-          "Verify navigation and accessibility",
-        ].map((s, i) => (
-          <label className="check-row" key={s}>
-            <input type="checkbox" defaultChecked={i < 2} />
-            {s}
-          </label>
-        ))}
+        <button className="btn small" onClick={saveNotes}>
+          Save notes
+        </button>
         <p className="demo-note">
-          Editable preview · changes stay in this open view.
+          Saved locally to Library. Each content change creates a restorable
+          version.
         </p>
       </article>
-    ) : id === "website" ? (
-      <div className="demo-webpage">
-        <div className="demo-site-nav">
-          LOCAL / OPPORTUNITY BOARD <span>2026</span>
-        </div>
-        <p className="eyebrow">INDEPENDENT BUSINESSES. UNDERSERVED WEBSITES.</p>
-        <h1>
-          Loved around town.
-          <br />
-          <em>Ready for a better site.</em>
-        </h1>
-        <p>
-          Five well-reviewed businesses, each with a clear opportunity to
-          improve their web presence.
-        </p>
-        <div className="demo-stats">
-          <div>
-            <b>05</b>CONCEPTS
-          </div>
-          <div>
-            <b>4.7–5.0 ★</b>RATING RANGE
-          </div>
-          <div>
-            <b>1,786</b>COMBINED REVIEWS
-          </div>
-        </div>
-        <div className="demo-sites">
-          {["Bakery Café", "Shoe Repair", "Auto Service", "Alterations"].map(
-            (n, i) => (
-              <button
-                key={n}
-                onClick={() =>
-                  notify(n + " concept selected · static demo preview")
-                }
-              >
-                <img
-                  src={asset(["brand", "campaign", "hiring", "property"][i])}
-                  alt={n}
-                />
-                <strong>{n}</strong>
-                <span>★ 4.8 · See concept →</span>
-              </button>
-            ),
-          )}
-        </div>
-      </div>
     ) : (
-      <div className="canvas-image">
-        <img src={asset(id)} alt={id + " preview"} />
-      </div>
+      <ArtifactView artifact={a} />
     );
+  };
   return (
     <div
       className={
@@ -299,18 +308,62 @@ export default function Thread({
                           setModal("rename");
                         } else if (name === "Thread settings…") setPanel(true);
                         else if (name === "Share") setModal("share");
-                        else if (name === "Fork thread") setModal("fork");
-                        else if (name === "Move to project")
-                          navigate("/projects");
-                        else
+                        else if (name === "Fork thread") {
+                          const id = uid("local");
+                          workspace.set("threads", (ts) => [
+                            {
+                              ...thread,
+                              id,
+                              title: thread.title + " (fork)",
+                              archived: false,
+                              time: "just now",
+                            },
+                            ...ts,
+                          ]);
+                          workspace.set("artifacts", (aa) => [
+                            ...aa,
+                            ...linkedArtifacts.map((a) => ({
+                              ...a,
+                              id: uid("artifact"),
+                              threadId: id,
+                            })),
+                          ]);
+                          navigate("/thread/" + id);
+                          notify("Thread forked locally.");
+                        } else if (name === "Move to project") {
+                          setProjectTarget(thread.project || "");
+                          setModal("project");
+                        } else if (name === "Archive") {
+                          update({ ...thread, archived: !thread.archived });
+                          navigate("/threads");
+                        } else if (name === "Exclude from knowledge") {
+                          update({ ...thread, excluded: !thread.excluded });
                           notify(
-                            name +
-                              " is a demo action; no remote data was changed.",
+                            thread.excluded
+                              ? "Included in local knowledge metadata."
+                              : "Excluded from local knowledge metadata. No indexing backend is connected.",
                           );
+                        } else if (name === "Regenerate name") {
+                          update({
+                            ...thread,
+                            title:
+                              thread.messages
+                                ?.find((m) => m.role === "user")
+                                ?.text.split("\n")[0]
+                                .slice(0, 65) || thread.summary.slice(0, 65),
+                          });
+                          notify(
+                            "Used the first message or summary as a local title. No LLM was called.",
+                          );
+                        }
                       }}
                     >
                       <Icon size={15} />
-                      {name}
+                      {name === "Archive" && thread.archived
+                        ? "Restore"
+                        : name === "Exclude from knowledge" && thread.excluded
+                          ? "Include in knowledge"
+                          : name}
                     </button>
                   );
                 })}
@@ -540,7 +593,7 @@ export default function Thread({
               <h3>Model & compute</h3>
               <label className="field">
                 Model
-                <select className="input">
+                <select aria-label="Model" className="input">
                   <option>Choose your model</option>
                   <option>Auto</option>
                   <option>GPT-6.1 Sol</option>
@@ -548,7 +601,7 @@ export default function Thread({
               </label>
               <label className="field">
                 Reasoning effort
-                <select className="input">
+                <select aria-label="Reasoning effort" className="input">
                   <option>Medium</option>
                   <option>Low</option>
                   <option>High</option>
@@ -556,7 +609,7 @@ export default function Thread({
               </label>
               <label className="field">
                 Provider
-                <select className="input">
+                <select aria-label="Provider" className="input">
                   <option>Any</option>
                   <option>OpenAI</option>
                 </select>
@@ -613,12 +666,20 @@ export default function Thread({
                   onClick={() => setMenu(menu === "filter" ? "" : "filter")}
                 >
                   <ListFilter size={15} />
-                  {filter}
+                  {filter.startsWith("All")
+                    ? "All " + artifacts.length
+                    : filter}
                   <ChevronDown size={12} />
                 </button>
                 {menu === "filter" && (
                   <div className="popover">
-                    {["All 6", "Documents", "Webpages", "Images"].map((f) => (
+                    {[
+                      "All " + artifacts.length,
+                      "Documents",
+                      "Webpages",
+                      "Images",
+                      "Files",
+                    ].map((f) => (
                       <button
                         key={f}
                         onClick={() => {
@@ -691,7 +752,7 @@ export default function Thread({
                     ) : a.id === "website" ? (
                       <Globe size={45} />
                     ) : (
-                      <img src={asset(a.id)} alt={a.title} />
+                      <img src={safeImage(a.content)} alt={a.title} />
                     )}
                     <strong>{a.title}</strong>
                     <small>{a.type}</small>
@@ -713,8 +774,14 @@ export default function Thread({
                       value={version}
                       onChange={(e) => setVersion(e.target.value)}
                     >
-                      <option>v1</option>
-                      <option>Original</option>
+                      <option value="current">
+                        v{selectedArtifact.versions.length + 1} Current
+                      </option>
+                      {selectedArtifact.versions.map((v, i) => (
+                        <option key={v.id} value={i}>
+                          v{i + 1}
+                        </option>
+                      ))}
                     </select>
                     <IconButton
                       label="Fullscreen artifact"
@@ -742,7 +809,7 @@ export default function Thread({
                   ) : a.id === "website" ? (
                     <Globe size={23} />
                   ) : (
-                    <img src={asset(a.id)} alt="" />
+                    <img src={safeImage(a.content)} alt="" />
                   )}
                   <span>{a.title}</span>
                 </button>
@@ -750,6 +817,43 @@ export default function Thread({
             </div>
           </section>
         )
+      )}
+      {modal === "project" && (
+        <Modal
+          title="Move to project"
+          onClose={() => setModal("")}
+          footer={
+            <button
+              className="btn primary"
+              onClick={() => {
+                update({ ...thread, project: projectTarget || undefined });
+                setModal("");
+                notify("Project assignment updated locally.");
+              }}
+            >
+              Move thread
+            </button>
+          }
+        >
+          <label className="field">
+            Project
+            <select
+              aria-label="Project"
+              className="input"
+              value={projectTarget}
+              onChange={(e) => setProjectTarget(e.target.value)}
+            >
+              <option value="">No project</option>
+              {workspace.data.projects
+                .filter((p) => !p.archived)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+        </Modal>
       )}
       {modal === "rename" && (
         <Modal
@@ -776,6 +880,7 @@ export default function Thread({
           <label className="field">
             Thread name
             <input
+              aria-label="Thread name"
               className="input"
               value={renamed}
               onChange={(e) => setRenamed(e.target.value)}
@@ -795,9 +900,24 @@ export default function Thread({
               <button
                 className="btn primary"
                 onClick={() => {
+                  workspace.set("schedules", (ss) => [
+                    ...ss,
+                    {
+                      id: uid("schedule"),
+                      name: thread.title,
+                      instructions: liveInstructions || thread.summary,
+                      cadence:
+                        liveCadence === "day"
+                          ? "Daily at 09:00"
+                          : liveCadence === "week"
+                            ? "Weekly on Monday"
+                            : "Every hour",
+                      enabled: false,
+                    },
+                  ]);
                   setModal("");
                   notify(
-                    "Live mode is a preview only. No schedule or agent was created.",
+                    "Schedule configuration saved locally. Execution remains off.",
                   );
                 }}
               >
@@ -812,7 +932,12 @@ export default function Thread({
           </p>
           <label className="field">
             Every
-            <select className="input">
+            <select
+              aria-label="Every"
+              className="input"
+              value={liveCadence}
+              onChange={(e) => setLiveCadence(e.target.value)}
+            >
               <option>day</option>
               <option>week</option>
               <option>hour</option>
@@ -821,6 +946,8 @@ export default function Thread({
             <textarea
               className="textarea"
               placeholder="Describe the recurring work…"
+              value={liveInstructions}
+              onChange={(e) => setLiveInstructions(e.target.value)}
             />
           </label>
           <h3>Where should this agent reach you?</h3>
@@ -860,9 +987,38 @@ export default function Thread({
           onClose={() => setModal("")}
         >
           <p>
-            This is a local frontend preview. Public sharing and server-side
-            thread operations are not connected.
+            Export a portable copy of this local conversation. This does not
+            publish a public link.
           </p>
+          <button
+            className="btn primary"
+            onClick={() =>
+              download(
+                thread.title + ".json",
+                JSON.stringify(thread, null, 2),
+                "application/json",
+              )
+            }
+          >
+            Export thread JSON
+          </button>
+          <button
+            className="btn"
+            onClick={() =>
+              download(
+                thread.title + ".md",
+                "# " +
+                  thread.title +
+                  "\n\n" +
+                  (thread.messages
+                    ?.map((m) => "## " + m.role + "\n" + m.text)
+                    .join("\n\n") || thread.summary),
+                "text/markdown",
+              )
+            }
+          >
+            Export Markdown
+          </button>
           <button
             className="btn"
             onClick={() => {

@@ -7,6 +7,10 @@ export type DemoThread = {
   time: string;
   project?: string;
   starred?: boolean;
+  archived?: boolean;
+  excluded?: boolean;
+  roomId?: string;
+  notes?: string;
   messages?: { role: "user" | "assistant"; text: string }[];
 };
 export type DemoProject = {
@@ -14,12 +18,23 @@ export type DemoProject = {
   name: string;
   description: string;
   goal: string;
+  archived?: boolean;
 };
 export type DemoAgent = {
   id: string;
   name: string;
   description: string;
   prompt: string;
+  model?: string;
+  provider?: string;
+  reasoning?: string;
+  tools?: string[];
+  skillIds?: string[];
+  memoryMode?: string;
+  learning?: Record<string, string>;
+  libraryEnabled?: boolean;
+  archived?: boolean;
+  starred?: boolean;
 };
 export type DemoMemory = {
   id: string;
@@ -27,6 +42,9 @@ export type DemoMemory = {
   category: string;
   importance: number;
   pinned: boolean;
+  whenToUse?: string;
+  tags?: string[];
+  scope?: string;
 };
 export type PageProps = {
   path: string;

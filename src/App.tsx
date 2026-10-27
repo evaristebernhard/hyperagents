@@ -50,6 +50,11 @@ import Settings from "./SettingsUI";
 import Thread from "./Thread";
 import Agents from "./Agents";
 import Marketing from "./Marketing";
+import { useWorkspace, useCollection } from "./workspace";
+import ContentHub from "./ContentHub";
+import Rooms from "./Rooms";
+import LibraryManager from "./LibraryManager";
+import LocalWorkspace from "./LocalWorkspace";
 
 function useSaved<T>(key: string, initial: T) {
   const [v, setV] = useState<T>(() => safeRead(key, initial));
@@ -89,16 +94,11 @@ export default function App() {
     setSearch(false);
     window.scrollTo(0, 0);
   };
-  const [threads, setThreads] = useSaved<DemoThread[]>(
-      "threads",
-      initialThreads,
-    ),
-    [projects, setProjects] = useSaved<DemoProject[]>(
-      "projects",
-      initialProjects,
-    ),
-    [agents, setAgents] = useSaved<DemoAgent[]>("agents", []),
-    [memories, setMemories] = useSaved<DemoMemory[]>("memories", []);
+  const workspace = useWorkspace();
+  const [threads, setThreads] = useCollection("threads");
+  const [projects, setProjects] = useCollection("projects");
+  const [agents, setAgents] = useCollection("agents");
+  const [memories, setMemories] = useCollection("memories");
   const [collapsed, setCollapsed] = useSaved("sidebar-collapsed", false),
     [theme, setTheme] = useSaved("theme", "light");
   const [menu, setMenu] = useState(""),
@@ -215,8 +215,21 @@ export default function App() {
       {!collapsed && extra}
     </a>
   );
-  const recent = threads.slice(0, 6);
+  const recent = threads.filter((t) => !t.archived).slice(0, 6);
   const renderPage = () => {
+    if (
+      path.startsWith("/skills") ||
+      path.startsWith("/memories") ||
+      path.startsWith("/rubrics")
+    )
+      return <ContentHub path={path} navigate={navigate} notify={notify} />;
+    if (path.startsWith("/rooms"))
+      return <Rooms path={path} navigate={navigate} notify={notify} />;
+    if (path === "/library" || path === "/documents")
+      return <LibraryManager path={path} navigate={navigate} notify={notify} />;
+    if (path === "/workspaces" || path === "/workflows")
+      return <LocalWorkspace path={path} navigate={navigate} notify={notify} />;
+
     if (path === "/threads/new" || path === "/home" || path === "/")
       return (
         <div className="home-page">
@@ -238,7 +251,7 @@ export default function App() {
           </div>
           <div className="home-recent">
             <ThreadList
-              threads={threads.slice(0, 3)}
+              threads={threads.filter((t) => !t.archived).slice(0, 3)}
               allThreads={threads}
               setThreads={setThreads}
               navigate={navigate}
@@ -500,7 +513,7 @@ export default function App() {
           <span className="avatar tiny">P</span>
           {!collapsed && (
             <>
-              Personal
+              {workspace.activeName}
               <ChevronDown size={14} />
             </>
           )}
@@ -607,9 +620,15 @@ export default function App() {
                 </>
               )}
             </button>
-            {roomsExpanded &&
-              !collapsed &&
-              link("/rooms/new", "New room", Plus)}
+            {roomsExpanded && !collapsed && (
+              <>
+                {workspace.data.rooms
+                  .filter((r) => !r.archived)
+                  .slice(0, 4)
+                  .map((r) => link("/rooms/" + r.id, r.name, Users))}
+                {link("/rooms/new", "New room", Plus)}
+              </>
+            )}
           </div>
           {!collapsed && (
             <div className="group-title resources-label">Resources</div>
@@ -657,6 +676,7 @@ export default function App() {
       </aside>
       <main
         ref={mainRef}
+        key={workspace.state.active}
         className={
           "main-content " + (path.startsWith("/thread/") ? "thread-main" : "")
         }
@@ -677,18 +697,37 @@ export default function App() {
               <>
                 <small>Workspaces</small>
                 <button onClick={() => setMenu("")}>
-                  <span className="avatar tiny">D</span>Personal
+                  <span className="avatar tiny">D</span>
+                  {workspace.activeName}
                   <Check size={14} />
                 </button>
                 <button
                   onClick={() => {
                     setMenu("");
-                    setDialog("workspace");
+                    navigate("/workspaces");
                   }}
                 >
                   <Plus size={15} />
                   Create workspace
                 </button>
+                <button onClick={() => navigate("/workspaces")}>
+                  <Folder size={15} />
+                  Manage workspaces & backups
+                </button>
+                {workspace.state.workspaces
+                  .filter((w) => w.id !== workspace.state.active)
+                  .map((w) => (
+                    <button
+                      key={w.id}
+                      onClick={() => {
+                        workspace.switchWorkspace(w.id);
+                        setMenu("");
+                        navigate("/threads/new");
+                      }}
+                    >
+                      {w.name}
+                    </button>
+                  ))}
               </>
             ) : menu === "learning" ? (
               <>
@@ -843,9 +882,13 @@ function ThreadList({
   const [grid, setGrid] = useState(false),
     [filter, setFilter] = useState("Recent"),
     [text, setText] = useState(""),
-    [filters, setFilters] = useState(false);
+    [filters, setFilters] = useState(false),
+    [showArchived, setShowArchived] = useState(false),
+    [projectFilter, setProjectFilter] = useState("");
   const items = threads.filter(
     (t) =>
+      !!t.archived === showArchived &&
+      (!projectFilter || t.project === projectFilter) &&
       (filter !== "Starred" || t.starred) &&
       (filter !== "Needs input" || t.messages?.at(-1)?.role === "user") &&
       t.title.toLowerCase().includes(text.toLowerCase()),
@@ -902,6 +945,14 @@ function ThreadList({
             onChange={(e) => setText(e.target.value)}
           />
           <div className="actions">
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(e) => setShowArchived(e.target.checked)}
+              />
+              Archived
+            </label>
             {["Starred", "Needs input", "Recent"].map((n) => (
               <button
                 className={"pill " + (filter === n ? "selected" : "")}
@@ -925,9 +976,18 @@ function ThreadList({
         <div className="filter-strip">
           <label>
             Project
-            <select onChange={(e) => setText(e.target.value)}>
+            <select
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+            >
               <option value="">All projects</option>
-              <option value="Velocity">hello</option>
+              {[
+                ...new Set(allThreads.map((t) => t.project).filter(Boolean)),
+              ].map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
             </select>
           </label>
           <button
@@ -983,14 +1043,29 @@ function ThreadList({
                 <Star size={15} fill={t.starred ? "currentColor" : "none"} />
               </IconButton>
               <IconButton
-                label={"Archive " + t.title}
+                label={(t.archived ? "Restore " : "Archive ") + t.title}
                 onClick={() => {
-                  if (confirm("Remove this demo thread from the local list?"))
-                    setThreads(allThreads.filter((x) => x.id !== t.id));
+                  setThreads(
+                    allThreads.map((x) =>
+                      x.id === t.id ? { ...x, archived: !x.archived } : x,
+                    ),
+                  );
                 }}
               >
                 <Archive size={15} />
               </IconButton>
+              {t.archived && (
+                <IconButton
+                  label={"Delete permanently " + t.title}
+                  onClick={() => {
+                    if (confirm("Permanently delete this local thread?")) {
+                      setThreads(allThreads.filter((x) => x.id !== t.id));
+                    }
+                  }}
+                >
+                  <X size={15} />
+                </IconButton>
+              )}
             </div>
           </article>
         ))}
@@ -1018,6 +1093,7 @@ function SearchDialog({
   onClose: () => void;
   navigate: (p: string) => void;
 }) {
+  const workspace = useWorkspace();
   const [q, setQ] = useState(""),
     [index, setIndex] = useState(0);
   const results = [
@@ -1036,6 +1112,19 @@ function SearchDialog({
       path: "/projects/" + p.id,
       type: "Project",
     })),
+    ...workspace.data.skills
+      .filter((s) => !s.archived)
+      .map((s) => ({ title: s.name, path: "/skills/" + s.id, type: "Skill" })),
+    ...workspace.data.rooms
+      .filter((r) => !r.archived)
+      .map((r) => ({ title: r.name, path: "/rooms/" + r.id, type: "Room" })),
+    ...workspace.data.artifacts
+      .filter((a) => !a.archived)
+      .map((a) => ({
+        title: a.title,
+        path: "/library?artifact=" + a.id,
+        type: a.kind,
+      })),
     ...gotoItems.map(([title, path]) => ({ title, path, type: "Go to" })),
   ].filter((x) => !q || x.title.toLowerCase().includes(q.toLowerCase()));
   useEffect(() => setIndex(0), [q]);

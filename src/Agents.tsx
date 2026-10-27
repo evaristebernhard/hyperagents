@@ -29,6 +29,8 @@ import {
 } from "lucide-react";
 import type { DemoAgent, PageProps } from "./types";
 import { IconButton, Modal } from "./ui";
+import { useWorkspace, download } from "./workspace";
+import Schedules from "./Schedules";
 export default function Agents({
   path,
   navigate,
@@ -36,6 +38,7 @@ export default function Agents({
   agents,
   setAgents,
 }: PageProps & { agents: DemoAgent[]; setAgents: (a: DemoAgent[]) => void }) {
+  const workspace = useWorkspace();
   const id = path.split("/")[2];
   const editing = agents.find((a) => a.id === id);
   const [tab, setTab] = useState("Identity"),
@@ -46,13 +49,23 @@ export default function Agents({
     [job, setJob] = useState(""),
     [query, setQuery] = useState(""),
     [modal, setModal] = useState(""),
-    [selected, setSelected] = useState([
-      "Search",
-      "Webpages",
-      "Documents",
-      "Thread Search",
-    ]),
-    [library, setLibrary] = useState(false);
+    [selected, setSelected] = useState(
+      editing?.tools || ["Search", "Webpages", "Documents", "Thread Search"],
+    ),
+    [library, setLibrary] = useState(editing?.libraryEnabled || false),
+    [model, setModel] = useState(editing?.model || "Auto"),
+    [provider, setProvider] = useState(editing?.provider || "Any"),
+    [reasoning, setReasoning] = useState(editing?.reasoning || "Medium"),
+    [memoryMode, setMemoryMode] = useState(
+      editing?.memoryMode || "Summary memory",
+    ),
+    [learning, setLearning] = useState<Record<string, string>>(
+      editing?.learning || {},
+    ),
+    [skillIds, setSkillIds] = useState<string[]>(editing?.skillIds || []),
+    [archived, setArchived] = useState(false),
+    [sort, setSort] = useState("Starred first"),
+    [starOnly, setStarOnly] = useState(false);
   const tabs = [
     ["Identity", Sparkles],
     ["Model", Settings2],
@@ -93,6 +106,14 @@ export default function Agents({
           </button>
         </div>
         <div className="list-controls">
+          <label className="check-row">
+            <input
+              type="checkbox"
+              checked={archived}
+              onChange={(e) => setArchived(e.target.checked)}
+            />
+            Archived
+          </label>
           <input
             className="search-input"
             placeholder="Search agents…"
@@ -104,7 +125,12 @@ export default function Agents({
             <SlidersHorizontal size={14} />
             Filters
           </button>
-          <select className="compact-select" aria-label="Sort agents">
+          <select
+            className="compact-select"
+            aria-label="Sort agents"
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+          >
             <option>Starred first</option>
             <option>Name</option>
             <option>Recently created</option>
@@ -119,29 +145,65 @@ export default function Agents({
         ) : (
           <div className="grid3 agent-roster">
             {agents
-              .filter((a) => a.name.toLowerCase().includes(query.toLowerCase()))
+              .filter(
+                (a) =>
+                  !!a.archived === archived &&
+                  (!starOnly || a.starred) &&
+                  a.name.toLowerCase().includes(query.toLowerCase()),
+              )
+              .slice()
+              .sort((a, b) =>
+                sort === "Name"
+                  ? a.name.localeCompare(b.name)
+                  : sort === "Starred first"
+                    ? Number(!!b.starred) - Number(!!a.starred)
+                    : agents.indexOf(b) - agents.indexOf(a),
+              )
               .map((a) => (
-                <a
-                  className="card"
-                  key={a.id}
-                  href={"/agents/" + a.id}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate("/agents/" + a.id);
-                  }}
-                >
-                  <span className="agent-avatar">🤖</span>
-                  <h3>{a.name}</h3>
-                  <p className="muted">{a.description}</p>
-                  <span className="badge">Local demo agent</span>
-                </a>
+                <article className="card" key={a.id}>
+                  <a
+                    href={"/agents/" + a.id}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate("/agents/" + a.id);
+                    }}
+                  >
+                    <span className="agent-avatar">🤖</span>
+                    <h3>{a.name}</h3>
+                    <p className="muted">{a.description}</p>
+                    <span className="badge">Local identity</span>
+                  </a>
+                  <div className="local-tags">
+                    <button
+                      className="plain"
+                      aria-label={"Star " + a.name}
+                      onClick={() =>
+                        setAgents(
+                          agents.map((x) =>
+                            x.id === a.id ? { ...x, starred: !x.starred } : x,
+                          ),
+                        )
+                      }
+                    >
+                      <Star
+                        size={14}
+                        fill={a.starred ? "currentColor" : "none"}
+                      />
+                      {a.starred ? "Starred" : "Star"}
+                    </button>
+                  </div>
+                </article>
               ))}
           </div>
         )}
         {modal === "filters" && (
           <Modal title="Filter agents" onClose={() => setModal("")}>
             <label className="check-row">
-              <input type="checkbox" />
+              <input
+                type="checkbox"
+                checked={starOnly}
+                onChange={(e) => setStarOnly(e.target.checked)}
+              />
               Starred agents only
             </label>
             <p className="demo-note">
@@ -169,10 +231,19 @@ export default function Agents({
       return;
     }
     const item = {
+      ...editing,
       id: editing?.id || "agent-" + Date.now(),
       name: name.trim(),
       description,
       prompt,
+      model,
+      provider,
+      reasoning,
+      tools: selected,
+      skillIds,
+      memoryMode,
+      learning,
+      libraryEnabled: library,
     };
     setAgents(
       editing
@@ -194,9 +265,64 @@ export default function Agents({
             {name || "Add a name and system prompt"}
           </small>
         </div>
-        <button className="btn primary" onClick={save}>
-          {editing ? "Save changes" : "Create Agent"}
-        </button>
+        <div className="actions">
+          {editing && (
+            <>
+              <button
+                className="btn small"
+                onClick={() =>
+                  download(
+                    editing.name + ".json",
+                    JSON.stringify(editing, null, 2),
+                    "application/json",
+                  )
+                }
+              >
+                Export JSON
+              </button>
+              <button
+                className="btn small"
+                onClick={() => {
+                  setAgents(
+                    agents.map((a) =>
+                      a.id === editing.id ? { ...a, archived: !a.archived } : a,
+                    ),
+                  );
+                  navigate("/agents");
+                }}
+              >
+                {editing.archived ? "Restore" : "Archive"}
+              </button>
+              <button
+                className="btn small"
+                onClick={() => {
+                  if (confirm("Delete this local agent identity?")) {
+                    setAgents(agents.filter((a) => a.id !== editing.id));
+                    workspace.set("rooms", (rs) =>
+                      rs.map((r) => ({
+                        ...r,
+                        agentIds: r.agentIds.filter((id) => id !== editing.id),
+                      })),
+                    );
+                    workspace.set("schedules", (ss) =>
+                      ss.map((s) =>
+                        s.agentId === editing.id
+                          ? { ...s, agentId: undefined, enabled: false }
+                          : s,
+                      ),
+                    );
+                    navigate("/agents");
+                  }
+                }}
+              >
+                Delete
+              </button>
+            </>
+          )}
+          <button className="btn primary" onClick={save}>
+            {editing ? "Save changes" : "Create Agent"}
+          </button>
+        </div>
       </header>
       <div className="agent-editor-body">
         <section className="agent-form">
@@ -253,6 +379,7 @@ export default function Agents({
                   <label className="field">
                     Describe the job
                     <textarea
+                      aria-label="Describe the job"
                       className="textarea"
                       rows={5}
                       value={job}
@@ -327,6 +454,7 @@ export default function Agents({
                   <label className="field">
                     Agent name
                     <input
+                      aria-label="Agent name"
                       className="input"
                       placeholder="e.g. Research Analyst"
                       value={name}
@@ -336,6 +464,7 @@ export default function Agents({
                   <label className="field">
                     Description
                     <input
+                      aria-label="Description"
                       className="input"
                       placeholder="What does this agent do?"
                       value={description}
@@ -345,6 +474,7 @@ export default function Agents({
                   <label className="field">
                     System prompt
                     <textarea
+                      aria-label="System prompt"
                       className="textarea"
                       rows={11}
                       placeholder="Define the agent’s role, instructions, and boundaries…"
@@ -367,7 +497,12 @@ export default function Agents({
             <>
               <label className="field">
                 Model
-                <select className="input" defaultValue="Auto">
+                <select
+                  aria-label="Model"
+                  className="input"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                >
                   <option>Auto</option>
                   <option>GPT-6.1 Sol</option>
                   <option>Claude Opus</option>
@@ -377,7 +512,12 @@ export default function Agents({
               <div className="grid2">
                 <label className="field">
                   Model provider
-                  <select className="input">
+                  <select
+                    aria-label="Model provider"
+                    className="input"
+                    value={provider}
+                    onChange={(e) => setProvider(e.target.value)}
+                  >
                     <option>Any</option>
                     <option>OpenAI</option>
                     <option>Anthropic</option>
@@ -385,7 +525,7 @@ export default function Agents({
                 </label>
                 <label className="field">
                   Quality preference
-                  <select className="input">
+                  <select aria-label="Quality preference" className="input">
                     <option>Balanced</option>
                     <option>Low cost</option>
                     <option>High capability</option>
@@ -394,7 +534,12 @@ export default function Agents({
               </div>
               <label className="field">
                 Reasoning effort
-                <select className="input">
+                <select
+                  aria-label="Reasoning effort"
+                  className="input"
+                  value={reasoning}
+                  onChange={(e) => setReasoning(e.target.value)}
+                >
                   <option>Medium</option>
                   <option>Low</option>
                   <option>High</option>
@@ -458,6 +603,13 @@ export default function Agents({
           )}
           {tab === "Invocations" && (
             <>
+              {editing ? (
+                <Schedules agentId={editing.id} />
+              ) : (
+                <p className="demo-note">
+                  Save the agent identity first to attach local schedules.
+                </p>
+              )}
               <div className="card invocation-row">
                 <Clock size={20} />
                 <div>
@@ -503,6 +655,28 @@ export default function Agents({
           )}
           {tab === "Knowledge" && (
             <>
+              <h3>Assigned skills</h3>
+              <p className="muted">
+                Local skill instructions linked to this identity.
+              </p>
+              {workspace.data.skills
+                .filter((s) => !s.archived)
+                .map((s) => (
+                  <label className="check-row" key={s.id}>
+                    <input
+                      type="checkbox"
+                      checked={skillIds.includes(s.id)}
+                      onChange={(e) =>
+                        setSkillIds(
+                          e.target.checked
+                            ? [...skillIds, s.id]
+                            : skillIds.filter((id) => id !== s.id),
+                        )
+                      }
+                    />
+                    {s.name}
+                  </label>
+                ))}
               <h3>Knowledge profile</h3>
               <p className="muted">
                 Choose the context and resources this agent can draw on.
@@ -518,7 +692,8 @@ export default function Agents({
                     <input
                       type="radio"
                       name="memory-mode"
-                      defaultChecked={i === 0}
+                      checked={memoryMode === n}
+                      onChange={() => setMemoryMode(n)}
                     />
                     <strong>{n}</strong>
                     <p className="muted">
@@ -537,7 +712,13 @@ export default function Agents({
               ].map((n) => (
                 <label className="setting-line" key={n}>
                   {n}
-                  <select className="compact-select">
+                  <select
+                    className="compact-select"
+                    value={learning[n] || "Suggest"}
+                    onChange={(e) =>
+                      setLearning({ ...learning, [n]: e.target.value })
+                    }
+                  >
                     <option>Suggest</option>
                     <option>Disabled</option>
                   </select>
@@ -573,11 +754,18 @@ export default function Agents({
             {description || "Add an identity to get started."}
           </small>
           {[
-            ["Model", "Low cost · Auto"],
-            ["Automations", "0"],
+            ["Model", model],
+            [
+              "Automations",
+              String(
+                workspace.data.schedules.filter(
+                  (s) => s.agentId === editing?.id,
+                ).length,
+              ),
+            ],
             ["Integrations", "0"],
             ["Tools", String(selected.length)],
-            ["Skills", "0"],
+            ["Skills", String(skillIds.length)],
             ["Memory", "0"],
             ["Library", "0"],
           ].map(([n, v]) => (
@@ -647,6 +835,7 @@ export default function Agents({
               <label className="field">
                 Agent JSON file
                 <input
+                  aria-label="Agent JSON file"
                   type="file"
                   accept=".json,application/json"
                   onChange={(e) => {
@@ -696,6 +885,7 @@ export default function Agents({
               <label className="field">
                 Instructions
                 <textarea
+                  aria-label="Instructions"
                   className="textarea"
                   placeholder="What should this automation do?"
                 />

@@ -35,6 +35,8 @@ import type { ResourceProps } from "./types";
 import { IconButton, Modal, Composer } from "./ui";
 import { asset } from "./data";
 import "./resources-ui.css";
+import { useWorkspace } from "./workspace";
+import { uid, now } from "./local-model";
 const skillList = [
   {
     id: "nyt-data-viz",
@@ -118,6 +120,7 @@ const marketAgents = [
   ],
 ];
 export default function ResourcesUI(p: ResourceProps) {
+  const workspace = useWorkspace();
   const {
     path,
     navigate,
@@ -715,44 +718,46 @@ export default function ResourcesUI(p: ResourceProps) {
             </div>,
           )}
           <div className="rp-project-cards">
-            {projects.map((pr) => (
-              <article className="card" key={pr.id}>
-                <a
-                  href={"/projects/" + pr.id}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate("/projects/" + pr.id);
-                  }}
-                >
-                  <h3>
-                    <Folder size={18} />
-                    {pr.name}
-                  </h3>
-                  <p className="muted">{pr.description}</p>
-                  <div className="actions">
-                    <span className="muted">Active today</span>
-                    <span className="badge">
-                      {threads.filter((t) => t.project === pr.id).length}{" "}
-                      threads
-                    </span>
-                    <span className="badge">0 files</span>
-                  </div>
-                </a>
-                <h5 className="muted">RECENT THREADS</h5>
-                {threads
-                  .filter((t) => t.project === pr.id)
-                  .map((t) => (
-                    <button
-                      className="rp-project-thread"
-                      key={t.id}
-                      onClick={() => openThread(t.id)}
-                    >
-                      {t.title}
-                      <small>{t.time}</small>
-                    </button>
-                  ))}
-              </article>
-            ))}
+            {projects
+              .filter((pr) => !!pr.archived === showArchived)
+              .map((pr) => (
+                <article className="card" key={pr.id}>
+                  <a
+                    href={"/projects/" + pr.id}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate("/projects/" + pr.id);
+                    }}
+                  >
+                    <h3>
+                      <Folder size={18} />
+                      {pr.name}
+                    </h3>
+                    <p className="muted">{pr.description}</p>
+                    <div className="actions">
+                      <span className="muted">Active today</span>
+                      <span className="badge">
+                        {threads.filter((t) => t.project === pr.id).length}{" "}
+                        threads
+                      </span>
+                      <span className="badge">0 files</span>
+                    </div>
+                  </a>
+                  <h5 className="muted">RECENT THREADS</h5>
+                  {threads
+                    .filter((t) => t.project === pr.id)
+                    .map((t) => (
+                      <button
+                        className="rp-project-thread"
+                        key={t.id}
+                        onClick={() => openThread(t.id)}
+                      >
+                        {t.title}
+                        <small>{t.time}</small>
+                      </button>
+                    ))}
+                </article>
+              ))}
           </div>
         </>
       );
@@ -798,7 +803,14 @@ export default function ResourcesUI(p: ResourceProps) {
                   ? threads.filter((t) => t.project === id).length
                   : i === 2
                     ? 1
-                    : 0}
+                    : workspace.data.artifacts.filter(
+                        (a) =>
+                          !a.archived &&
+                          (a.projectId === id ||
+                            threads.some(
+                              (t) => t.id === a.threadId && t.project === id,
+                            )),
+                      ).length}
                 )
               </button>
             ))}
@@ -849,11 +861,31 @@ export default function ResourcesUI(p: ResourceProps) {
               <p className="muted">Accumulated research and discoveries.</p>
             </div>
           ) : (
-            empty(
-              "No artifacts yet",
-              "Artifacts from this project’s threads appear here.",
-              <Layers size={28} />,
-            )
+            <div className="grid2 local-summary-cards">
+              {workspace.data.artifacts
+                .filter(
+                  (a) =>
+                    !a.archived &&
+                    (a.projectId === id ||
+                      threads.some(
+                        (t) => t.id === a.threadId && t.project === id,
+                      )),
+                )
+                .map((a) => (
+                  <button
+                    className="card"
+                    key={a.id}
+                    onClick={() => navigate("/library?artifact=" + a.id)}
+                  >
+                    <FileText size={22} />
+                    <h3>{a.title}</h3>
+                    <small>{a.kind}</small>
+                  </button>
+                ))}
+              <button className="card" onClick={() => navigate("/library")}>
+                Open Library to add an artifact →
+              </button>
+            </div>
           )}
         </>
       ) : (
@@ -985,7 +1017,32 @@ export default function ResourcesUI(p: ResourceProps) {
           <p>{a[3]}</p>
           <button
             className="btn primary"
-            onClick={() => navigate("/agents/new")}
+            onClick={() => {
+              const exists = workspace.data.agents.find((x) => x.name === a[1]);
+              if (exists) {
+                navigate("/agents/" + exists.id);
+                return;
+              }
+              const agent = {
+                id: uid("agent"),
+                name: a[1],
+                description: a[3],
+                prompt:
+                  "You are " +
+                  a[1] +
+                  ", a " +
+                  a[2].toLowerCase() +
+                  " assistant. " +
+                  a[3] +
+                  " Ask before consequential actions.",
+                model: "Auto",
+                tools: ["Search", "Documents"],
+                skillIds: [],
+              };
+              workspace.set("agents", (aa) => [...aa, agent]);
+              navigate("/agents/" + agent.id);
+              notify("Agent template added locally.");
+            }}
           >
             Add agent <Plus size={14} />
           </button>
@@ -1030,13 +1087,16 @@ export default function ResourcesUI(p: ResourceProps) {
             <button
               className="btn primary"
               onClick={() => {
-                setInstalled([...new Set([...installed, s.id])]);
-                notify(
-                  "Added to the demo skill list for this session. No remote installation.",
-                );
+                const installedId = workspace.installSkill(s.id);
+                navigate("/skills/" + installedId);
+                notify("Skill installed locally.");
               }}
             >
-              {installed.includes(s.id) ? "Added to demo" : "Add skill"}
+              {workspace.data.skills.some(
+                (x) => x.sourceId === s.id || x.id === s.id,
+              )
+                ? "Open installed skill"
+                : "Add skill"}
               <Plus size={14} />
             </button>
             <span className="badge">{s.tag}</span>
@@ -1152,7 +1212,11 @@ export default function ResourcesUI(p: ResourceProps) {
         {header(
           "Learning",
           undefined,
-          <span className="badge">1 pending</span>,
+          <span className="badge">
+            {workspace.data.reviewedSuggestions.includes("small-biz-update")
+              ? "0 pending"
+              : "1 pending"}
+          </span>,
         )}
         <div className="rp-learning-filters">
           <span>Agent:</span>
@@ -1184,7 +1248,10 @@ export default function ResourcesUI(p: ResourceProps) {
               </small>
             </button>
             <span className="muted">
-              {t.id === "small-business" ? "1 suggestion" : "—"}
+              {t.id === "small-business" &&
+              !workspace.data.reviewedSuggestions.includes("small-biz-update")
+                ? "1 suggestion"
+                : "—"}
             </span>
             <div className="actions">
               <IconButton
@@ -1314,11 +1381,19 @@ export default function ResourcesUI(p: ResourceProps) {
         {header("Command Center")}
         <div className="rp-stat-grid">
           {[
-            ["AGENTS", "0"],
+            [
+              "AGENTS",
+              String(workspace.data.agents.filter((a) => !a.archived).length),
+            ],
             ["ACTIVE", "0"],
             ["TOTAL RUNS", "0"],
             ["AVG SCORE", "--"],
-            ["PENDING", "1"],
+            [
+              "PENDING",
+              workspace.data.reviewedSuggestions.includes("small-biz-update")
+                ? "0"
+                : "1",
+            ],
           ].map(([n, v]) => (
             <div key={n}>
               <small>{n}</small>
@@ -1328,7 +1403,10 @@ export default function ResourcesUI(p: ResourceProps) {
         </div>
         <div className="card rp-roster">
           <h3>
-            Agent Roster <span className="badge">0 agents</span>
+            Agent Roster{" "}
+            <span className="badge">
+              {workspace.data.agents.filter((a) => !a.archived).length} agents
+            </span>
           </h3>
           <table className="table">
             <thead>
@@ -1345,6 +1423,19 @@ export default function ResourcesUI(p: ResourceProps) {
               </tr>
             </thead>
           </table>
+          {workspace.data.agents
+            .filter((a) => !a.archived)
+            .map((a) => (
+              <button
+                className="rp-add-thread-row"
+                key={a.id}
+                onClick={() => navigate("/agents/" + a.id)}
+              >
+                <Bot size={17} />
+                <strong>{a.name}</strong>
+                <span className="badge">Local identity · not executing</span>
+              </button>
+            ))}
           {empty(
             "No agent runs yet",
             "Locally created demo agents do not execute.",
@@ -1514,6 +1605,48 @@ export default function ResourcesUI(p: ResourceProps) {
                 Cancel
               </button>
               <button
+                className="btn"
+                onClick={() => {
+                  setProjects(
+                    projects.map((p) =>
+                      p.id === id ? { ...p, archived: !p.archived } : p,
+                    ),
+                  );
+                  setModal("");
+                  navigate("/projects");
+                }}
+              >
+                {projects.find((p) => p.id === id)?.archived
+                  ? "Restore project"
+                  : "Archive project"}
+              </button>
+              <button
+                className="btn danger-outline"
+                onClick={() => {
+                  if (
+                    confirm(
+                      "Delete this project? Its threads and artifacts will remain in the workspace.",
+                    )
+                  ) {
+                    setProjects(projects.filter((p) => p.id !== id));
+                    p.setThreads(
+                      threads.map((t) =>
+                        t.project === id ? { ...t, project: undefined } : t,
+                      ),
+                    );
+                    workspace.set("artifacts", (aa) =>
+                      aa.map((a) =>
+                        a.projectId === id ? { ...a, projectId: undefined } : a,
+                      ),
+                    );
+                    setModal("");
+                    navigate("/projects");
+                  }
+                }}
+              >
+                Delete project
+              </button>
+              <button
                 className="btn primary"
                 disabled={!title.trim()}
                 onClick={() => {
@@ -1678,7 +1811,10 @@ export default function ResourcesUI(p: ResourceProps) {
             className="btn"
             onClick={() => {
               setModal("");
-              notify("Suggestion reviewed in this local preview.");
+              workspace.set("reviewedSuggestions", (ss) => [
+                ...new Set([...ss, "small-biz-update"]),
+              ]);
+              notify("Suggestion marked reviewed locally.");
             }}
           >
             Mark reviewed locally

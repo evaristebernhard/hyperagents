@@ -182,9 +182,9 @@ test("thread canvas, title menu and panel query", async ({ page }) => {
       exact: true,
     })
     .click();
-  await expect(page.locator(".demo-webpage")).toContainText(
-    "Loved around town.",
-  );
+  await expect(
+    page.frameLocator(".local-web-frame").locator("main"),
+  ).toContainText("Loved around town.");
   await page
     .getByRole("button", { name: "Open thread details", exact: true })
     .click();

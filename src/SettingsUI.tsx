@@ -35,6 +35,8 @@ import {
 import type { SettingsProps } from "./types";
 import { IconButton, Modal } from "./ui";
 import { safeRead } from "./data";
+import { useWorkspace } from "./workspace";
+import { uid, now } from "./local-model";
 import "./settings-ui.css";
 const groups = [
   {
@@ -95,6 +97,10 @@ export default function SettingsUI({
   theme,
   setTheme,
 }: SettingsProps) {
+  const workspace = useWorkspace();
+  const [connectionLabel, setConnectionLabel] = useState(""),
+    [endpoint, setEndpoint] = useState(""),
+    [connectionEnabled, setConnectionEnabled] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
   const [profile, setProfile] = useState(() =>
     safeRead("profile", { name: "Demo User", company: "" }),
@@ -116,6 +122,127 @@ export default function SettingsUI({
     [frequency, setFrequency] = useState("Monthly"),
     [push, setPush] = useState(() => safeRead("push-notifications", true));
   const fileInput = useRef<HTMLInputElement>(null);
+  const existingConnection = dialog.startsWith("manage:")
+    ? workspace.data.connections.find((c) => c.id === dialog.slice(7))
+    : workspace.data.connections.find((c) => c.provider === dialog.slice(8));
+  const connectionProvider =
+    existingConnection?.provider ||
+    (dialog === "custom"
+      ? "Custom MCP"
+      : dialog.startsWith("connect:")
+        ? dialog.slice(8)
+        : "");
+  useEffect(() => {
+    if (
+      dialog === "custom" ||
+      dialog.startsWith("connect:") ||
+      dialog.startsWith("manage:")
+    ) {
+      setConnectionLabel(existingConnection?.label || connectionProvider);
+      setEndpoint(existingConnection?.endpoint || "");
+      setConnectionEnabled(existingConnection?.enabled ?? true);
+    }
+  }, [dialog]);
+  const connectionForm = (
+    <>
+      <p className="demo-note">
+        External authentication is not connected. Save labels and endpoints
+        only; do not enter API keys, passwords, or tokens.
+      </p>
+      <label className="field">
+        Connection label
+        <input
+          aria-label="Connection label"
+          className="input"
+          value={connectionLabel}
+          onChange={(e) => setConnectionLabel(e.target.value)}
+        />
+      </label>
+      <label className="field">
+        Endpoint (optional)
+        <input
+          aria-label="Endpoint (optional)"
+          className="input"
+          type="url"
+          value={endpoint}
+          onChange={(e) => setEndpoint(e.target.value)}
+          placeholder="https://example.com/mcp"
+        />
+      </label>
+      <label className="check-row">
+        <input
+          type="checkbox"
+          checked={connectionEnabled}
+          onChange={(e) => setConnectionEnabled(e.target.checked)}
+        />
+        Enable local UI binding
+      </label>
+      <div className="actions">
+        <button
+          className="btn primary"
+          disabled={!connectionLabel.trim()}
+          onClick={() => {
+            if (endpoint) {
+              try {
+                const u = new URL(endpoint);
+                if (
+                  u.protocol !== "https:" ||
+                  u.username ||
+                  u.password ||
+                  u.search ||
+                  u.hash
+                )
+                  throw Error();
+              } catch {
+                notify(
+                  "Use an HTTPS endpoint without credentials or query parameters.",
+                );
+                return;
+              }
+            }
+            const value = {
+              id: existingConnection?.id || uid("connection"),
+              provider: connectionProvider,
+              label: connectionLabel.trim(),
+              endpoint,
+              enabled: connectionEnabled,
+              createdAt: existingConnection?.createdAt || now(),
+            };
+            workspace.set("connections", (cs) =>
+              existingConnection
+                ? cs.map((c) => (c.id === existingConnection.id ? value : c))
+                : [...cs, value],
+            );
+            setDialog("");
+            notify(
+              "Connection metadata saved locally. No authentication or network connection was made.",
+            );
+          }}
+        >
+          Save configuration
+        </button>
+        {existingConnection && (
+          <button
+            className="btn danger-outline"
+            onClick={() => {
+              if (
+                confirm(
+                  "Remove this local configuration? This does not revoke any real service access.",
+                )
+              ) {
+                workspace.set("connections", (cs) =>
+                  cs.filter((c) => c.id !== existingConnection.id),
+                );
+                setDialog("");
+              }
+            }}
+          >
+            Remove configuration
+          </button>
+        )}
+      </div>
+    </>
+  );
   const heading =
     (groups
       .flatMap((g) => g.items)
@@ -517,27 +644,55 @@ export default function SettingsUI({
           .
         </p>
         <h4>
-          Connected <span className="badge">Demo</span>
+          Local configurations{" "}
+          <span className="badge">{workspace.data.connections.length}</span>
         </h4>
-        {!search && (
-          <div className="sx-integration-grid">
-            <div className="sx-integration-card">
-              <div className="sx-integration-heading">
-                <span className="sx-service-logo">◉</span>
-                <strong>GitHub</strong>
-                <span className="sx-service-type">MCP</span>
+        <div className="sx-integration-grid">
+          {workspace.data.connections
+            .filter((c) =>
+              (c.provider + " " + c.label)
+                .toLowerCase()
+                .includes(search.toLowerCase()),
+            )
+            .map((c) => (
+              <div className="sx-integration-card" key={c.id}>
+                <div className="sx-integration-heading">
+                  <strong>{c.label}</strong>
+                  <span className="sx-service-type">LOCAL</span>
+                </div>
+                <small>
+                  {c.provider} · {c.enabled ? "Enabled UI binding" : "Disabled"}{" "}
+                  · Not authenticated
+                </small>
+                <button
+                  className="btn small"
+                  onClick={() => setDialog("manage:" + c.id)}
+                >
+                  Manage configuration
+                </button>
               </div>
-              <small>Code repositories, issues, PRs</small>
-              <small>Example connection — not authenticated</small>
-              <button
-                className="btn small"
-                onClick={() => setDialog("connect:GitHub")}
-              >
-                Manage preview
-              </button>
+            ))}
+        </div>
+        {!search &&
+          !workspace.data.connections.some((c) => c.provider === "GitHub") && (
+            <div className="sx-integration-grid">
+              <div className="sx-integration-card">
+                <div className="sx-integration-heading">
+                  <span className="sx-service-logo">◉</span>
+                  <strong>GitHub</strong>
+                  <span className="sx-service-type">MCP</span>
+                </div>
+                <small>Code repositories, issues, PRs</small>
+                <small>Example connection — not authenticated</small>
+                <button
+                  className="btn small"
+                  onClick={() => setDialog("connect:GitHub")}
+                >
+                  Manage preview
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
         <h4>Featured</h4>
         <div className="sx-integration-grid">
           {catalog
@@ -882,17 +1037,19 @@ export default function SettingsUI({
       {dialog && (
         <Modal
           title={
-            dialog === "plans"
-              ? "Choose a plan"
-              : dialog.startsWith("connect:")
-                ? "Connect " + dialog.slice(8)
-                : dialog === "custom"
-                  ? "Add custom MCP server"
-                  : dialog === "delete"
-                    ? "Delete account"
-                    : dialog === "tools"
-                      ? "Default tools"
-                      : "Security preview"
+            dialog.startsWith("manage:")
+              ? "Connection settings"
+              : dialog === "plans"
+                ? "Choose a plan"
+                : dialog.startsWith("connect:")
+                  ? "Connect " + dialog.slice(8)
+                  : dialog === "custom"
+                    ? "Add custom MCP server"
+                    : dialog === "delete"
+                      ? "Delete account"
+                      : dialog === "tools"
+                        ? "Default tools"
+                        : "Security preview"
           }
           onClose={() => setDialog("")}
         >
@@ -938,33 +1095,10 @@ export default function SettingsUI({
                 purchase offer is made.
               </p>
             </>
-          ) : dialog === "custom" ? (
-            <>
-              <label className="field">
-                Server name
-                <input className="input" placeholder="My integration" />
-              </label>
-              <label className="field">
-                MCP server URL
-                <input
-                  className="input"
-                  type="url"
-                  placeholder="https://example.com/mcp"
-                />
-              </label>
-              <p className="demo-note">
-                No connection, token, or credential will be created.
-              </p>
-              <button
-                className="btn"
-                onClick={() => {
-                  setDialog("");
-                  notify("MCP setup preview closed. No server was connected.");
-                }}
-              >
-                Close preview
-              </button>
-            </>
+          ) : dialog === "custom" ||
+            dialog.startsWith("connect:") ||
+            dialog.startsWith("manage:") ? (
+            <>{connectionForm}</>
           ) : dialog === "tools" ? (
             <>
               <p className="muted">

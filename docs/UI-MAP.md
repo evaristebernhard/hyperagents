@@ -46,4 +46,8 @@ Public showcase image crops are local SVG wrappers with embedded JPEGs, so the U
 
 The default base path is `/`. `history.pushState`, popstate handling and server-side fallback enable ordinary path-based navigation. Nginx `try_files` is included. GitHub Pages automatic deployment was removed per the user's direction.
 
-There are 41 Playwright tests. Visual captures help inspect layout, but no pixel-perfect golden comparison is claimed. The current mobile behavior is an adaptation; the original reference set was desktop-only.
+There are 56 Playwright tests. Visual captures help inspect layout, but no pixel-perfect golden comparison is claimed. The current mobile behavior is an adaptation; the original reference set was desktop-only.
+
+## Local-first follow-up
+
+The 0.3 implementation adds a shared WorkspaceProvider, ContentHub, Rooms, Schedules, LibraryManager and LocalWorkspace. Skills, memories, manual rubrics, Agent configuration and room/plan content are persistent local records rather than transient toast actions. Library documents and thread canvases now share artifact data and version history. See LOCAL-FIRST.md for scope, limits, migration and backup behavior. The original UI observations remain references, not a claim that local extensions reproduce uncaptured server features.
