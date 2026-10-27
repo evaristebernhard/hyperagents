@@ -108,6 +108,15 @@ export default function App() {
     [recentExpanded, setRecentExpanded] = useState(true),
     [roomsExpanded, setRoomsExpanded] = useState(true),
     [dialog, setDialog] = useState("");
+  const [menuPosition, setMenuPosition] = useState<{ left: number; top?: number; bottom?: number }>({ left: 8 });
+  const shellMenuRef = useRef<HTMLDivElement>(null);
+  const menuTriggerRef = useRef<HTMLElement | null>(null);
+  const profile = safeRead("profile", { name: "Demo User", company: "" });
+  const profileName = profile.name || "Demo User";
+  const profileInitials = profileName.split(/\s+/).slice(0, 2).map(n => n[0]).join("").toUpperCase();
+  useEffect(() => {
+    if (menu) shellMenuRef.current?.querySelector<HTMLElement>("button")?.focus();
+  }, [menu]);
   const mainRef = useRef<HTMLElement>(null);
   const query = new URLSearchParams(url.split("?")[1] || "");
   const path = url.split("?")[0];
@@ -174,7 +183,17 @@ export default function App() {
     document.title = title + " · Hyperagents UI Demo";
   }, [path, threads]);
   const notify = (t: string) => setToast(t);
-  const toggle = (m: string) => setMenu(menu === m ? "" : m);
+  const toggle = (m: string, trigger?: HTMLElement) => {
+    if (trigger) {
+      menuTriggerRef.current = trigger;
+      const rect = trigger.getBoundingClientRect();
+      const left = Math.max(8, Math.min(m === "learning" ? rect.right + 4 : rect.left, innerWidth - 248));
+      setMenuPosition(m === "account"
+        ? { left, bottom: Math.max(8, innerHeight - rect.top + 4) }
+        : { left, top: Math.max(8, Math.min(m === "learning" ? rect.top : rect.bottom + 4, innerHeight - 170)) });
+    }
+    setMenu(menu === m ? "" : m);
+  };
   const createThread = (text: string, project?: string) => {
     const id = "local-" + Date.now();
     const t: DemoThread = {
@@ -507,7 +526,8 @@ export default function App() {
         </div>
         <button
           className="workspace-switch"
-          onClick={() => toggle("workspace")}
+          onClick={(e) => toggle("workspace", e.currentTarget)}
+          aria-haspopup="menu"
           aria-expanded={menu === "workspace"}
         >
           <span className="avatar tiny">P</span>
@@ -541,6 +561,8 @@ export default function App() {
             <button
               className="group-title"
               onClick={() => setAgentsExpanded(!agentsExpanded)}
+              aria-expanded={agentsExpanded}
+              aria-controls="sidebar-agent-list"
               title="Agents"
             >
               {collapsed ? (
@@ -557,17 +579,19 @@ export default function App() {
               )}
             </button>
             {agentsExpanded && !collapsed && (
-              <>
+              <div id="sidebar-agent-list">
                 {agents.map((a) => link("/agents/" + a.id, a.name, Users))}
                 {link("/agents/new", "New agent", Plus)}
                 {link("/agents", "View roster", ArrowUpRight)}
-              </>
+              </div>
             )}
           </div>
           <div className="nav-group">
             <button
               className="group-title"
               onClick={() => setRecentExpanded(!recentExpanded)}
+              aria-expanded={recentExpanded}
+              aria-controls="sidebar-recent-list"
               title="Recent threads"
             >
               {collapsed ? (
@@ -575,12 +599,12 @@ export default function App() {
               ) : (
                 <>
                   Recent threads
-                  <ChevronDown size={12} />
+                  {recentExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 </>
               )}
             </button>
             {recentExpanded && !collapsed && (
-              <>
+              <div id="sidebar-recent-list">
                 {recent.map((t) => (
                   <a
                     href={"/thread/" + t.id}
@@ -602,13 +626,15 @@ export default function App() {
                   </a>
                 ))}
                 {link("/threads", "View all", ArrowUpRight)}
-              </>
+              </div>
             )}
           </div>
           <div className="nav-group">
             <button
               className="group-title"
               onClick={() => setRoomsExpanded(!roomsExpanded)}
+              aria-expanded={roomsExpanded}
+              aria-controls="sidebar-room-list"
               title="Rooms"
             >
               {collapsed ? (
@@ -616,18 +642,18 @@ export default function App() {
               ) : (
                 <>
                   Recent rooms
-                  <ChevronDown size={12} />
+                  {roomsExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 </>
               )}
             </button>
             {roomsExpanded && !collapsed && (
-              <>
+              <div id="sidebar-room-list">
                 {workspace.data.rooms
                   .filter((r) => !r.archived)
                   .slice(0, 4)
                   .map((r) => link("/rooms/" + r.id, r.name, Users))}
                 {link("/rooms/new", "New room", Plus)}
-              </>
+              </div>
             )}
           </div>
           {!collapsed && (
@@ -643,7 +669,9 @@ export default function App() {
                 : "")
             }
             title="Learning"
-            onClick={() => toggle("learning")}
+            onClick={(e) => toggle("learning", e.currentTarget)}
+            aria-haspopup="menu"
+            aria-expanded={menu === "learning"}
           >
             <GraduationCap size={17} />
             {!collapsed && (
@@ -653,20 +681,21 @@ export default function App() {
               </>
             )}
           </button>
-          {link("/projects", "Projects", Folder)}
+          {projects.length ? link("/projects", "Projects", Folder) : link("/projects/new", "New project", Plus)}
           {link("/library", "Library", BookOpen)}
           {link("/marketplace", "Marketplace", Store)}
         </nav>
         <button
           className="account-button"
-          onClick={() => toggle("account")}
+          onClick={(e) => toggle("account", e.currentTarget)}
+          aria-haspopup="menu"
           aria-expanded={menu === "account"}
         >
-          <span className="avatar">D</span>
+          <span className="avatar">{profileInitials}</span>
           {!collapsed && (
             <>
               <span>
-                <strong>Demo User</strong>
+                <strong>{profileName}</strong>
                 <small>demo@example.com</small>
               </span>
               <ChevronRight size={14} />
@@ -687,6 +716,21 @@ export default function App() {
         <>
           <div className="menu-dismiss" onClick={() => setMenu("")} />
           <div
+            ref={shellMenuRef}
+            role="menu"
+            aria-label={menu === "workspace" ? "Workspaces" : menu === "learning" ? "Learning" : "Account"}
+            style={menuPosition}
+            onKeyDown={(e) => {
+              if (["Escape", "ArrowLeft"].includes(e.key)) {
+                e.preventDefault(); e.stopPropagation(); setMenu(""); menuTriggerRef.current?.focus(); return;
+              }
+              if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+              e.preventDefault();
+              const buttons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button")];
+              const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+              const next = e.key === "Home" ? 0 : e.key === "End" ? buttons.length - 1 : (index + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+              buttons[next]?.focus();
+            }}
             className={
               "popover shell-menu " +
               menu +
@@ -696,12 +740,12 @@ export default function App() {
             {menu === "workspace" ? (
               <>
                 <small>Workspaces</small>
-                <button onClick={() => setMenu("")}>
-                  <span className="avatar tiny">D</span>
+                <button role="menuitem" onClick={() => setMenu("")}>
+                  <span className="avatar tiny">{profileInitials}</span>
                   {workspace.activeName}
                   <Check size={14} />
                 </button>
-                <button
+                <button role="menuitem"
                   onClick={() => {
                     setMenu("");
                     navigate("/workspaces");
@@ -710,14 +754,10 @@ export default function App() {
                   <Plus size={15} />
                   Create workspace
                 </button>
-                <button onClick={() => navigate("/workspaces")}>
-                  <Folder size={15} />
-                  Manage workspaces & backups
-                </button>
                 {workspace.state.workspaces
                   .filter((w) => w.id !== workspace.state.active)
                   .map((w) => (
-                    <button
+                    <button role="menuitem"
                       key={w.id}
                       onClick={() => {
                         workspace.switchWorkspace(w.id);
@@ -737,7 +777,7 @@ export default function App() {
                   ["Rubrics", "/rubrics"],
                   ["Autowiki", "/wiki"],
                 ].map(([n, p]) => (
-                  <button key={p} onClick={() => navigate(p)}>
+                  <button role="menuitem" key={p} onClick={() => navigate(p)}>
                     {n}
                     <ChevronRight size={13} />
                   </button>
@@ -746,20 +786,20 @@ export default function App() {
             ) : (
               <>
                 <div className="account-menu-heading">
-                  <strong>Demo User</strong>
+                  <strong>{profileName}</strong>
                   <small>demo@example.com</small>
                 </div>
-                <button
+                <button role="menuitem"
                   onClick={() => navigate(path + "?settings=personalization")}
                 >
                   <Settings2 size={15} />
                   Account settings
                 </button>
-                <button onClick={() => navigate(path + "?settings=billing")}>
+                <button role="menuitem" onClick={() => navigate(path + "?settings=billing")}>
                   <Star size={15} />
                   Plan & billing<span className="badge">Free</span>
                 </button>
-                <button
+                <button role="menuitem"
                   onClick={() => {
                     setMenu("");
                     setDialog("help");
@@ -768,7 +808,7 @@ export default function App() {
                   <HelpCircle size={15} />
                   Help & support
                 </button>
-                <button
+                <button role="menuitem"
                   onClick={() => {
                     setMenu("");
                     setDialog("account");
@@ -777,9 +817,9 @@ export default function App() {
                   <Plus size={15} />
                   Add account
                 </button>
-                <button onClick={() => navigate("/login")}>
+                <button role="menuitem" title="Return to the local demo login; no real account session is managed." onClick={() => navigate("/login")}>
                   <LogOut size={15} />
-                  Sign out of demo
+                  Sign out
                 </button>
               </>
             )}
@@ -1081,11 +1121,7 @@ function ThreadList({
   );
 }
 function SearchDialog({
-  threads,
-  projects,
-  agents,
-  onClose,
-  navigate,
+  threads, projects, agents, onClose, navigate,
 }: {
   threads: DemoThread[];
   projects: DemoProject[];
@@ -1094,101 +1130,94 @@ function SearchDialog({
   navigate: (p: string) => void;
 }) {
   const workspace = useWorkspace();
-  const [q, setQ] = useState(""),
-    [index, setIndex] = useState(0);
-  const results = [
-    ...threads.map((t) => ({
-      title: t.title,
-      path: "/thread/" + t.id,
-      type: "Thread",
-    })),
-    ...agents.map((a) => ({
-      title: a.name,
-      path: "/agents/" + a.id,
-      type: "Agent",
-    })),
-    ...projects.map((p) => ({
-      title: p.name,
-      path: "/projects/" + p.id,
-      type: "Project",
-    })),
-    ...workspace.data.skills
-      .filter((s) => !s.archived)
-      .map((s) => ({ title: s.name, path: "/skills/" + s.id, type: "Skill" })),
-    ...workspace.data.rooms
-      .filter((r) => !r.archived)
-      .map((r) => ({ title: r.name, path: "/rooms/" + r.id, type: "Room" })),
-    ...workspace.data.artifacts
-      .filter((a) => !a.archived)
-      .map((a) => ({
-        title: a.title,
-        path: "/library?artifact=" + a.id,
-        type: a.kind,
-      })),
-    ...gotoItems.map(([title, path]) => ({ title, path, type: "Go to" })),
-  ].filter((x) => !q || x.title.toLowerCase().includes(q.toLowerCase()));
-  useEffect(() => setIndex(0), [q]);
+  const [q, setQ] = useState("");
+  const [index, setIndex] = useState(0);
+  const [status, setStatus] = useState("");
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const query = q.trim().toLowerCase();
+  const threadResults = threads.filter(t => !t.archived).map(t => ({
+    title: t.title, path: "/thread/" + t.id, type: "Thread",
+    group: /yesterday|h ago|days? ago/.test(t.time) ? "Past week" : "Today",
+  }));
+  const allResults = [
+    ...threadResults,
+    ...agents.filter(a => !a.archived).map(a => ({ title: a.name, path: "/agents/" + a.id, type: "Agent", group: "Agents" })),
+    ...projects.filter(p => !p.archived).map(p => ({ title: p.name, path: "/projects/" + p.id, type: "Project", group: "Projects" })),
+    ...workspace.data.skills.filter(s => !s.archived).map(s => ({ title: s.name, path: "/skills/" + s.id, type: "Skill", group: "Skills" })),
+    ...workspace.data.rooms.filter(r => !r.archived).map(r => ({ title: r.name, path: "/rooms/" + r.id, type: "Room", group: "Rooms" })),
+    ...workspace.data.artifacts.filter(a => !a.archived).map(a => ({ title: a.title, path: "/library?artifact=" + a.id, type: a.kind, group: "Library" })),
+    ...gotoItems.map(([title, path]) => ({ title, path, type: "Go to", group: "Go to" })),
+  ];
+  const results = query
+    ? allResults.filter(r => r.title.toLowerCase().includes(query))
+    : allResults.filter(r => r.type === "Thread" || r.type === "Go to");
+  useEffect(() => { setIndex(0); setStatus(""); }, [q]);
+  useEffect(() => {
+    resultsRef.current?.querySelector(`#search-result-${index}`)?.scrollIntoView({ block: "nearest" });
+  }, [index]);
+  const selected = results[Math.min(index, results.length - 1)];
+  const open = (result: (typeof results)[number], newTab = false) => {
+    if (newTab) window.open(result.path, "_blank", "noopener,noreferrer");
+    else navigate(result.path);
+    onClose();
+  };
+  const copy = async () => {
+    if (!selected) return;
+    try {
+      await navigator.clipboard.writeText(new URL(selected.path, location.origin).href);
+      setStatus("Link copied");
+    } catch { setStatus("Clipboard unavailable in this browser"); }
+  };
+  const icon = (type: string, title: string) => {
+    if (type === "Thread") return MessageSquare;
+    if (type === "Agent" || title === "Agents") return Users;
+    if (type === "Project" || title === "Projects") return Folder;
+    if (type === "Skill" || title === "Skills") return Puzzle;
+    if (title === "Inbox") return Inbox;
+    if (type === "Room" || title === "Rooms") return MessageSquare;
+    if (title === "Memories") return Brain;
+    if (title === "Library") return BookOpen;
+    if (title === "Marketplace") return Store;
+    return Layers;
+  };
   return (
-    <Modal title="Search" onClose={onClose}>
-      <div
-        className="search-dialog-content"
-        onKeyDown={(e) => {
-          if (e.key === "ArrowDown") {
-            e.preventDefault();
-            setIndex((index + 1) % Math.max(results.length, 1));
-          }
-          if (e.key === "ArrowUp") {
-            e.preventDefault();
-            setIndex(
-              (index - 1 + results.length) % Math.max(results.length, 1),
-            );
-          }
-          if (e.key === "Enter" && results[index]) {
-            navigate(results[index].path);
-            onClose();
-          }
-        }}
-      >
-        <p className="muted">
-          Search for a thread, agent, project, or page by name
-        </p>
+    <Modal title="Search" onClose={onClose} headerless>
+      <div className="search-dialog-content" onKeyDown={e => {
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          setIndex(i => (i + (e.key === "ArrowDown" ? 1 : -1) + Math.max(results.length, 1)) % Math.max(results.length, 1));
+        }
+        if (e.key === "Enter" && selected) {
+          e.preventDefault(); open(selected, e.ctrlKey || e.metaKey);
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
+          const input = e.target as HTMLInputElement;
+          if (input.tagName === "INPUT" && input.selectionStart !== input.selectionEnd) return;
+          e.preventDefault(); void copy();
+        }
+      }}>
         <div className="search-dialog-input">
           <Search size={18} />
-          <input
-            autoFocus
-            aria-label="Search workspace"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search threads, agents, projects…"
-          />
-          <span className="badge">Personal</span>
+          <span className="search-scope"><Users size={14} />{workspace.activeName}</span>
+          <input autoFocus aria-label="Search workspace" aria-controls="workspace-search-results"
+            aria-activedescendant={selected ? `search-result-${Math.min(index, results.length - 1)}` : undefined}
+            autoComplete="off" value={q} onChange={e => setQ(e.target.value)} placeholder={"Search in " + workspace.activeName + "..."} />
         </div>
-        <div className="search-results" role="listbox">
-          {results.map((r, i) => (
-            <button
-              role="option"
-              aria-selected={index === i}
-              className={index === i ? "selected" : ""}
-              key={r.path}
-              onMouseEnter={() => setIndex(i)}
-              onClick={() => {
-                navigate(r.path);
-                onClose();
-              }}
-            >
-              <span>{r.title}</span>
-              <small>{r.type}</small>
-              {i === index && <span>↵</span>}
-            </button>
-          ))}
-          {!results.length && (
-            <div className="empty-state">No matches found.</div>
-          )}
+        <div className="search-results" id="workspace-search-results" role="listbox" aria-label="Search results" ref={resultsRef}>
+          {results.map((result, i) => {
+            const Icon = icon(result.type, result.title);
+            return <div key={result.path} role="presentation">
+              {(i === 0 || result.group !== results[i - 1].group) && <div className="search-group-label" role="presentation">{result.group}</div>}
+              <button type="button" role="option" id={`search-result-${i}`} data-kind={result.type} aria-selected={index === i} className={index === i ? "selected" : ""}
+                onMouseEnter={() => setIndex(i)} onClick={e => open(result, e.ctrlKey || e.metaKey)}>
+                <Icon size={19} /><span className="search-result-title">{result.title}</span>
+                {i === index && <span className="search-result-shortcuts" aria-hidden="true"><span><kbd>Ctrl</kbd><kbd>↵</kbd> open in new tab</span><span><kbd>Ctrl</kbd><kbd>C</kbd> copy</span></span>}
+              </button>
+            </div>;
+          })}
+          {!results.length && <div className="empty-state">No matches found.</div>}
         </div>
-        <div className="search-keyboard">
-          ↑ ↓ navigate <span>↵ open</span>
-          <span>esc close</span>
-        </div>
+        <div className="search-keyboard"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span><span role="status">{status}</span></div>
       </div>
     </Modal>
   );
@@ -1282,7 +1311,7 @@ function RoomPage({
           </button>
         </div>
         <div className="card room-member">
-          <span className="avatar">D</span>
+          <span className="avatar">{profileInitials}</span>
           <div>
             <strong>You</strong>
             <p className="muted">Room manager</p>

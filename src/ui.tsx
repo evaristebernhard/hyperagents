@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import type { Navigate } from "./types";
+import ComposerMenus from "./ComposerMenus";
 export function Mark() {
   return (
     <span className="brand-mark" aria-hidden="true">
@@ -64,12 +65,14 @@ export function Modal({
   onClose,
   footer,
   wide = false,
+  headerless = false,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   footer?: ReactNode;
   wide?: boolean;
+  headerless?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -122,12 +125,14 @@ export function Modal({
         aria-label={title}
         tabIndex={-1}
       >
-        <div className="modal-header">
-          <h2>{title}</h2>
-          <IconButton label="Close dialog" onClick={onClose}>
-            <X size={18} />
-          </IconButton>
-        </div>
+        {!headerless && (
+          <div className="modal-header">
+            <h2>{title}</h2>
+            <IconButton label="Close dialog" onClick={onClose}>
+              <X size={18} />
+            </IconButton>
+          </div>
+        )}
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}
       </div>
@@ -160,7 +165,7 @@ export function Composer({
   const [text, setText] = useState(""),
     [menu, setMenu] = useState(""),
     [mode, setMode] = useState("Execute"),
-    [model, setModel] = useState("Choose your model"),
+    [model] = useState("Choose your model"),
     [output, setOutput] = useState(""),
     [files, setFiles] = useState<string[]>([]),
     [agent, setAgent] = useState("Agent");
@@ -235,6 +240,8 @@ export function Composer({
           <button
             className={"pill " + (compact ? "compact-model" : "")}
             aria-label="Model settings"
+            aria-haspopup="menu"
+            aria-expanded={menu === "model"}
             onClick={() => toggle("model")}
           >
             <SlidersHorizontal size={14} />
@@ -242,7 +249,7 @@ export function Composer({
             {!compact && <ChevronDown size={12} />}
           </button>
           {!compact && (
-            <button className="pill" onClick={() => toggle("agents")}>
+            <button className="pill" aria-label="Use an agent" aria-haspopup="menu" aria-expanded={menu === "agents"} onClick={() => toggle("agents")}>
               <Bot size={14} />
               {agent}
               <ChevronDown size={12} />
@@ -253,6 +260,8 @@ export function Composer({
           <button
             className="plain execution"
             aria-label="Execution mode"
+            aria-haspopup="menu"
+            aria-expanded={menu === "mode"}
             onClick={() => toggle("mode")}
           >
             <Zap size={15} />
@@ -379,121 +388,17 @@ export function Composer({
           ))}
         </div>
       )}
-      {menu === "mode" && (
-        <div className="popover mode-popover">
-          {[
-            [
-              "Plan first",
-              "Think through an approach and get user clarification before taking action",
-            ],
-            ["Execute", "Act immediately without a plan"],
-            ["Auto", "Choose the appropriate execution mode"],
-          ].map(([n, t]) => (
-            <button
-              key={n}
-              onClick={() => {
-                setMode(n);
-                setMenu("");
-              }}
-            >
-              <span>
-                <strong>{n}</strong>
-                <small>{t}</small>
-              </span>
-              {mode === n && "✓"}
-            </button>
-          ))}
-        </div>
-      )}
-      {menu === "model" && (
-        <div className="popover model-popover">
-          <label>
-            Model
-            <select
-              aria-label="Choose model"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-            >
-              {[
-                "Choose your model",
-                "Auto",
-                "GPT-6.1 Sol",
-                "Claude Opus",
-                "Gemini Pro",
-              ].map((n) => (
-                <option key={n}>{n}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Reasoning effort
-            <select aria-label="Reasoning effort" defaultValue="Medium">
-              <option>Low</option>
-              <option>Medium</option>
-              <option>High</option>
-            </select>
-          </label>
-          <label>
-            Provider
-            <select aria-label="Provider">
-              <option>Any</option>
-              <option>OpenAI</option>
-              <option>Anthropic</option>
-              <option>Google</option>
-            </select>
-          </label>
-          <button
-            onClick={() => {
-              navigate(
-                location.pathname +
-                  "?" +
-                  (location.pathname.startsWith("/thread/")
-                    ? "panel=settings"
-                    : "settings=thread-defaults"),
-              );
-              setMenu("");
-            }}
-          >
-            <SlidersHorizontal size={14} />
-            Open full settings
-          </button>
-          <small className="demo-note">Model selections are UI-only.</small>
-        </div>
-      )}
-      {menu === "agents" && (
-        <div className="popover composer-popover">
-          <button
-            onClick={() => {
-              setAgent("Agent");
-              setMenu("");
-            }}
-          >
-            <Bot size={15} />
-            General assistant
-          </button>
-          {agents.map((a) => (
-            <button
-              key={a}
-              onClick={() => {
-                setAgent(a);
-                setMenu("");
-              }}
-            >
-              <Bot size={15} />
-              {a}
-            </button>
-          ))}
-          <button
-            onClick={() => {
-              navigate("/agents/new");
-              setMenu("");
-            }}
-          >
-            <Plus size={15} />
-            New agent
-          </button>
-        </div>
-      )}
+      <ComposerMenus
+        menu={menu}
+        close={() => setMenu("")}
+        navigate={navigate}
+        mode={mode}
+        setMode={setMode}
+        model={model}
+        agent={agent}
+        setAgent={setAgent}
+        agents={agents}
+      />
     </div>
   );
 }
