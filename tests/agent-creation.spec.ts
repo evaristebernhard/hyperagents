@@ -99,3 +99,81 @@ test("prompt HTML from a persisted draft is sanitized before preview", async ({ 
   await expect(page.locator(".agent-prompt-preview img,.agent-prompt-preview script")).toHaveCount(0);
   expect(await page.evaluate(() => (window as any).promptXss)).toBeUndefined();
 });
+
+test("multiline typed and pasted prompts keep line boundaries across repeated apply", async ({ page }) => {
+  await page.goto("/agents/new?creation=manual");
+  const readPrompt = () => page.evaluate(() => JSON.parse(localStorage.getItem("hyperagents-demo:agent-creation:personal") || "{}").prompt);
+  await page.getByRole("button", { name: "Edit system prompt", exact: true }).click();
+  let dialog = page.getByRole("dialog", { name: "System prompt", exact: true });
+  let editor = dialog.getByRole("textbox", { name: "System prompt", exact: true });
+  await editor.pressSequentially("one");
+  await editor.press("Enter");
+  await editor.pressSequentially("two");
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect.poll(readPrompt).toBe("one\ntwo");
+  await page.getByRole("button", { name: "Edit system prompt", exact: true }).click();
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect.poll(readPrompt).toBe("one\ntwo");
+  await page.getByRole("button", { name: "Edit system prompt", exact: true }).click();
+  await editor.fill("");
+  await editor.evaluate(node => {
+    (node as HTMLElement).focus();
+    const data = new DataTransfer();
+    data.setData("text/html", "alpha<div>beta</div>");
+    node.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: data }));
+  });
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect.poll(readPrompt).toBe("alpha\nbeta");
+  await page.getByRole("button", { name: "Edit system prompt", exact: true }).click();
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect.poll(readPrompt).toBe("alpha\nbeta");
+});
+
+test("existing legacy Skills learning preference stays disabled when editing and saving", async ({ page }) => {
+  await page.goto("/agents");
+  await expect(page.getByRole("heading", { name: "Agents", exact: true })).toBeVisible();
+  await page.evaluate(() => {
+    const key = "hyperagents-demo:workspace-v1";
+    const snapshot = JSON.parse(localStorage.getItem(key)!);
+    const workspace = snapshot.workspaces.find((w: any) => w.id === snapshot.active);
+    workspace.data.agents.push({ id: "legacy-learning", name: "Existing legacy agent", description: "", prompt: "Verify evidence", memoryMode: "Custom memory", learning: { Skills: "Disabled" } });
+    localStorage.setItem(key, JSON.stringify(snapshot));
+  });
+  await page.goto("/agents/legacy-learning");
+  const nav = page.getByRole("navigation", { name: "Agent configuration" });
+  await nav.getByRole("button", { name: "Knowledge", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Skill suggestions", exact: true })).toHaveValue("Disabled");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await page.goto("/agents/legacy-learning");
+  await nav.getByRole("button", { name: "Knowledge", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Skill suggestions", exact: true })).toHaveValue("Disabled");
+});
+
+test("cleared casting posting does not fall back to the original job after navigation", async ({ page }) => {
+  await page.addInitScript(() => {
+    const key = "hyperagents-demo:agent-creation:personal";
+    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ job: "An original posting" }));
+  });
+  await page.goto("/agents/new/cast");
+  await expect(page.getByRole("textbox", { name: "What should this agent do?", exact: true })).toHaveValue("An original posting");
+  await page.getByRole("textbox", { name: "What should this agent do?", exact: true }).fill("");
+  await page.goto("/agents");
+  await page.goto("/agents/new/cast");
+  await expect(page.getByRole("textbox", { name: "What should this agent do?", exact: true })).toHaveValue("");
+  await expect(page.getByRole("button", { name: "Cast", exact: true })).toBeDisabled();
+});
+
+test("redraft confirmation contains reverse-tab focus and returns to the trigger", async ({ page }) => {
+  await page.goto("/agents/new?creation=manual");
+  const trigger = page.getByRole("button", { name: "Re-draft from a posting", exact: true });
+  await trigger.click();
+  const dialog = page.getByRole("alertdialog", { name: "Re-draft from a posting?", exact: true });
+  await expect(dialog).toBeVisible();
+  for (let i = 0; i < 5; i++) {
+    await page.keyboard.press("Shift+Tab");
+    expect(await dialog.evaluate(node => node.contains(document.activeElement))).toBe(true);
+  }
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+  await expect(trigger).toBeFocused();
+});

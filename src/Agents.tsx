@@ -73,9 +73,11 @@ export default function Agents({
     [memoryMode, setMemoryMode] = useState(
       normalizeMemoryProfile(editing?.memoryMode || draft.memoryMode),
     ),
-    [learning, setLearning] = useState<Record<string, string>>(
-      editing?.learning || draft.learning || {},
-    ),
+    [learning, setLearning] = useState<Record<string, string>>(() => {
+      const initial = { ...(editing?.learning || draft.learning || {}) };
+      if (initial["Skill suggestions"] === undefined && initial.Skills !== undefined) initial["Skill suggestions"] = initial.Skills;
+      return initial;
+    }),
     [skillIds, setSkillIds] = useState<string[]>(editing?.skillIds || draft.skillIds || []),
     [archived, setArchived] = useState(false),
     [sort, setSort] = useState("Starred first"),
@@ -695,7 +697,7 @@ export default function Agents({
                 <input type="checkbox" role="switch" aria-label="Learns automatically" checked={learnsAutomatically} onChange={e => { setLearnsAutomatically(e.target.checked); setMemoryMode("Custom memory"); }} />
               </label>
               {learnsAutomatically && ["Memory suggestions", "Skill suggestions", "Prompt suggestions", "Rubric suggestions", "Agent configurations"].map(value => <label className="setting-line" key={value}>{value}
-                <select className="compact-select" aria-label={value} value={learning[value] || (value === "Agent configurations" ? "Disabled" : "Suggest")} onChange={e => { setLearning({ ...learning, [value]: e.target.value }); setMemoryMode("Custom memory"); }}>
+                <select className="compact-select" aria-label={value} value={learning[value] || (value === "Agent configurations" ? "Disabled" : "Suggest")} onChange={e => { setLearning({ ...learning, [value]: e.target.value, ...(value === "Skill suggestions" ? { Skills: e.target.value } : {}) }); setMemoryMode("Custom memory"); }}>
                   <option value="Suggest">Suggested</option><option value="Disabled">Off</option>
                 </select>
               </label>)}

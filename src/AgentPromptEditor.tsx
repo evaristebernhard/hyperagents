@@ -2,11 +2,40 @@ import { useEffect, useRef } from "react";
 import DOMPurify from "dompurify";
 import { Modal } from "./ui";
 
+const promptTags = ["p", "br", "strong", "b", "em", "i", "s", "strike", "code", "pre", "blockquote", "h1", "h2", "h3", "ul", "ol", "li", "hr"];
 export function sanitizePromptHtml(value: string) {
-  return DOMPurify.sanitize(value, {
-    ALLOWED_TAGS: ["p", "br", "strong", "b", "em", "i", "s", "strike", "code", "pre", "blockquote", "h1", "h2", "h3", "ul", "ol", "li", "hr"],
-    ALLOWED_ATTR: [],
-  });
+  const container = document.createElement("div");
+  container.innerHTML = DOMPurify.sanitize(typeof value === "string" ? value : "", { ALLOWED_TAGS: [...promptTags, "div"], ALLOWED_ATTR: [] });
+  // Native contenteditable and clipboard HTML use DIV for line boundaries.
+  // Convert the boundaries before removing wrappers, otherwise lines concatenate.
+  for (const div of [...container.querySelectorAll("div")].reverse()) {
+    const fragment = document.createDocumentFragment();
+    const previous = div.previousSibling;
+    const isBoundary = previous?.nodeType === Node.ELEMENT_NODE && /^(BR|P|DIV|H[1-6]|PRE|BLOCKQUOTE|UL|OL|LI|HR)$/.test((previous as Element).tagName);
+    if (previous && !isBoundary) fragment.append(document.createElement("br"));
+    while (div.firstChild) fragment.append(div.firstChild);
+    fragment.append(document.createElement("br"));
+    div.replaceWith(fragment);
+  }
+  return DOMPurify.sanitize(container.innerHTML, { ALLOWED_TAGS: promptTags, ALLOWED_ATTR: [] });
+}
+export function promptTextFromHtml(html: string) {
+  const container = document.createElement("div");
+  container.innerHTML = html;
+  let text = "";
+  const newline = () => { if (text && !text.endsWith("\n")) text += "\n"; };
+  const visit = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) { text += node.textContent || ""; return; }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const tag = (node as Element).tagName;
+    if (tag === "BR") { text += "\n"; return; }
+    const block = /^(P|H[1-6]|PRE|BLOCKQUOTE|UL|OL|LI|HR)$/.test(tag);
+    if (block) newline();
+    for (const child of node.childNodes) visit(child);
+    if (block) newline();
+  };
+  for (const node of container.childNodes) visit(node);
+  return text.replace(/\u00a0/g, " ").replace(/\r\n/g, "\n").trim();
 }
 function escapeText(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -40,7 +69,7 @@ export default function AgentPromptEditor({ text, html, onApply, onClose }: {
     <button type="button" className="btn" onClick={onClose}>Close</button>
     <button type="button" className="btn primary" onClick={() => {
       const clean = sanitizePromptHtml(editor.current?.innerHTML || "");
-      const plain = editor.current?.innerText.trim() || "";
+      const plain = promptTextFromHtml(clean);
       onApply(plain, plain ? clean : "");
     }}>OK</button>
   </>}>

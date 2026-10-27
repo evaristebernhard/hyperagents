@@ -21,7 +21,7 @@ const worlds = ["Big-hearted animation", "Hand-drawn wonder", "Space opera", "Fi
 export default function AgentCasting({ navigate }: { navigate: Navigate }) {
   const w = useWorkspace();
   const [initial] = useState(() => readAgentDraft(w.state.active));
-  const [job, setJob] = useState(initial.casting?.job || initial.job || "");
+  const [job, setJob] = useState(initial.casting?.job ?? initial.job ?? "");
   const [lens, setLens] = useState<keyof typeof lenses>(initial.casting?.lens && Object.hasOwn(lenses, initial.casting.lens) ? initial.casting.lens as keyof typeof lenses : "Archetype");
   const [world, setWorld] = useState(initial.casting?.world || "");
   const [status, setStatus] = useState("");

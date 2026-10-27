@@ -48,3 +48,13 @@ This batch implements the pre-submit workflows observed during the 2026-10-27 in
 - Actual model-generated identity/candidates, skill research/import execution, safe ZIP package parsing, final installation, and populated-server states not captured in the audit.
 
 This is a bounded workflow-fidelity improvement, not a claim that the entire app or every creation backend has been recreated.
+
+## Follow-up review hardening
+
+- Normalize native/pasted DIV line boundaries before sanitizing prompt HTML. Derive plain text from that normalized representation so reopening and applying again cannot concatenate lines.
+- Preserve legacy learning["Skills"] when the new Skill suggestions preference is absent; keep the keys consistent when the preference is explicitly edited.
+- Treat an explicitly cleared Casting job as a saved empty string rather than falling back to the original posting.
+- Generic dialogs now focus the first enabled control when no input exists and keep reverse-tab inside the dialog, including the re-draft confirmation.
+- Four more regressions bring this batch to 18 new tests: multiline type/paste round-trip, an existing legacy-agent fixture, cleared Casting draft restore, and confirmation keyboard containment/focus return.
+
+The prior a729fc0 commit's build/typecheck and full Playwright test step passed in GitHub Actions. The follow-up commit requires its own CI result; the older result is not evidence for the new changes.
