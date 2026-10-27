@@ -66,6 +66,7 @@ export function Modal({
   footer,
   wide = false,
   headerless = false,
+  dialogRole = "dialog",
 }: {
   title: string;
   children: ReactNode;
@@ -73,6 +74,7 @@ export function Modal({
   footer?: ReactNode;
   wide?: boolean;
   headerless?: boolean;
+  dialogRole?: "dialog" | "alertdialog";
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -120,7 +122,7 @@ export function Modal({
       <div
         ref={ref}
         className={"modal-dialog " + (wide ? "wide" : "")}
-        role="dialog"
+        role={dialogRole}
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}

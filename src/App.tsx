@@ -49,6 +49,7 @@ import Resources from "./ResourcesUI";
 import Settings from "./SettingsUI";
 import Thread from "./Thread";
 import Agents from "./Agents";
+import AgentCasting from "./AgentCasting";
 import Marketing from "./Marketing";
 import { useWorkspace, useCollection } from "./workspace";
 import ContentHub from "./ContentHub";
@@ -351,11 +352,14 @@ export default function App() {
         />
       );
     }
+    if (path === "/agents/new/cast")
+      return <AgentCasting key={workspace.state.active + ":casting"} navigate={navigate} />;
     if (path.startsWith("/agents"))
       return (
         <Agents
-          key={path}
+          key={workspace.state.active + ":" + path}
           path={path}
+          creationManual={query.get("creation") === "manual"}
           navigate={navigate}
           notify={notify}
           agents={agents}

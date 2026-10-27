@@ -22,6 +22,7 @@ import { communitySkills, uid, now } from "./local-model";
 import { useWorkspace, download } from "./workspace";
 import { IconButton, Modal } from "./ui";
 import "./local.css";
+import SkillCreationWizard from "./SkillCreationWizard";
 export function Markdown({ content }: { content: string }) {
   return (
     <div className="local-markdown">
@@ -89,15 +90,24 @@ export default function ContentHub({ path, navigate, notify }: PageProps) {
       setTags("");
     }
   }, [path, w.state.active]);
-  const importSkill = async (file: File) => {
-    if (file.size > 1024 * 1024) {
-      notify("Skill files must be smaller than 1 MB.");
-      return;
-    }
+  const importSkill = async (
+    file: File,
+    options?: { wizard: true; signal: AbortSignal },
+  ): Promise<string | null> => {
+    const fail = (message: string) => {
+      if (!options) notify(message);
+      return message;
+    };
+    const maxBytes = (options ? 5 : 1) * 1024 * 1024;
+    if (file.size > maxBytes)
+      return fail(options ? "Skill files must be 5 MB or smaller." : "Skill files must be smaller than 1 MB.");
+    if (!(options ? /\.(json|md)$/i : /\.(json|md|txt)$/i).test(file.name))
+      return fail("Choose a supported skill file.");
     try {
       const text = await file.text();
+      if (options?.signal.aborted) return "Import cancelled.";
       let input: Partial<Skill>;
-      if (file.name.endsWith(".json")) {
+      if (file.name.toLowerCase().endsWith(".json")) {
         input = JSON.parse(text);
         if (
           !input ||
@@ -131,8 +141,9 @@ export default function ContentHub({ path, navigate, notify }: PageProps) {
       w.set("skills", (ss) => [...ss, s]);
       navigate("/skills/" + s.id);
       notify("Skill imported locally. No script or tool was executed.");
+      return null;
     } catch (e) {
-      notify(e instanceof Error ? e.message : "Could not import skill.");
+      return fail(e instanceof Error ? e.message : "Could not import skill.");
     }
   };
   const exportSkill = (s: Skill) =>
@@ -241,6 +252,9 @@ export default function ContentHub({ path, navigate, notify }: PageProps) {
             <h1 className="page-title">
               {creating ? "Create skill" : "Edit skill"}
             </h1>
+            {creating && (
+              <p className="demo-note">Local-only manual editor. Save your own instructions without research, model calls, or script execution.</p>
+            )}
             {editing && !skill ? (
               <div className="empty-state">Skill not found.</div>
             ) : preview ? (
@@ -467,7 +481,7 @@ export default function ContentHub({ path, navigate, notify }: PageProps) {
                 </button>
                 <button
                   className="btn primary"
-                  onClick={() => navigate("/skills/new")}
+                  onClick={() => setModal("skill-create")}
                 >
                   <Plus size={14} />
                   Create skill
@@ -792,6 +806,13 @@ export default function ContentHub({ path, navigate, notify }: PageProps) {
           e.target.value = "";
         }}
       />
+      {modal === "skill-create" && (
+        <SkillCreationWizard
+          onClose={() => setModal("")}
+          onManual={() => { setModal(""); navigate("/skills/new"); }}
+          onImport={(file, signal) => importSkill(file, { wizard: true, signal })}
+        />
+      )}
       {modal === "memory" && (
         <Modal
           title={editId ? "Edit Memory" : "Add Memory"}
