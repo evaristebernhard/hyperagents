@@ -75,7 +75,7 @@ test("settings are query driven and escape closes", async ({ page }) => {
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Appearance", exact: true }).click();
   await expect(page).toHaveURL(/\/learning\?settings=appearance$/);
-  await dialog.getByRole("button", { name: "Dark", exact: true }).click();
+  await dialog.getByRole("combobox", { name: "Color mode" }).selectOption("dark");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/learning$/);

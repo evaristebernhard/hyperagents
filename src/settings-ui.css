@@ -6,14 +6,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 28px;
+  padding: 24px;
 }
 .sx-dialog {
-  width: 960px;
+  width: 1180px;
   max-width: 100%;
-  height: 660px;
-  max-height: calc(100dvh - 70px);
-  border-radius: 10px;
+  height: 760px;
+  max-height: calc(100dvh - 48px);
+  border-radius: 14px;
+  font-size: 16px;
+  line-height: 24px;
   border: 1px solid var(--line);
   background: var(--bg);
   color: var(--ink);
@@ -32,23 +34,24 @@
   height: 23px;
 }
 .sx-nav {
-  width: 190px;
-  flex: 0 0 190px;
-  padding: 16px 10px 24px;
+  width: 240px;
+  flex: 0 0 240px;
+  padding: 8px 12px;
   background: var(--soft);
   border-right: 1px solid var(--line);
   overflow: auto;
   scrollbar-width: thin;
 }
 .sx-nav section {
-  margin-bottom: 17px;
+  margin-bottom: 16px;
 }
 .sx-nav h5 {
-  font-size: 10px;
+  font-size: 12px;
+  line-height: 20px;
   color: var(--muted);
   font-weight: 400;
-  padding-left: 10px;
-  margin: 0 0 4px;
+  padding-left: 8px;
+  margin: 12px 0 8px;
 }
 .sx-nav button {
   width: 100%;
@@ -56,10 +59,11 @@
   align-items: center;
   gap: 8px;
   text-align: left;
-  font-size: 11px;
-  min-height: 30px;
-  border-radius: 6px;
-  padding: 6px 9px;
+  font-size: 14px;
+  line-height: 20px;
+  min-height: 36px;
+  border-radius: 12px;
+  padding: 8px 16px 8px 8px;
   white-space: nowrap;
 }
 .sx-nav button.active {
@@ -69,22 +73,76 @@
   background: var(--hover);
 }
 .sx-nav button svg {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   color: var(--muted);
 }
 .sx-content {
-  padding: 25px 30px;
+  padding: 32px 48px 32px 32px;
   flex: 1;
   min-width: 0;
   overflow: auto;
   scrollbar-width: thin;
 }
 .sx-content > h2 {
-  font-size: 18px;
+  font-size: 20px;
+  line-height: 28px;
   font-weight: 600;
   letter-spacing: -0.4px;
-  margin: 0 0 25px;
+  margin: 0 0 24px;
+}
+/* Measured desktop Appearance row; other settings controls are separate batches. */
+.sx-appearance {
+  max-width: 800px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.sx-appearance-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.sx-appearance-copy {
+  flex: 1;
+  min-width: 0;
+}
+.sx-appearance-copy label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.sx-content .sx-appearance-copy p {
+  margin: 2px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+.sx-appearance-row select {
+  width: 280px;
+  max-width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 14px;
+  background: var(--bg);
+}
+@media (max-width: 1000px) {
+  .sx-appearance {
+    padding: 0;
+    border: 0;
+  }
+  .sx-appearance-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .sx-appearance-row select {
+    width: 100%;
+    height: 44px;
+    font-size: 16px;
+  }
 }
 .sx-content h4 {
   font-size: 12px;

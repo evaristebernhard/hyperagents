@@ -22,7 +22,6 @@ import {
   Download,
   KeyRound,
   Monitor,
-  Check,
   Folder,
   Mail,
   Globe,
@@ -419,36 +418,25 @@ export default function SettingsUI({
     );
   else if (section === "appearance")
     content = (
-      <>
-        {select("Color mode", theme, ["light", "dark", "system"], setTheme)}
-        <p className="muted">
-          Choose a light or dark appearance, or follow your system preference.
-        </p>
-        <div className="sx-theme-previews">
-          {["light", "dark", "system"].map((n) => (
-            <button
-              className={
-                (theme === n ? "active " : "") + "sx-theme-preview " + n
-              }
-              key={n}
-              onClick={() => setTheme(n)}
-            >
-              <div>
-                <aside />
-                <main>
-                  <i />
-                  <i />
-                  <i />
-                </main>
-              </div>
-              <span>
-                {n[0].toUpperCase() + n.slice(1)}
-                {theme === n && <Check size={13} />}
-              </span>
-            </button>
-          ))}
+      <section className="sx-appearance" aria-label="Appearance">
+        <div className="sx-appearance-row">
+          <div className="sx-appearance-copy">
+            <label htmlFor="personalization-theme">Color mode</label>
+            <p className="muted">
+              System follows this device's light or dark setting.
+            </p>
+          </div>
+          <select
+            id="personalization-theme"
+            value={theme}
+            onChange={(e) => setTheme(e.target.value)}
+          >
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
         </div>
-      </>
+      </section>
     );
   else if (section === "thread-defaults")
     content = (

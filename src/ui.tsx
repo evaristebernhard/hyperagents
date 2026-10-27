@@ -21,6 +21,7 @@ import {
   Brain,
   Folder,
   Layers,
+  Plug,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import type { Navigate } from "./types";
@@ -344,6 +345,15 @@ export function Composer({
           </button>
           <button
             onClick={() => {
+              navigate(location.pathname + "?settings=integrations");
+              setMenu("");
+            }}
+          >
+            <Plug size={15} />
+            Integrations
+          </button>
+          <button
+            onClick={() => {
               navigate("/projects");
               setMenu("");
             }}
@@ -372,7 +382,10 @@ export function Composer({
       {menu === "mode" && (
         <div className="popover mode-popover">
           {[
-            ["Plan first", "Think through an approach before taking action"],
+            [
+              "Plan first",
+              "Think through an approach and get user clarification before taking action",
+            ],
             ["Execute", "Act immediately without a plan"],
             ["Auto", "Choose the appropriate execution mode"],
           ].map(([n, t]) => (
