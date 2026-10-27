@@ -1,0 +1,965 @@
+.rp-page {
+  padding: 28px 26px 55px;
+  min-height: 100%;
+  max-width: 1800px;
+  margin: auto;
+}
+.rp-description {
+  font-size: 12px;
+  margin: 7px 0 0;
+}
+.rp-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 26px 0 16px;
+}
+.rp-section-head h3 {
+  font-size: 14px;
+  margin: 0;
+}
+.rp-skill-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 15px;
+  margin-bottom: 45px;
+}
+.rp-skill-card {
+  padding: 17px;
+  overflow: hidden;
+  min-height: 265px;
+  display: flex;
+  flex-direction: column;
+}
+.rp-skill-card h3 {
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+.rp-skill-card > small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+}
+.rp-author-avatar {
+  height: 18px;
+  width: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--soft);
+  font-size: 10px;
+}
+.rp-skill-card > p {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.65;
+  margin: 12px 0 20px;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.rp-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: auto;
+}
+.rp-card-footer .badge {
+  font-size: 9px;
+  padding: 2px 4px;
+  max-width: 145px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rp-card-footer > small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.rp-skill-card:hover {
+  box-shadow: 0 4px 18px #0001;
+}
+.rp-table-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 20px 0;
+}
+.rp-table-top > .tabs {
+  border: 0;
+}
+.rp-table-top .tabs > button {
+  font-size: 13px;
+  padding: 5px 10px;
+}
+.rp-skill-description {
+  color: var(--muted);
+  max-width: 390px;
+  min-width: 170px;
+  font-size: 11px !important;
+}
+.rp-search-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 170px;
+}
+.rp-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-width: 140px;
+  color: var(--muted);
+}
+.rp-search > input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: none;
+  font-size: 12px;
+}
+.rp-search-row > .btn {
+  font-size: 12px;
+}
+.rp-form {
+  max-width: 650px;
+  margin: 30px auto;
+}
+.rp-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 28px;
+}
+.rp-back {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 25px;
+}
+.rp-back + .page-title,
+.rp-back + h1 {
+  margin-top: 20px;
+}
+.rp-tags {
+  margin: 15px 0 28px;
+}
+.rp-tags > .btn {
+  margin-left: auto;
+}
+.rp-recent-threads {
+  margin-bottom: 20px;
+}
+.rp-recent-threads > .page-header {
+  margin-bottom: 0;
+}
+.rp-recent-threads .empty-state {
+  padding: 32px;
+}
+.rp-recent-threads .empty-state h3 {
+  font-size: 13px;
+}
+.rp-recent-threads .empty-state p {
+  font-size: 12px;
+}
+.rp-doc-section {
+  border-top: 1px solid var(--line);
+  margin: 25px 0;
+  padding-top: 25px;
+  font-size: 13px;
+}
+.rp-doc-section > h3 {
+  font-size: 14px;
+}
+.rp-doc-section > p {
+  line-height: 1.85;
+}
+.rp-doc-section > h2 {
+  margin-top: 20px;
+}
+.rp-meta-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.rp-memory-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 12px;
+  margin: 20px 0;
+}
+.rp-memory-toolbar > .rp-search-row {
+  margin-left: auto;
+  max-width: 370px;
+}
+.rp-memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.rp-memory-list p {
+  white-space: pre-wrap;
+}
+.rp-memory-list .page-header {
+  margin-bottom: 10px;
+}
+.rp-project-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.rp-project-cards h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 0;
+}
+.rp-project-cards p {
+  font-size: 12px;
+}
+.rp-project-cards .actions {
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+.rp-project-cards h5 {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+  font-size: 9px;
+  letter-spacing: 0.7px;
+  margin-top: 20px;
+}
+.rp-project-thread {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  font-size: 12px;
+  width: 100%;
+  padding: 8px 0;
+  text-align: left;
+}
+.rp-project-thread > small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.rp-project-thread:hover {
+  text-decoration: underline;
+}
+.rp-project-composer {
+  max-width: 900px;
+  margin: 20px 0;
+}
+.rp-project-thread-card {
+  display: block;
+  width: 100%;
+  margin: 15px 0;
+  text-align: left;
+}
+.rp-project-thread-card h3 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+.rp-project-thread-card p {
+  font-size: 12px;
+  color: var(--muted);
+}
+.rp-project-thread-card small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.rp-context {
+  margin-top: 25px;
+  max-width: 800px;
+  padding: 35px;
+}
+.rp-context h3 {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+  margin-top: 35px;
+}
+.rp-add-thread-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding: 13px 5px;
+  font-size: 12px;
+  text-align: left;
+}
+.rp-add-thread-row > svg:last-child {
+  margin-left: auto;
+}
+.rp-library-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 24px;
+}
+.rp-library-toolbar > .rp-search-row {
+  max-width: 650px;
+}
+.rp-library-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 25px 18px;
+  margin-top: 22px;
+}
+.rp-library-card {
+  text-align: left;
+  padding: 0;
+  min-width: 0;
+}
+.rp-library-preview {
+  height: 185px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.rp-library-preview > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.rp-library-card > strong {
+  font-size: 12px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.rp-library-card > small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.rp-library-card > small > span {
+  color: var(--ink);
+}
+.rp-library-card:hover .rp-library-preview {
+  box-shadow: 0 5px 15px #0001;
+}
+.rp-note-preview {
+  font-size: 10px;
+  transform: scale(0.8);
+  padding: 15px;
+  background: var(--bg);
+  height: 210px;
+  min-width: 210px;
+}
+.rp-note-preview h2 {
+  font-size: 19px;
+}
+.rp-note-preview h4 {
+  font-size: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 7px;
+}
+.rp-library-grid.list {
+  grid-template-columns: 1fr;
+}
+.rp-library-grid.list > .rp-library-card {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 5px 20px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 15px;
+}
+.rp-library-grid.list .rp-library-preview {
+  grid-row: span 3;
+  height: 80px;
+  margin: 0;
+}
+.rp-marketplace {
+  background: #0d0d0e;
+  color: #efefef;
+  --bg: #171717;
+  --soft: #212121;
+  --muted: #999;
+  --line: #343434;
+  --ink: #efefef;
+}
+.rp-marketplace .page-title {
+  font-size: 13px;
+  font-weight: 400;
+  color: #aaa;
+}
+.rp-marketplace .page-header {
+  margin-bottom: 15px;
+}
+.rp-marketplace .card {
+  background: #1b1b1c;
+  color: #eee;
+}
+.rp-marketplace .btn.primary {
+  color: #111;
+  background: #f5f5f5;
+  border-color: #f5f5f5;
+}
+.rp-marketplace .badge {
+  background: #252525;
+  color: #bbb;
+}
+.rp-market-heading {
+  font-size: 27px;
+  font-weight: 500;
+  margin: 14px 0 20px;
+}
+.rp-marketplace > p {
+  font-size: 12px;
+}
+.rp-market-agents {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 38px;
+}
+.rp-market-agents > .card {
+  padding: 19px;
+}
+.rp-market-agents .card > p {
+  font-size: 12px;
+  color: #aaa;
+  line-height: 1.8;
+  margin-top: 13px;
+  min-height: 85px;
+}
+.rp-market-agents .card > span {
+  font-size: 11px;
+}
+.rp-agent-title {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 13px;
+}
+.rp-agent-title > span {
+  font-size: 30px;
+}
+.rp-agent-title h3 {
+  font-size: 17px;
+  margin: 0 0 2px;
+}
+.rp-agent-title small {
+  font-size: 11px;
+  color: #bbb;
+}
+.rp-market-agents > a:hover {
+  border-color: #777;
+}
+.rp-market-detail {
+  max-width: 930px;
+  padding: 0 30px 50px;
+}
+.rp-market-detail > .plain {
+  display: flex;
+  margin-bottom: 45px;
+}
+.rp-market-avatar {
+  font-size: 42px;
+  display: block;
+  margin-bottom: 18px;
+}
+.rp-market-detail > h1 {
+  margin-top: 10px;
+}
+.rp-market-detail > h3 {
+  margin-top: 40px;
+  font-size: 14px;
+}
+.rp-market-detail > p {
+  font-size: 13px;
+  color: #bbb;
+  max-width: 700px;
+}
+.rp-market-detail > .btn {
+  margin-top: 12px;
+}
+.rp-market-skills {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 700px;
+}
+.rp-market-skills .card {
+  padding: 15px;
+}
+.rp-market-skills strong {
+  font-size: 13px;
+}
+.rp-market-skills p {
+  color: #aaa;
+  font-size: 12px;
+  margin-top: 7px;
+}
+.rp-market-cover {
+  width: 100%;
+  max-width: 640px;
+  height: 280px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-top: 25px;
+}
+.rp-inbox {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr);
+  min-height: 650px;
+  overflow: hidden;
+}
+.rp-inbox > aside {
+  padding: 10px;
+  border-right: 1px solid var(--line);
+}
+.rp-inbox > aside > button {
+  display: flex;
+  gap: 10px;
+  border-radius: 9px;
+  padding: 14px 10px;
+  text-align: left;
+  width: 100%;
+}
+.rp-inbox > aside > button > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rp-inbox > aside strong {
+  font-size: 12px;
+}
+.rp-inbox > aside small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.rp-inbox > section {
+  padding: 25px;
+}
+.rp-inbox > section p {
+  font-size: 12px;
+}
+.rp-inbox .card {
+  margin: 20px 0;
+}
+.rp-learning-filters {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.rp-learning-filters > span {
+  margin-right: 5px;
+  color: var(--muted);
+}
+.rp-learning-filters > span:nth-of-type(2) {
+  margin-left: 20px;
+}
+.rp-learning-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+.rp-learning-row > button {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  text-align: left;
+  flex: 1;
+}
+.rp-learning-row strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.rp-learning-row small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.rp-learning-row > span {
+  font-size: 11px;
+}
+.rp-learning-row .icon-btn {
+  width: 24px;
+  height: 24px;
+}
+.rp-learning-suggestion {
+  margin-top: 25px;
+}
+.rp-no-pages {
+  font-size: 12px;
+  margin-top: 25px;
+}
+.rp-wiki-start {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 35px;
+}
+.rp-wiki-start > p {
+  font-size: 13px;
+  color: var(--muted);
+}
+.rp-wiki-start .actions {
+  flex-wrap: wrap;
+  margin: 25px 0;
+  font-size: 12px;
+}
+.rp-wiki-start .input {
+  width: 130px;
+}
+.rp-wiki-start .demo-note {
+  margin-top: 15px;
+}
+.rp-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 25px 0;
+}
+.rp-stat-grid > div {
+  padding: 20px;
+  border-right: 1px solid var(--line);
+}
+.rp-stat-grid > div:last-child {
+  border: 0;
+}
+.rp-stat-grid small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.rp-stat-grid strong {
+  display: block;
+  font-size: 29px;
+  margin-top: 10px;
+  font-weight: 500;
+}
+.rp-roster {
+  padding: 20px;
+}
+.rp-roster .empty-state {
+  padding: 25px;
+}
+.rp-roster .empty-state h3 {
+  font-size: 13px;
+}
+.rp-roster .empty-state p {
+  font-size: 11px;
+}
+.rp-dashboard-grid {
+  margin: 20px 0;
+}
+.rp-dashboard-grid .empty-state {
+  padding: 35px 10px;
+}
+.rp-dashboard-grid .empty-state h3 {
+  font-size: 13px;
+}
+.rp-dashboard-grid .empty-state p {
+  font-size: 11px;
+}
+.rp-dashboard-grid .card h3 > small {
+  float: right;
+  font-size: 10px;
+  font-weight: 400;
+}
+.rp-section-spaced {
+  margin-top: 30px;
+}
+.rp-artifact-modal {
+  position: fixed;
+  inset: 0;
+  background: #151515f5;
+  color: #f5f5f5;
+  z-index: 110;
+  display: flex;
+  flex-direction: column;
+}
+.rp-artifact-modal > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #181818;
+  border-bottom: 1px solid #444;
+  font-size: 13px;
+}
+.rp-artifact-modal .icon-btn {
+  color: #ddd;
+}
+.rp-artifact-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.rp-artifact-display {
+  flex: 1;
+  overflow: auto;
+  padding: 30px 50px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.rp-artifact-display > img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  min-height: 300px;
+}
+.rp-artifact-display > .notes-document {
+  background: white;
+  color: #111;
+  max-width: 750px;
+  width: 100%;
+  min-height: 600px;
+  border-radius: 8px;
+}
+.rp-artifact-body > aside {
+  width: 280px;
+  background: #202020;
+  padding: 24px;
+  overflow: auto;
+  border-left: 1px solid #444;
+}
+.rp-artifact-body > aside h3 {
+  font-size: 14px;
+  margin-bottom: 30px;
+}
+.rp-artifact-body > aside h5 {
+  font-size: 10px;
+  color: #999;
+  letter-spacing: 1px;
+  margin-top: 25px;
+}
+.rp-artifact-body > aside button {
+  display: block;
+  color: #ddd;
+  font-size: 12px;
+  text-align: left;
+  padding: 9px 0;
+}
+.rp-artifact-body > aside p {
+  font-size: 11px;
+  color: #999;
+}
+.rp-artifact-body > aside strong {
+  font-size: 12px;
+}
+.rp-artifact-body > aside strong small {
+  font-size: 10px;
+  margin-left: 8px;
+  color: #aaa;
+}
+@media (max-width: 1250px) {
+  .rp-skill-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .rp-library-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .rp-inbox {
+    grid-template-columns: 220px 1fr;
+  }
+  .rp-table-top + .table {
+    font-size: 11px;
+  }
+  .rp-page .table th,
+  .rp-page .table td {
+    padding: 12px 6px;
+  }
+  .rp-market-agents {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .rp-market-agents .card > p {
+    min-height: 0;
+  }
+}
+@media (max-width: 900px) {
+  .rp-library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .rp-memory-toolbar {
+    flex-wrap: wrap;
+  }
+  .rp-memory-toolbar > .rp-search-row {
+    max-width: none;
+    margin: 0;
+  }
+  .rp-project-cards {
+    grid-template-columns: 1fr;
+  }
+  .rp-inbox {
+    display: block;
+    min-height: 500px;
+  }
+  .rp-inbox > aside {
+    border: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .rp-market-detail {
+    padding-inline: 0;
+  }
+  .rp-page .table {
+    display: block;
+    overflow: auto;
+  }
+  .rp-stat-grid > div {
+    padding: 14px 10px;
+  }
+  .rp-stat-grid strong {
+    font-size: 24px;
+  }
+  .rp-stat-grid small {
+    font-size: 8px;
+    letter-spacing: 0;
+  }
+  .rp-artifact-body > aside {
+    width: 220px;
+    padding: 20px;
+  }
+  .rp-artifact-display {
+    padding: 25px;
+  }
+  .rp-learning-row > .actions {
+    gap: 1px;
+  }
+  .rp-learning-row > span {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .rp-page {
+    padding: 22px 16px 40px;
+  }
+  .rp-page .page-header {
+    flex-wrap: wrap;
+  }
+  .rp-page .page-title {
+    font-size: 23px;
+  }
+  .rp-skill-cards {
+    grid-template-columns: 1fr;
+  }
+  .rp-skill-card {
+    min-height: 190px;
+  }
+  .rp-library-grid {
+    grid-template-columns: 1fr;
+  }
+  .rp-library-preview {
+    height: 200px;
+  }
+  .rp-market-agents {
+    grid-template-columns: 1fr;
+  }
+  .rp-market-detail > h1 {
+    font-size: 25px;
+  }
+  .rp-page .page-header > .actions {
+    flex-wrap: wrap;
+  }
+  .rp-skill-description {
+    display: none;
+  }
+  .rp-stat-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .rp-stat-grid > div {
+    border-bottom: 1px solid var(--line);
+  }
+  .rp-stat-grid > div:nth-child(3) {
+    border-right: 0;
+  }
+  .rp-stat-grid > div:nth-child(4),
+  .rp-stat-grid > div:nth-child(5) {
+    border-bottom: 0;
+  }
+  .rp-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .rp-learning-filters {
+    flex-wrap: wrap;
+  }
+  .rp-learning-row {
+    gap: 8px;
+  }
+  .rp-memory-toolbar > .rp-search-row {
+    width: 100%;
+    flex-basis: 100%;
+  }
+  .rp-form.card {
+    padding: 18px;
+  }
+  .rp-artifact-body {
+    flex-direction: column;
+  }
+  .rp-artifact-display {
+    min-height: 50%;
+    padding: 15px;
+  }
+  .rp-artifact-body > aside {
+    width: 100%;
+    max-height: 40%;
+    border: 0;
+    border-top: 1px solid #444;
+  }
+  .rp-artifact-display > img {
+    min-height: 0;
+  }
+  .rp-artifact-body > aside h3 {
+    margin-bottom: 10px;
+  }
+  .rp-wiki-start {
+    padding: 22px;
+    margin-top: 25px;
+  }
+  .rp-back .actions {
+    gap: 3px;
+  }
+  .rp-back .btn {
+    font-size: 10px;
+    padding: 6px;
+  }
+  .rp-tags {
+    flex-wrap: wrap;
+  }
+  .rp-tags .btn {
+    margin-left: 0;
+  }
+  .rp-page .table th:nth-child(3),
+  .rp-page .table td:nth-child(3),
+  .rp-page .table th:nth-child(5),
+  .rp-page .table td:nth-child(5) {
+    display: none;
+  }
+}
