@@ -41,12 +41,13 @@ export default function BackendGate({ children }: { children: ReactNode }) {
       }}>
         <small>HYPERAGENTS · LOCAL DATA SERVICE</small>
         <h1>{!info ? "Connect your workspace" : info.setupRequired ? "Set up your private workspace" : "Sign in to your workspace"}</h1>
-        <p>{!info ? "Start the project with npm run dev. The API and database must be available; sample data is not used as a fallback." : info.setupRequired ? "Create the single-owner password on this computer. It is hashed in the local database, never stored in the browser." : "Your conversations and files stay in your local data service. Model and browser execution are not connected."}</p>
+        <p>{!info ? "Start the project with npm run dev. The API and database must be available; sample data is not used as a fallback." : info.setupRequired ? "Create the single-owner password on this computer. It is hashed in the local database, never stored in the browser." : "Sign in with this replica’s local owner password, not your API key or Hyperagent password. Conversations and files stay in your data service; model and integration availability depends on server configuration."}</p>
         {info && <><label className="field">Password<input type="password" aria-label="Password" required minLength={info.setupRequired ? 12 : undefined} autoComplete={info.setupRequired ? "new-password" : "current-password"} value={password} onChange={e => setPassword(e.target.value)} /></label>
           {info.setupRequired && <><label className="field">Confirm password<input type="password" aria-label="Confirm password" required autoComplete="new-password" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label><small>Use at least 12 characters. Initial setup is only available through a local loopback origin.</small></>}
           <button className="btn primary" type="submit" disabled={busy || !password || (info.setupRequired && password.length < 12)}>{busy ? "Connecting…" : info.setupRequired ? "Create owner account" : "Sign in"}</button>
         </>}
         {error && <p role="alert" className="backend-error">{error}</p>}
+        {info && !info.setupRequired && <p className="backend-recovery-help">Forgot this local password? On your own server terminal, stop the app and run npm run reset-password. This preserves workspace data; there is no public password-reset endpoint.</p>}
         {!info && <button className="btn" type="button" onClick={() => void check()}>Retry connection</button>}
       </form>
     </div>}

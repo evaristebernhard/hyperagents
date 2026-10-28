@@ -16,7 +16,8 @@
     "start": "node server/index.mjs",
     "test:backend": "node --test server/*.test.mjs",
     "test:backend-flow": "playwright test --config=playwright.backend.config.ts",
-    "test:fixtures": "playwright test"
+    "test:fixtures": "playwright test",
+    "reset-password": "node scripts/reset-owner-password.mjs"
   },
   "dependencies": {
     "dompurify": "^3.4.17",

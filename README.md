@@ -165,3 +165,28 @@ See `docs/BACKEND-CONTRACT.md` for endpoints and security boundaries, and the ea
 `docs/UI-FIDELITY-BATCH-*` audit notes for frontend replication history. Local sandbox
 npm access has been blocked by registry403, so full browser/build verification is
 reported from GitHub CI rather than falsely claimed as local execution.
+
+## Forgotten local owner password
+
+Do not delete .data or the SQLite database. On your own server, stop the app and run:
+
+```sh
+npm run reset-password
+```
+
+The local-only command reads the same .env / APP_DATA_DIR configuration, shows the
+selected data directory, asks you to type RESET, then asks for a new password twice
+without echoing it. It accepts no password command arguments, environment password,
+HTTP request or default password. Use 12+ characters. Run it as the OS account that
+owns the data (the container's node user for a mounted Docker data volume).
+
+Before changing credentials it creates a private consistent SQLite backup in
+.data/recovery-backups (or the configured data directory). It changes only the owner
+password hash and invalidates existing login sessions. Conversations, uploaded bytes,
+workspace configuration and integration settings are preserved. Missing, symlinked,
+unrecognized or future-schema databases are refused, not recreated. The backup is
+private and contains sensitive workspace data; do not publish it.
+
+Restart the normal app service and sign in with the new local password. This is not
+your DeepSeek key or Hyperagent password. APP_OWNER_PASSWORD remains a first-owner
+bootstrap only; changing it does not replace an existing password.
