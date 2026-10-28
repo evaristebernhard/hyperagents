@@ -181,7 +181,7 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
         </>}
         {sub === "integrations" && <>
           <button type="button" role="menuitem" onClick={() => settings("integrations")}><Plug size={16} />Manage integrations<ArrowUpRight size={14} /></button>
-          <small className="menu-local-note">Connection settings only. No OAuth is started.</small>
+          <small className="menu-local-note">Manage server API credentials and test actual account access. Writes require explicit confirmation.</small>
         </>}
       </div>}
     </div>

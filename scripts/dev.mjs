@@ -1,3 +1,4 @@
+import {captureIntegrationCredentials} from '../server/integrations.mjs';
 import path from 'node:path';
 import { createApp } from '../server/app.mjs';
 import { loadLocalEnv } from './env.mjs';
@@ -25,6 +26,7 @@ for (let i=0;i<args.length;i++) {
 const publicBind=!['127.0.0.1','localhost','::1'].includes(host);
 if (!fixture && publicBind && !process.env.APP_PUBLIC_ORIGIN) throw Error('Public Vite binding requires an explicit APP_PUBLIC_ORIGIN and an initialized owner.');
 process.env.VITE_STORAGE_MODE=fixture?'fixture':'server';
+const integrationCredentials=captureIntegrationCredentials(process.env);
 const ownerPassword=process.env.APP_OWNER_PASSWORD;
 const deepseekApiKey=process.env.DEEPSEEK_API_KEY;
 const openAlexApiKey=process.env.OPENALEX_API_KEY;
@@ -46,7 +48,7 @@ async function shutdown(code=0) {
 for (const signal of ['SIGINT','SIGTERM']) process.on(signal,()=>void shutdown());
 try {
   if (!fixture) {
-    app=await createApp({host:apiHost,port:apiPort,dataDir:process.env.APP_DATA_DIR ?? path.resolve('.data'),devOrigin:process.env.APP_DEV_ORIGIN,publicOrigin:process.env.APP_PUBLIC_ORIGIN,maxFileBytes:process.env.APP_MAX_FILE_BYTES,ownerPassword,deepseekApiKey,openAlexApiKey,publicUserAgent});
+    app=await createApp({host:apiHost,port:apiPort,dataDir:process.env.APP_DATA_DIR ?? path.resolve('.data'),devOrigin:process.env.APP_DEV_ORIGIN,publicOrigin:process.env.APP_PUBLIC_ORIGIN,maxFileBytes:process.env.APP_MAX_FILE_BYTES,ownerPassword,integrationCredentials,deepseekApiKey,openAlexApiKey,publicUserAgent});
     await app.listen();
     if (publicBind) {
       const response=await fetch(`http://${proxyHost}:${apiPort}/api/session`);

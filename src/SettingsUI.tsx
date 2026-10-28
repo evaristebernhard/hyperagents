@@ -38,6 +38,7 @@ import { useWorkspace } from "./workspace";
 import { uid, now } from "./local-model";
 import "./settings-ui.css";
 import ServerThreadDefaults from "./ServerThreadDefaults";
+import IntegrationSettings from "./IntegrationSettings";
 const groups = [
   {
     label: "Account",
@@ -598,7 +599,7 @@ export default function SettingsUI({
       </>
     );
   else if (section === "integrations")
-    content = (
+    content = workspace.mode === "server" ? <IntegrationSettings notify={notify} /> : (
       <>
         <div className="sx-catalog-toolbar">
           <div className="sx-catalog-search">

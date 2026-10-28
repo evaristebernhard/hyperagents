@@ -1,8 +1,10 @@
+import {captureIntegrationCredentials} from './integrations.mjs';
 import { createApp } from './app.mjs';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
 import { loadLocalEnv } from '../scripts/env.mjs';
 loadLocalEnv();
+const integrationCredentials=captureIntegrationCredentials(process.env);
 const ownerPassword=process.env.APP_OWNER_PASSWORD;
 const deepseekApiKey=process.env.DEEPSEEK_API_KEY;
 const openAlexApiKey=process.env.OPENALEX_API_KEY;
@@ -18,7 +20,7 @@ try {
     devOrigin:process.env.APP_DEV_ORIGIN,
     publicOrigin:process.env.APP_PUBLIC_ORIGIN,
     maxFileBytes:process.env.APP_MAX_FILE_BYTES,
-    ownerPassword,
+    ownerPassword,integrationCredentials,
     deepseekApiKey,openAlexApiKey,publicUserAgent,
     distDir:process.env.APP_SERVE_DIST==='1' && existsSync('dist/index.html') ? path.resolve('dist') : undefined,
   });

@@ -19,6 +19,7 @@ export function prepareLegacy(input,findFile) {
       if(!t || typeof t!=='object')continue;
       unlink(t,'projectId','projects',`thread ${t.id}`);unlink(t,'roomId','rooms',`thread ${t.id}`);unlink(t.config,'agentId','agents',`thread ${t.id} settings`);
       for(const m of Array.isArray(t.messages)?t.messages:[]) {
+        if(Array.isArray(m?.actionRequests)&&m.actionRequests.length){m.actionRequests=m.actionRequests.map(a=>({...a,token:'',status:a.status==='pending'?'dismissed':a.status}));warn(`${w.name}: disabled copied integration approvals in thread ${t.id}. Request new approvals in the imported conversation.`);}
         if(Array.isArray(m?.context?.attachments) && m.context.attachments.length) throw new ApiError(422,'This backup contains attachment references. Browser migration cannot copy binary files. Keep the original backup and data directory; create an explicit metadata-only copy without attachment references if you want to import its text. No attachment was removed.','MIGRATION_ATTACHMENTS');
       }
     }

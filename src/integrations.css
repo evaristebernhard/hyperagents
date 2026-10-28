@@ -1,0 +1,17 @@
+.real-integrations { font-size:13px;line-height:1.7;min-width:0; }
+.real-integrations h2 { margin:0 0 14px;font-size:22px; }
+.ri-intro,.ri-note { color:var(--muted,#777);font-size:12px; }
+.ri-note { padding:12px;background:var(--hover,#f5f5f5);border-radius:8px; }
+.ri-toolbar { display:flex;gap:10px;align-items:center;margin:20px 0; }
+.ri-toolbar input { flex:1;min-width:0;padding:9px 12px;border:1px solid var(--line,#ddd);border-radius:7px;background:var(--bg,#fff);color:inherit; }
+.ri-grid { display:grid;grid-template-columns:1fr;gap:12px; }
+.ri-card { padding:17px;border:1px solid var(--line,#ddd);border-radius:10px;min-width:0; }
+.ri-card-heading { display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center; }
+.ri-card h3 { font-size:15px;margin:0; }.ri-card-heading span { font-size:10px;border:1px solid var(--line,#ddd);padding:3px 7px;border-radius:5px; }
+.ri-card p,.ri-card small { font-size:11px;color:var(--muted,#777);overflow-wrap:anywhere; }
+.ri-actions { display:flex;gap:7px;flex-wrap:wrap;margin-top:13px; }
+.ri-setup { border-top:1px solid var(--line,#ddd);margin-top:14px;padding-top:12px; }.ri-setup h4 {font-size:12px;}
+.ri-setup pre { white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.7 ui-monospace,monospace;background:var(--hover,#f5f5f5);padding:12px;border-radius:7px; }
+.ri-setup ul { padding-left:18px;font-size:11px; }.ri-setup li { margin-bottom:9px; }.ri-setup li span { display:block;color:var(--muted,#777); }
+.ri-error { color:#9e2525;background:#fff1f0;padding:12px;border-radius:7px;overflow-wrap:anywhere; }
+.ri-unsupported { border-top:1px solid var(--line,#ddd);padding-top:18px;margin-top:24px; }.ri-unsupported p { font-size:11px;color:var(--muted,#777); }

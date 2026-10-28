@@ -1,10 +1,10 @@
 import type { Artifact } from "./local-model";
-import type { ToolRun } from "./types";
+import type { IntegrationApproval, ToolRun } from "./types";
 import { ApiError, authenticatedStream } from "./backend-client";
 
 export type LlmConfig = { configured: boolean; models: string[] };
 export type ArtifactPatch = { artifact: Artifact; base?: { content: string; title: string; updatedAt: string } };
-export type ChatEvent = ({ type: "tool" } & ToolRun) | { type: "artifact"; patch: ArtifactPatch } | { type: "delta" | "reasoning"; text: string } | { type: "done"; model: string } | { type: "error"; message: string };
+export type ChatEvent = { type: "approval"; approval: IntegrationApproval } | ({ type: "tool" } & ToolRun) | { type: "artifact"; patch: ArtifactPatch } | { type: "delta" | "reasoning"; text: string } | { type: "done"; model: string } | { type: "error"; message: string };
 export const currentModels = ["deepseek-flash", "deepseek-v4-pro"];
 export const pendingKey = (workspaceId: string, threadId: string) => "llm-pending:" + workspaceId + ":" + threadId;
 
@@ -21,6 +21,7 @@ export async function consumeChat(response: Response, onEvent: (event: ChatEvent
     if (event.type === "error") throw new Error(typeof event.message === "string" ? event.message : "Generation failed.");
     if ((event.type === "delta" || event.type === "reasoning") && typeof event.text === "string") onEvent(event);
     else if (event.type === "tool" && typeof event.id === "string" && typeof event.summary === "string") onEvent(event);
+    else if (event.type === "approval" && typeof event.approval?.token === "string") onEvent(event);
     else if (event.type === "artifact" && event.patch?.artifact && typeof event.patch.artifact.id === "string") onEvent(event);
     else if (event.type === "done" && typeof event.model === "string") { complete = true; onEvent(event); }
     else throw new Error("Invalid model stream event.");

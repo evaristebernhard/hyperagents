@@ -2,7 +2,7 @@
 
 Independent recreation of Hyperagent's web UI, now with a real local data service.
 It is not the official application, does not include its private implementation,
-and optionally calls DeepSeek through the authenticated server. It does not control a browser or execute external integrations.
+and optionally calls DeepSeek through the authenticated server. It does not control a browser; explicitly selected, server-configured integrations can read real APIs and perform human-confirmed writes.
 
 ## Run locally
 
@@ -59,10 +59,19 @@ old demo cannot recover file bytes that were never uploaded.
 - Owner-created immutable public share snapshots and revocation. Public views do
   not expose private attachment bytes, Agent prompts, credentials or whole workspaces.
 
-Local workspace tools execute; no browser runtime, OAuth, external service actions, scheduled worker, payment service or
+Local workspace tools and selected server-configured integration APIs execute; no browser runtime, browser OAuth onboarding, scheduled worker, payment service or
 remote skill research/import is connected. Such actions are disabled or explicitly
 state that they are unavailable; they do not report fake successful execution.
 Existing fixture-only controls are not evidence that execution exists.
+
+## Real account integrations
+
+Settings > Integrations now tests real API access before enabling a workspace binding.
+Thirteen services and 31 operations are implemented; external writes require signed,
+exact-content approval cards and are never automatic model actions. Configure only the
+services you use in private .env. See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) for
+credentials, least scopes, setup, supported operations and limits. Google uses pre-consented
+server tokens with optional automatic refresh; no fake browser OAuth flow is shown.
 
 ## Skills and Marketplace
 

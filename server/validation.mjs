@@ -91,7 +91,8 @@ export function validateState(state, findFile = () => undefined) {
         if (key === 'threads') {
           if (item.config !== undefined) settings(item.config);
           if (item.messages !== undefined && !list(item.messages,m=> {
-            keys(m,['id','role','text','createdAt','context','toolRuns']);
+            keys(m,['id','role','text','createdAt','context','toolRuns','actionRequests']);
+            if(m.actionRequests!==undefined && (!Array.isArray(m.actionRequests)||m.actionRequests.length>12||!m.actionRequests.every(a=>{keys(a,['id','token','provider','operation','summary','args','status','result']);return id(a.id)&&str(a.token)&&a.token.length<=66000&&str(a.provider)&&str(a.operation)&&str(a.summary)&&obj(a.args)&&['pending','completed','failed','dismissed'].includes(a.status)&&(a.result===undefined||str(a.result));}))) fail('Invalid action request.');
             if(m.toolRuns!==undefined && (!Array.isArray(m.toolRuns) || m.toolRuns.length>30 || !m.toolRuns.every(t=>{keys(t,['id','name','status','summary']);return id(t.id) && str(t.name) && ['running','success','error'].includes(t.status) && str(t.summary) && t.summary.length<=1600;}))) fail('Invalid tool history.');
             if (m.id !== undefined && !id(m.id)) fail();
             if (m.createdAt !== undefined && !str(m.createdAt)) fail();

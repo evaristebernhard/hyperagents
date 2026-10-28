@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Star, SlidersHorizontal, Share2, GitFork, Archive, Trash2, Pencil, X } from "lucide-react";
 import type { ThreadProps } from "./Thread";
-import type { DemoMessage, MessageContext, ThreadSettings, ToolRun } from "./types";
+import type { DemoMessage, MessageContext, ThreadSettings, ToolRun, IntegrationApproval } from "./types";
 import { defaultThreadSettings } from "./types";
 import type { Artifact } from "./local-model";
 import { now, uid } from "./local-model";
@@ -12,6 +12,7 @@ import { api, fileDownloadUrl } from "./backend-client";
 import { streamChat, pendingKey, artifactFromAnswer, currentModels, type LlmConfig, type ArtifactPatch } from "./llm-client";
 import AnswerMarkdown from "./AnswerMarkdown";
 import { parseTable } from "./table-utils";
+import IntegrationApprovals from "./IntegrationApprovals";
 import "./real-thread.css";
 
 type Share = { id: string; token: string; createdAt: string; revokedAt?: string };
@@ -109,7 +110,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     generation.current = controller; setGenerating(true); setDraft(""); setError(""); setReasoning(false); setToolRuns([]);
     const originalId = thread.id;
     let text = "", failure = "", stopped = false;
-    const runs: ToolRun[] = [], patches: ArtifactPatch[] = [];
+    const runs: ToolRun[] = [], patches: ArtifactPatch[] = [], approvals: IntegrationApproval[] = [];
     let artifactFailure = "";
     try {
       await w.flush();
@@ -120,7 +121,9 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
         if (event.type === "reasoning") setReasoning(true);
         if (event.type === "tool") { const run: ToolRun = { id: event.id, name: event.name, status: event.status, summary: event.summary }; const at = runs.findIndex(t => t.id === run.id); if (at < 0) runs.push(run); else runs[at] = run; setToolRuns([...runs]); }
         if (event.type === "artifact") patches.push(event.patch);
+        if (event.type === "approval") approvals.push(event.approval);
       });
+      if (!text.trim() && approvals.length) text = "An integration action is ready for your explicit review. No write has been performed.";
       if (!text.trim() && patches.length) text = "Prepared " + patches.length + " artifact(s) using local workspace tools.";
       if (!text.trim()) throw new Error("The model returned no answer text. Try again.");
     } catch (e) {
@@ -147,7 +150,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
           setSelectedId(patches[0].artifact.id);
           } catch (e) { artifactFailure = errorText(e); }
         }
-        const answer: DemoMessage = { id: crypto.randomUUID(), role: "assistant" as const, text: text + (failure ? "\n\n[" + (stopped ? "Stopped — partial answer" : "Interrupted — partial answer") + "]" : ""), createdAt: now(), ...(runs.length ? { toolRuns: runs.map(run => ({ ...run, status: run.status === "running" ? "error" as const : run.status })) } : {}) };
+        const answer: DemoMessage = { id: crypto.randomUUID(), role: "assistant" as const, text: text + (failure ? "\n\n[" + (stopped ? "Stopped — partial answer" : "Interrupted — partial answer") + "]" : ""), createdAt: now(), ...(!failure && approvals.length ? { actionRequests: approvals } : {}), ...(runs.length ? { toolRuns: runs.map(run => ({ ...run, status: run.status === "running" ? "error" as const : run.status })) } : {}) };
         const next = { ...latest.current, messages: [...(latest.current.messages || []), answer], updatedAt: now() };
         latest.current = next; update(next); await w.flush();
         if (!isCurrentView(epoch) || generation.current !== controller) return;
@@ -192,7 +195,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     const allArtifacts = w.data.artifacts.filter(a => a.threadId === thread.id);
     const ids = new Map(allArtifacts.map(a => [a.id, uid("artifact")]));
     const copies = allArtifacts.map(a => ({ ...structuredClone(a), id: ids.get(a.id)!, threadId: id, versions: a.versions.map(v => ({ ...v, id: uid("version") })), createdAt: timestamp, updatedAt: timestamp }));
-    const copy = { ...structuredClone(thread), id, title: thread.title + " (fork)", starred: false, archived: false, createdAt: timestamp, updatedAt: timestamp, messages: (thread.messages || []).map(m => ({ ...structuredClone(m), id: crypto.randomUUID(), ...(m.context ? { context: { ...structuredClone(m.context), artifactIds: (m.context.artifactIds || []).map(a => ids.get(a) || a) } } : {}) })) };
+    const copy = { ...structuredClone(thread), id, title: thread.title + " (fork)", starred: false, archived: false, createdAt: timestamp, updatedAt: timestamp, messages: (thread.messages || []).map(m => ({ ...structuredClone(m), id: crypto.randomUUID(), ...(m.actionRequests ? { actionRequests: m.actionRequests.map(a => ({ ...a, token: "", status: a.status === "pending" ? "dismissed" as const : a.status })) } : {}), ...(m.context ? { context: { ...structuredClone(m.context), artifactIds: (m.context.artifactIds || []).map(a => ids.get(a) || a) } } : {}) })) };
     w.set("threads", items => [...items, copy]);
     w.set("artifacts", items => [...items, ...copies]);
     await w.flush(); navigate("/thread/" + id);
@@ -236,7 +239,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
       </div>
     </header>
     <div className="rt-status"><span>{llm?.configured ? "DeepSeek connected · Text generation and saved context" : llmError ? "Model status unavailable" : llm ? "DeepSeek not configured · Messages are still saved" : "Checking model connection…"}</span><span role="status">{busy ? "Saving…" : w.persistence === "saved" ? "Saved" : w.persistence}</span></div>
-    {llm && !llm.configured && <p className="rt-notice">To enable real replies, set DEEPSEEK_API_KEY in the server’s private .env or deployment environment and restart the service. Never commit a key or use a VITE_ secret. Local tools and selected public-data APIs are available when enabled. Browser, generic web search, media, OAuth integrations and schedules are not executed.</p>}
+    {llm && !llm.configured && <p className="rt-notice">To enable real replies, set DEEPSEEK_API_KEY in the server’s private .env or deployment environment and restart the service. Never commit a key or use a VITE_ secret. Local tools and selected public-data APIs are available when enabled. Selected configured integrations can read actual APIs. Writes require your per-action confirmation. Browser, generic web search, media and schedules are not executed.</p>}
     {llmError && <p className="rt-error" role="alert">{llmError}</p>}
     {error && <div className="rt-error" role="alert">{error}<button className="btn small" onClick={() => setError("")}>Dismiss</button></div>}
     {(w.persistence === "error" || w.persistence === "conflict") && <div className="rt-error" role="alert"><p>{w.storageError || "Changes are not saved. Export a backup before reloading saved data."}</p><div className="rt-actions"><button className="btn small" onClick={w.exportSnapshot}>Export backup</button>{w.persistence === "error" && <button className="btn small" disabled={busy} onClick={() => void perform(w.retrySave)}>Retry save</button>}<button className="btn small" disabled={busy} onClick={() => { if (window.confirm("Discard unsaved local changes and reload saved server data? Export a backup first if you want to keep them.")) void perform(w.reload); }}>Reload saved data</button></div></div>}
@@ -249,6 +252,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
             {message.role === "assistant" ? <div className="rt-answer"><AnswerMarkdown content={message.text} /><div className="rt-answer-actions"><button className="btn small" onClick={() => void navigator.clipboard.writeText(message.text).then(() => notify("Answer copied")).catch(() => setError("Clipboard access failed. Select and copy the answer text instead."))}>Copy answer</button><button className="btn small" disabled={busy || generating} onClick={() => void perform(() => answerArtifact(message.text, "Document"))}>Save as document</button><button className="btn small" disabled={busy || generating} onClick={() => void perform(() => answerArtifact(message.text, "Webpage"))}>Save as webpage</button></div></div> : <p>{message.text}</p>}
             {!!message.context?.attachments?.length && <ul className="rt-attachments">{message.context.attachments.map(file => <li key={file.id}><a href={fileDownloadUrl(file)} download={file.name}>{file.name}</a><span> · {file.size.toLocaleString()} bytes</span></li>)}</ul>}
             {!!message.toolRuns?.length && <ToolHistory runs={message.toolRuns} />}
+            {!!message.actionRequests?.length && message.id && <IntegrationApprovals threadId={thread.id} messageId={message.id} requests={message.actionRequests} />}
             {message.context && <details className="rt-context"><summary>Saved context</summary><dl><dt>Model preference</dt><dd>{message.context.settings?.model || "Not selected"}</dd><dt>Provider preference</dt><dd>{message.context.settings?.provider || "Not selected"}</dd><dt>Skills</dt><dd>{(message.context.skillIds || []).map(id => w.data.skills.find(s => s.id === id)?.name || id).join(", ") || "None"}</dd><dt>Memories</dt><dd>{(message.context.memoryIds || []).length}</dd><dt>Artifacts</dt><dd>{(message.context.artifactIds || []).map(id => w.data.artifacts.find(a => a.id === id)?.title || id).join(", ") || "None"}</dd><dt>Integrations</dt><dd>{(message.context.integrationIds || []).map(id => w.data.connections.find(c => c.id === id)?.label || id).join(", ") || "None"}</dd></dl></details>}
           </article>)}
           {generating && thread.messages?.at(-1)?.role !== "assistant" && <article className="rt-message assistant" aria-label="Streaming answer"><div className="rt-message-meta"><strong>Assistant</strong><span role="status">{draft ? "Writing…" : reasoning ? "Reasoning…" : "Working…"}</span></div>{!!toolRuns.length && <ToolHistory runs={toolRuns} />}{draft && <div className="rt-answer"><AnswerMarkdown content={draft} /></div>}<button className="btn small" onClick={() => generation.current?.abort()}>Stop generation</button></article>}
@@ -268,7 +272,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
           {editing ? <form onSubmit={e => { e.preventDefault(); void perform(saveArtifact); }} className="rt-artifact-form"><label>Artifact title<input required value={artifactTitle} onChange={e => setArtifactTitle(e.target.value)} /></label><label>{selected.kind === "Webpage" ? "HTML source" : "Content"}<textarea aria-label="Artifact content" value={content} onChange={e => setContent(e.target.value)} /></label><button className="btn primary" disabled={busy}>Save artifact</button></form> : <ArtifactView artifact={preview!} />}
         </div> : !!linked.length && <p className="rt-empty">Select an artifact to preview, edit, download, or restore a version.</p>}
       </section>
-      {settingsPanel && <aside className="rt-settings" aria-label="Thread configuration"><div className="rt-section-heading"><h2>Configuration</h2><IconButton label="Close configuration" onClick={() => navigate("/thread/" + thread.id)}><X size={16} /></IconButton></div><p className="rt-notice">DeepSeek uses the selected agent prompt and saved context. Only the supported models below execute. Enable Thread Search, Documents, Webpages and Tables for local tool calls. World Bank / Weather / configured OpenAlex are read-only API tools. Browser, generic web search, media, OAuth integrations and schedules are not connected.</p>
+      {settingsPanel && <aside className="rt-settings" aria-label="Thread configuration"><div className="rt-section-heading"><h2>Configuration</h2><IconButton label="Close configuration" onClick={() => navigate("/thread/" + thread.id)}><X size={16} /></IconButton></div><p className="rt-notice">DeepSeek uses the selected agent prompt and saved context. Only the supported models below execute. Enable Thread Search, Documents, Webpages and Tables for local tool calls. World Bank / Weather / configured OpenAlex are read-only API tools. Selected integrations execute actual API reads; writes are confirmation-gated. Browser, generic web search, media and schedules are not connected.</p>
         <label>Project<select aria-label="Thread project" value={thread.projectId || ""} onChange={e => void perform(() => saveThread({ projectId: e.target.value || undefined, project: undefined }))}><option value="">No project</option>{w.data.projects.filter(p => !p.archived || p.id === thread.projectId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
         <form onSubmit={e => { e.preventDefault(); void perform(() => saveThread({ config })); }}>
           <label>Provider<select value="DeepSeek" disabled><option>DeepSeek</option></select></label>

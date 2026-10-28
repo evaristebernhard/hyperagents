@@ -213,3 +213,17 @@ test('selected installed weather skill exposes and executes an actual API adapte
   d.threads[0].messages[0].context={skillIds:['installed-weather']};await h.save(s);
   const res=await h.chat();const result=events(await res.text());assert.equal(network,2);assert.equal(round,2);assert.equal(result.at(-1).type,'done',JSON.stringify(result));assert.ok(result.some(e=>e.type==='tool' && e.name==='weather_forecast' && e.status==='success'));
 });
+
+test('LLM integration writes produce a sealed approval; only explicit API confirmation sends once',async t=>{
+  let round=0,writes=0;
+  const h=await harness(t,{deepseekApiKey:'test-only-placeholder',integrationCredentials:{GITHUB_TOKEN:'synthetic-github-token'},integrationFetch:async(url,init)=>{assert.equal(init.method,'POST');assert.match(url,/\/repos\/owner\/repo\/issues$/);writes++;return new Response(JSON.stringify({number:7,title:'Approved issue',state:'open',html_url:'https://github.com/owner/repo/issues/7'}),{headers:{'content-type':'application/json'}});},llmFetch:async(_url,init)=>{
+    round++;const body=JSON.parse(init.body);assert.ok(body.tools.some(t=>t.function.name==='prepare_github_create_issue'));assert.equal(body.tools.some(t=>t.function.name==='github_create_issue'),false);
+    if(round===1)return new Response(frame({choices:[{delta:{tool_calls:[{index:0,id:'call-integration',type:'function',function:{name:'prepare_github_create_issue',arguments:JSON.stringify({connectionId:'conn-github',owner:'owner',repo:'repo',title:'Approved issue',body:'Exact issue content'})}}]},finish_reason:'tool_calls'}]})+frame('[DONE]'),{headers:{'content-type':'text/event-stream'}});
+    const result=JSON.parse(body.messages.find(m=>m.role==='tool').content);assert.equal(result.status,'approval_required');assert.equal(result.token,undefined);return success();
+  }});
+  await h.setup();const s=snapshot();s.workspaces[0].data.connections.push({id:'conn-github',provider:'GitHub',label:'Verified GitHub',endpoint:'https://api.github.com',enabled:true,createdAt:new Date().toISOString()});s.workspaces[0].data.threads[0].messages[0].context={integrationIds:['conn-github']};await h.save(s);
+  const result=events(await(await h.chat()).text()),approval=result.find(e=>e.type==='approval')?.approval;assert.ok(approval?.token);assert.equal(writes,0);assert.equal(result.at(-1).type,'done');
+  assert.equal((await h.call('/api/integrations/execute',{method:'POST',body:{token:approval.token,workspaceId:request.workspaceId,threadId:request.threadId,confirmed:false}})).status,422);assert.equal(writes,0);
+  const sent=await(await h.call('/api/integrations/execute',{method:'POST',body:{token:approval.token,workspaceId:request.workspaceId,threadId:request.threadId,confirmed:true}})).json();assert.equal(sent.status,'completed');assert.equal(writes,1);
+  assert.equal((await(await h.call('/api/integrations/execute',{method:'POST',body:{token:approval.token,workspaceId:request.workspaceId,threadId:request.threadId,confirmed:true}})).json()).replayed,true);assert.equal(writes,1);
+});

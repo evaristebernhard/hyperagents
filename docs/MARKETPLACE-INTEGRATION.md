@@ -97,3 +97,8 @@ Browser automation remains intentionally excluded. General web search, image/vid
 | skill | [Airtable Kanban Work Tracker](https://hyperagent.com/marketplace/s/ccs01KVDJA2SF_B9G0PXF4NPHJNEBK) | Source only | Airtable |
 
 The UI displays each implementation's exact limitations. Requirements inferred from source-listing text are labelled as inferred, not official package manifests.
+
+
+## Subsequent account-integration increment
+
+Thirteen server-owned account API adapters and 31 bounded operations are now supplied; see INTEGRATIONS.md. This expands API availability after configuring credentials, but it does not automatically implement the source-only marketplace recipes, their unattended workers, media pipelines or full OAuth onboarding. The ledger above describes recipe coverage, not the later adapter inventory. Gmail creates drafts but does not send; generic Email dependencies remain unsatisfied where actual outbound sending is required.

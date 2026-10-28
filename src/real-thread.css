@@ -103,3 +103,9 @@
 .rt-tool small { color:var(--muted,#777); float:right; font-size:10px; }
 .rt-tool pre { margin:0; padding:12px; border-top:1px solid var(--line,#ddd); white-space:pre-wrap; overflow-wrap:anywhere; font:11px/1.7 ui-monospace,monospace; max-height:220px; overflow:auto; }
 .rt-tool.error { border-color:#c87a7a; }
+.rt-approvals { display:flex; flex-direction:column; gap:10px; margin-top:16px; }
+.rt-approval { border:1px solid #b7c6d2; padding:16px; border-radius:10px; background:var(--hover,#f6f9fc); font-size:12px; line-height:1.7; }
+.rt-approval strong { font-size:13px; }
+.rt-approval pre,.rt-approval-details { white-space:pre-wrap; overflow-wrap:anywhere; max-height:360px; overflow:auto; font:11px/1.65 ui-monospace,monospace; }
+.rt-approval .rt-actions { margin-top:12px; }
+.rt-approval.completed { border-color:#91b99d; }.rt-approval.failed { border-color:#cd9b9b; }

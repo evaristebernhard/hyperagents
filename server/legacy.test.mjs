@@ -25,3 +25,8 @@ test('binary attachment migration is blocked before confirmation and never fabri
   assert.throws(()=>prepareLegacy(source,()=>undefined),error=>error.code==='MIGRATION_ATTACHMENTS' && /No attachment was removed/.test(error.message));
   assert.equal(JSON.stringify(source),before);
 });
+
+test('imported copies preserve action history but remove executable pending approval authority',()=>{
+ const source=emptyState();source.workspaces[0].data.threads.push({id:'approval-thread',title:'Imported approval',summary:'',time:'',messages:[{id:'message-action',role:'assistant',text:'Review action',actionRequests:[{id:'approval-old',token:'old-signed-token',provider:'GitHub',operation:'github_create_issue',summary:'Issue',args:{title:'Copy'},status:'pending'}]}]});
+ const copy=prepareLegacy(source);const action=copy.state.workspaces[0].data.threads[0].messages[0].actionRequests[0];assert.equal(action.token,'');assert.equal(action.status,'dismissed');assert.equal(source.workspaces[0].data.threads[0].messages[0].actionRequests[0].token,'old-signed-token');assert.ok(copy.warnings.some(w=>w.includes('disabled copied integration approvals')));
+});

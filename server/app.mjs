@@ -10,6 +10,8 @@ import { ApiError, emptyState, validateState } from './validation.mjs';
 import { prepareLegacy } from './legacy.mjs';
 import { createLlm } from './llm.mjs';
 import { marketplaceCapabilities, marketplaceCatalog } from './marketplace.mjs';
+import { createIntegrationRegistry } from './integrations.mjs';
+import { createApprovalBroker } from './integration-approvals.mjs';
 const scrypt = promisify(scryptCallback);
 const hash = value => createHash('sha256').update(value).digest('hex');
 const random = () => randomBytes(32).toString('base64url');
@@ -77,8 +79,10 @@ export async function createApp(options = {}) {
   const load = () => { const row=db.prepare('SELECT * FROM workspace WHERE id=1').get(); return {state:JSON.parse(row.state),revision:row.revision}; };
   const meta = row => row && ({id:row.id,workspaceId:row.workspace_id,name:row.name,size:row.size,mimeType:row.mime_type,createdAt:row.created_at});
   const findFile = (id,workspaceId) => meta(db.prepare('SELECT * FROM files WHERE id=? AND workspace_id=?').get(id,workspaceId));
+  const integrationRegistry=createIntegrationRegistry({credentials:options.integrationCredentials,fetchImpl:options.integrationFetch,load});
+  const approvalBroker=createApprovalBroker({load,registry:integrationRegistry});
   // Only authenticated chat execution can read saved, workspace-owned UTF-8 text.
-  const llm=createLlm({apiKey:options.deepseekApiKey,fetchImpl:options.llmFetch,publicFetch:options.publicFetch,openAlexApiKey:options.openAlexApiKey,publicUserAgent:options.publicUserAgent,load,readAttachment:async(f,workspaceId)=> {
+  const llm=createLlm({apiKey:options.deepseekApiKey,integrationRegistry,approvalBroker,fetchImpl:options.llmFetch,publicFetch:options.publicFetch,openAlexApiKey:options.openAlexApiKey,publicUserAgent:options.publicUserAgent,load,readAttachment:async(f,workspaceId)=> {
     if (!/^file-[a-f0-9-]{36}$/.test(f.id)) return null;
     const stored=findFile(f.id,workspaceId);
     if (!stored || ['name','size','mimeType','createdAt','workspaceId'].some(k=>stored[k]!==f[k]) || stored.size>16384) return null;
@@ -200,7 +204,21 @@ export async function createApp(options = {}) {
         res.setHeader('Set-Cookie',`hyperagents_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure?'; Secure':''}`);
         return send(res,200,{authenticated:false,setupRequired:false});
       }
-      if (route==='/api/marketplace/capabilities' && method==='GET') return send(res,200,marketplaceCapabilities({deepseekConfigured:llm.config().configured,openAlexApiKey:options.openAlexApiKey,userAgent:options.publicUserAgent}));
+      if (route==='/api/integrations' && method==='GET') return send(res,200,integrationRegistry.statuses());
+      const integrationTest=route.match(/^\/api\/integrations\/([a-z-]+)\/test$/);
+      if(integrationTest && method==='POST') {
+        rate('integration-tests',60);const b=await body(req,4096);exactBody(b,['workspaceId']);workspace(b.workspaceId);
+        try{return send(res,200,await integrationRegistry.test(integrationTest[1]));}catch(e){err(422,e.message,'INTEGRATION_TEST');}
+      }
+      if(route==='/api/integrations/execute' && method==='POST') {
+        const b=await body(req,70000);exactBody(b,['token','confirmed','workspaceId','threadId']);if(b.confirmed!==true)err(422,'Explicit confirmation is required.','CONFIRMATION');
+        rate('integration-writes',60);try{return send(res,200,await approvalBroker.execute(b.token,{workspaceId:b.workspaceId,threadId:b.threadId}));}catch(e){err(422,e.message,'INTEGRATION_ACTION');}
+      }
+      if (route==='/api/marketplace/capabilities' && method==='GET') {
+        const result=marketplaceCapabilities({deepseekConfigured:llm.config().configured,openAlexApiKey:options.openAlexApiKey,userAgent:options.publicUserAgent});
+        for(const provider of integrationRegistry.statuses().providers)result.capabilities[provider.name]={available:provider.configured,reason:provider.configured?'Server API adapter configured; select a tested workspace connection. Write operations still need per-action confirmation.':'API adapter implemented; configure '+provider.env.join(' / ')+' and test the provider access.'};
+        result.capabilities.Email={available:false,reason:'Gmail supports reads and approval-gated drafts, not direct outbound email sending. See the Gmail capability.'};result.capabilities.Calendar=result.capabilities['Google Calendar'];return send(res,200,result);
+      }
       if (route==='/api/marketplace/catalog' && method==='GET') return send(res,200,marketplaceCatalog);
       if (route==='/api/llm/config' && method==='GET') return send(res,200,llm.config());
       if (route==='/api/llm/chat' && method==='POST') return await llm.chat(req,res,await body(req,4096));

@@ -42,7 +42,7 @@ Authenticated GET /api/llm/config returns configuration presence and model names
 
 The server re-resolves resources from the requested saved workspace, rather than trusting arbitrary prompt bodies supplied by the browser. It uses bounded recent message history, the selected agent's prompt and linked skill documentation, explicitly selected skills/memories/artifacts, workspace pinned memories, project description/goal and thread notes. The latest message's saved settings determine model/mode/output format.
 
-Only bounded UTF-8 text attachments with matching saved file metadata are read (at most 16 KiB per file, further bounded in prompts). Images, PDFs, larger or binary files remain downloadable but are explicitly reported as not read. Text resources and history are truncated under documented implementation limits; this is not full-document retrieval or vector search. Skill documents supply instructions, not executable tools, and connection metadata supplies no authenticated integration access.
+Only bounded UTF-8 text attachments with matching saved file metadata are read (at most 16 KiB per file, further bounded in prompts). Images, PDFs, larger or binary files remain downloadable but are explicitly reported as not read. Text resources and history are truncated under documented implementation limits; this is not full-document retrieval or vector search. Skill documents supply instructions, not executable tools, and connection metadata alone supplies no authenticated integration access; selected bindings additionally require a configured server API adapter and provider credentials.
 
 ## Executable local tools
 
@@ -60,7 +60,7 @@ Artifact changes are staged until the complete run succeeds. The UI validates th
 
 ## Not equivalent to all of Hyperagent
 
-Browser control is intentionally excluded. General web search/research providers, image/video/audio/avatar generation, transcription, maps, executable apps, OAuth connectors, unattended schedules/live runs, multi-user permissions and billing are not implemented by this increment. Their existing configuration UI is not evidence of execution. This is a functional text-and-local-tools agent, not complete non-browser feature parity or a durable unattended runner.
+Browser control is intentionally excluded. General web search/research providers, image/video/audio/avatar generation, transcription, maps, executable apps, full OAuth onboarding and unimplemented service connectors, unattended schedules/live runs, multi-user permissions and billing are not implemented by this increment. Their existing configuration UI is not evidence of execution. This is a functional text-and-local-tools agent, not complete non-browser feature parity or a durable unattended runner.
 
 ## Verification boundary
 
@@ -73,3 +73,8 @@ Local verification for this increment: production build passes; backend suite co
 ## Marketplace skills and public data
 
 Selected independently installed Marketplace skills can bind the fixed read-only World Bank, NWS and configured OpenAlex tools. The server re-resolves the source template and selected installation; it does not execute arbitrary code embedded in skill documentation. See MARKETPLACE-INTEGRATION.md for the complete dated inventory, per-item coverage, live NWS test, World Bank WAF failure and unconfigured OpenAlex boundary.
+
+
+## Selected account integration tools
+
+Configured integrations explicitly selected in a message now supply bounded real API reads and prepare-only write tools. Writes require owner confirmation outside the model loop, with signed current-thread/workspace scope and replay protection. See INTEGRATIONS.md for actual supported services and remaining limits. Connected Hyperagent accounts are not reused.

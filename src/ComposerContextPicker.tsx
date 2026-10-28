@@ -22,7 +22,7 @@ export default function ComposerContextPicker({ kind, close, choose, navigate }:
     <input autoFocus aria-label={"Search " + kind} placeholder={"Search " + kind} value={query} onChange={e => setQuery(e.target.value)} />
     {filtered.map(item => <button key={item.id} onClick={() => { choose(item.id); close(); }}>{item.label}</button>)}
     {!filtered.length && <p className="empty-state">{items.length ? "No matching items" : "No " + kind + " available"}</p>}
-    {kind === "integrations" && <><small>Saved connection metadata only; no external service is called.</small><button onClick={() => { close(); navigate(location.pathname + "?settings=integrations"); }}>Add other integrations</button></>}
+    {kind === "integrations" && <><small>Select a server-configured integration for real API reads. Writes require a separate approval card. Unsupported metadata entries cannot execute.</small><button onClick={() => { close(); navigate(location.pathname + "?settings=integrations"); }}>Add other integrations</button></>}
     {kind === "projects" && !creating && <button onClick={() => setCreating(true)}>Create new project…</button>}
     {kind === "projects" && creating && <form onSubmit={async e => {
       e.preventDefault(); if (!name.trim() || busy) return;
