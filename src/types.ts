@@ -1,5 +1,21 @@
 import type { ReactNode } from "react";
 export type Navigate = (path: string) => void;
+export type ThreadSettings = {
+  model: string;
+  reasoning: string;
+  provider: string;
+  mode: string;
+  agentId?: string;
+  starterAgentName?: string;
+  tools: string[];
+  outputFormat?: string;
+  visuals?: string;
+};
+export type FileMeta = { id: string; name: string; size: number; mimeType: string; createdAt: string; workspaceId: string };
+export type MessageContext = { settings: ThreadSettings; skillIds: string[]; memoryIds: string[]; artifactIds: string[]; integrationIds: string[]; projectId?: string; attachments: FileMeta[] };
+export type DemoMessage = { id?: string; role: "user" | "assistant"; text: string; createdAt?: string; context?: MessageContext };
+export type WorkspacePreferences = { defaultThreadSettings?: ThreadSettings; [key: string]: unknown };
+export const defaultThreadSettings: ThreadSettings = { model: "", reasoning: "Medium", provider: "Any", mode: "Execute", tools: [] };
 export type DemoThread = {
   id: string;
   title: string;
@@ -11,7 +27,11 @@ export type DemoThread = {
   excluded?: boolean;
   roomId?: string;
   notes?: string;
-  messages?: { role: "user" | "assistant"; text: string }[];
+  messages?: DemoMessage[];
+  createdAt?: string;
+  updatedAt?: string;
+  config?: ThreadSettings;
+  projectId?: string;
 };
 export type DemoProject = {
   id: string;

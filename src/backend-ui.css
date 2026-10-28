@@ -1,0 +1,45 @@
+.backend-auth { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 28px; background: var(--bg); overflow-y: auto; }
+.backend-auth-card { width: min(480px, 100%); display: flex; flex-direction: column; gap: 14px; padding: 32px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); }
+.backend-auth-card > small { font-size: 11px; letter-spacing: .08em; color: var(--muted); }
+.backend-auth-card h1 { font-size: 30px; line-height: 36px; margin: 0; }
+.backend-auth-card p { color: var(--muted); font-size: 14px; line-height: 22px; margin: 0; }
+.backend-auth-card input { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
+.backend-auth-card .field { margin: 0; }
+.backend-error { color: #b22525 !important; }
+.backend-loading { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; }
+.backend-savebar { height: 34px; padding: 6px 14px; display: flex; align-items: center; gap: 12px; font-size: 12px; border-bottom: 1px solid var(--line); background: var(--soft); overflow-x: auto; white-space: nowrap; }
+.backend-savebar > button { text-decoration: underline; text-underline-offset: 2px; flex-shrink: 0; }
+.backend-savebar.error, .backend-savebar.conflict { color: #9e3022; background: #fff0e5; }
+.backend-signout { margin-left: auto; }
+.backend-savebar ~ .app-shell { height: calc(100dvh - 34px); }
+.backend-migration { position: fixed; z-index: 80; top: 54px; left: max(20px, calc(50% - 370px)); width: min(740px, calc(100vw - 40px)); max-height: calc(100dvh - 84px); overflow: auto; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 35px #0002; padding: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.backend-migration > span { flex: 1; font-size: 12px; color: var(--muted); }
+.backend-migration-preview { flex-basis: 100%; font-size: 13px; }
+.backend-migration-preview label { display: block; margin: 16px 0; }
+.backend-migration-preview .btn { margin-right: 8px; }
+.composer-upload-error { padding: 8px 14px; color: #b22525; font-size: 12px; }
+.composer-context-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 14px; }
+.composer-context-chips button { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 6px; padding: 4px 7px; font-size: 12px; }
+.context-picker { position: absolute; z-index: 40; top: calc(100% - 48px); left: 16px; width: min(320px, 100% - 32px); max-height: 360px; overflow: auto; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); box-shadow: 0 8px 26px #0002; }
+.context-picker input { width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; margin-bottom: 6px; }
+.context-picker > button { display: flex; width: 100%; text-align: left; gap: 8px; padding: 9px 8px; border-radius: 7px; font-size: 13px; align-items: center; }
+.context-picker > button:hover { background: var(--soft); }
+.context-picker .empty-state { padding: 24px 8px; }
+.context-picker form { padding: 8px; display: grid; gap: 8px; }
+.context-picker textarea { min-height: 70px; padding: 8px; }
+.compact .context-picker { top: auto; bottom: calc(100% + 4px); }
+@media(max-width:600px) { .backend-auth-card { padding: 22px; } .backend-savebar { gap: 8px; } }
+.composer.server-composer > .composer-popover,
+.composer.server-composer > .fidelity-model-menu,
+.composer.server-composer > .fidelity-mode-menu,
+.composer.server-composer > .fidelity-agent-menu,
+.composer.server-composer > .context-picker { top: calc(100% - 8px); }
+.composer.server-composer.compact > .composer-popover,
+.composer.server-composer.compact > .fidelity-model-menu,
+.composer.server-composer.compact > .fidelity-mode-menu,
+.composer.server-composer.compact > .fidelity-agent-menu,
+.composer.server-composer.compact > .context-picker { top: auto; bottom: calc(100% + 4px); }
+.backend-owner-root { height: 100dvh; overflow: hidden; }
+.backend-replacement-overlay { position: fixed; inset: 0; z-index: 1900; background: var(--bg); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; text-align: center; }
+.backend-replacement-overlay h2 { margin-bottom: 12px; }
+.backend-replacement-overlay p { max-width: 520px; }

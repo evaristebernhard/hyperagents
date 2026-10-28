@@ -36,7 +36,7 @@ import {
   Clock,
   Check,
 } from "lucide-react";
-import type { DemoThread, DemoAgent, DemoProject, DemoMemory } from "./types";
+import type { DemoThread, DemoAgent, DemoProject, DemoMemory, MessageContext } from "./types";
 import {
   initialThreads,
   initialProjects,
@@ -44,12 +44,15 @@ import {
   safeRead,
   asset,
 } from "./data";
+import { defaultThreadSettings } from "./types";
+import { uid, now } from "./local-model";
 import { Mark, IconButton, Modal, Composer } from "./ui";
 import Resources from "./ResourcesUI";
 import Settings from "./SettingsUI";
 import Thread from "./Thread";
 import Agents from "./Agents";
 import AgentCasting from "./AgentCasting";
+import { deleteThreadData } from "./thread-operations";
 import Marketing from "./Marketing";
 import { useWorkspace, useCollection } from "./workspace";
 import ContentHub from "./ContentHub";
@@ -200,7 +203,7 @@ export default function App() {
       "Workspace";
     document.title = title + " · Hyperagents UI Demo";
   }, [path, threads]);
-  const notify = (t: string) => setToast(t);
+  const notify = (t: string) => setToast(workspace.mode === "server" && /saved locally|updated locally|stored locally/i.test(t) ? "Change recorded. Check the storage status for server confirmation." : t);
   const toggle = (m: string, trigger?: HTMLElement) => {
     if (trigger) {
       menuTriggerRef.current = trigger;
@@ -212,23 +215,20 @@ export default function App() {
     }
     setMenu(menu === m ? "" : m);
   };
-  const createThread = (text: string, project?: string) => {
-    const id = "local-" + Date.now();
+  const createThread = async (text: string, project?: string, context?: MessageContext, clientRequestId?: string) => {
+    const id = clientRequestId ? "thread-" + clientRequestId : uid("thread");
+    const timestamp = now();
     const t: DemoThread = {
       id,
-      title: text.split("\n")[0].slice(0, 65) || "New conversation",
-      summary: text.slice(0, 150),
-      time: "just now",
-      project,
-      messages: [
-        { role: "user", text },
-        {
-          role: "assistant",
-          text: "This is a frontend-only preview. Your message is saved on this device; no LLM, browser session, or tool was called.",
-        },
-      ],
+      title: text.split("\n")[0].slice(0, 65) || context?.attachments[0]?.name || "New conversation",
+      summary: text.slice(0, 150), time: "just now", project,
+      projectId: context?.projectId,
+      createdAt: timestamp, updatedAt: timestamp,
+      config: context?.settings || workspace.data.preferences?.defaultThreadSettings || defaultThreadSettings,
+      messages: [{ id: clientRequestId || uid("message"), role: "user", text, createdAt: timestamp, ...(context ? { context } : {}) }],
     };
-    setThreads([t, ...threads]);
+    workspace.set("threads", items => items.some(item => item.id === id) ? items : [t, ...items]);
+    await workspace.flush();
     navigate("/thread/" + id);
   };
   const link = (
@@ -274,7 +274,7 @@ export default function App() {
             <h1>Let's get to work.</h1>
             <Composer
               navigate={navigate}
-              onSend={createThread}
+              onSend={(text, context, clientId) => createThread(text, undefined, context, clientId)}
               notify={notify}
               agents={agents.map((a) => a.name)}
             />
@@ -643,7 +643,7 @@ export default function App() {
                       <Mark />
                     </span>
                     <span>{t.title}</span>
-                    {t.project && <Folder size={11} />}
+                    {(t.projectId || t.project) && <Folder size={11} />}
                   </a>
                 ))}
                 {link("/threads", "View all", ArrowUpRight)}
@@ -940,6 +940,11 @@ function ThreadList({
   title: string;
   home?: boolean;
 }) {
+  const workspace = useWorkspace();
+  const [listError, setListError] = useState("");
+  const deleting = useRef(false);
+  const projectOf = (thread: DemoThread) => thread.projectId || thread.project;
+  const projectLabel = (thread: DemoThread) => workspace.data.projects.find(p => p.id === projectOf(thread))?.name || projectOf(thread);
   const [grid, setGrid] = useState(false),
     [filter, setFilter] = useState("Recent"),
     [text, setText] = useState(""),
@@ -949,13 +954,14 @@ function ThreadList({
   const items = threads.filter(
     (t) =>
       !!t.archived === showArchived &&
-      (!projectFilter || t.project === projectFilter) &&
+      (!projectFilter || projectOf(t) === projectFilter) &&
       (filter !== "Starred" || t.starred) &&
       (filter !== "Needs input" || t.messages?.at(-1)?.role === "user") &&
       t.title.toLowerCase().includes(text.toLowerCase()),
   );
   return (
     <section className="thread-list-section">
+      {listError && <p role="alert">{listError}</p>}
       <div className="page-header">
         <h2 className={home ? "" : "page-title"}>{title}</h2>
         <div className="actions">
@@ -1043,10 +1049,10 @@ function ThreadList({
             >
               <option value="">All projects</option>
               {[
-                ...new Set(allThreads.map((t) => t.project).filter(Boolean)),
+                ...new Set(allThreads.map(projectOf).filter(Boolean)),
               ].map((p) => (
                 <option key={p} value={p}>
-                  {p}
+                  {workspace.data.projects.find(project => project.id === p)?.name || p}
                 </option>
               ))}
             </select>
@@ -1073,17 +1079,17 @@ function ThreadList({
                 navigate("/thread/" + t.id);
               }}
             >
-              {t.project && (
+              {projectOf(t) && (
                 <span className="thread-project">
                   <Folder size={14} />
-                  {t.project}
+                  {projectLabel(t)}
                 </span>
               )}
               <h3>{t.title}</h3>
               <p>{t.summary}</p>
               <small>{t.time}</small>
             </a>
-            {t.id === "small-business" && (
+            {workspace.mode === "fixture" && t.id === "small-business" && (
               <img
                 className="thread-thumbnail"
                 src={asset("brand")}
@@ -1119,9 +1125,10 @@ function ThreadList({
                 <IconButton
                   label={"Delete permanently " + t.title}
                   onClick={() => {
-                    if (confirm("Permanently delete this local thread?")) {
-                      setThreads(allThreads.filter((x) => x.id !== t.id));
-                    }
+                    if (deleting.current || !confirm("Permanently delete this thread? Artifacts are kept unlinked, and public snapshots will be revoked.")) return;
+                    if (workspace.mode === "fixture") { setThreads(allThreads.filter(x => x.id !== t.id)); return; }
+                    deleting.current = true; setListError("");
+                    void deleteThreadData(workspace, t.id).catch(e => setListError(e instanceof Error ? e.message : "Could not delete thread.")).finally(() => { deleting.current = false; });
                   }}
                 >
                   <X size={15} />

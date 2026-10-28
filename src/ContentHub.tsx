@@ -139,6 +139,7 @@ export default function ContentHub({ path, navigate, notify }: PageProps) {
         updatedAt: now(),
       };
       w.set("skills", (ss) => [...ss, s]);
+      await w.flush();
       navigate("/skills/" + s.id);
       notify("Skill imported locally. No script or tool was executed.");
       return null;

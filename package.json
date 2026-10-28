@@ -4,14 +4,19 @@
   "version": "0.3.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
+    "preview": "node scripts/preview.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "playwright test",
+    "test": "npm run test:backend && npm run test:fixtures && npm run test:backend-flow",
     "test:ui": "playwright test --ui",
     "format": "prettier --write src tests docs README.md *.json *.ts",
-    "format:check": "prettier --check src tests docs README.md *.json *.ts"
+    "format:check": "prettier --check src tests docs README.md *.json *.ts",
+    "dev:fixtures": "node scripts/dev.mjs --fixtures",
+    "start": "node server/index.mjs",
+    "test:backend": "node --test server/*.test.mjs",
+    "test:backend-flow": "playwright test --config=playwright.backend.config.ts",
+    "test:fixtures": "playwright test"
   },
   "dependencies": {
     "dompurify": "^3.4.17",
@@ -27,5 +32,8 @@
     "prettier": "^3.9.10",
     "typescript": "~5.6.3",
     "vite": "^6.0.1"
+  },
+  "engines": {
+    "node": ">=24.0.0"
   }
 }

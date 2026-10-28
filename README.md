@@ -1,127 +1,140 @@
-# Hyperagents UI recreation
+# Hyperagents — local single-owner workspace
 
-根据实际浏览器采集的 Hyperagent 界面与导航规则，重新实现的独立前端演示。**不是 Hyperagent 官方应用，也不包含其私有源码或后端。**
+Independent recreation of Hyperagent's web UI, now with a real local data service.
+It is not the official application, does not include its private implementation,
+and does not call an LLM, control a browser, or execute integrations.
 
-## 0.3 更新：从页面演示到本地可用
+## Run locally
 
-本轮继续轻量化：**固定 Skills 随前端发布，用户内容保存在浏览器，不要求数据库。**
+Use **Node 24+** (`.nvmrc` is included):
 
-- Skills 完整的创建、编辑、预览、安装、复制、归档、删除、导入导出及 Agent 关联。
-- Agent 模型/工具/知识偏好与已关联 Skills 一起保存，不再仅保存身份字段。
-- 房间、笔记、团队身份、关联会话和计划配置可本地保存；后台执行始终关闭。
-- Library 支持产物创建/导入/编辑/下载/归档/版本恢复，与会话画布共用数据。
-- 会话分叉、项目迁移、归档恢复与导出；Memories 完整编辑；手工 Rubrics。
-- 隔离的本地工作区、JSON 内容备份与带验证/确认的恢复流程。
-- 集成页面可以保存/删除连接元数据，但不会发起 OAuth 或保存密钥。
-
-详见 [docs/LOCAL-FIRST.md](docs/LOCAL-FIRST.md)。保留用户新增的 Vite `lp.chayu123.me` 主机配置。
-
-## 页面范围
-
-- 256px 全局侧栏、折叠图标栏、Personal 工作区菜单、账户菜单。
-- 新任务首页、近期会话、案例预览、会话列表与筛选/网格。
-- 会话详情、可拖动/键盘调整宽度的分栏、文档与网页画布、产物过滤、Tile/Carousel/Windows 展示状态、全屏预览。
-- 搜索弹窗（Ctrl/Cmd+K、方向键、Enter、Escape）、输入框模型/执行模式/附件/输出格式菜单。
-- Agent 列表、新建与编辑、Identity / Model / Tools & integrations / Invocations / Knowledge 五个页签。
-- Skills 列表/详情/编辑器、Memories、新建记忆弹窗。
-- Projects 列表/新建/详情、关联已有会话、项目内会话跳转。
-- Library 列表与产物预览，Marketplace 深色首页与 Agent/Skill 详情。
-- Inbox → Learning、Rubrics、Autowiki、Command Center。
-- 13 个账户设置子页面，通过当前路径的 settings 查询参数展示。
-- 营销参考页 `/marketing`、认证演示 `/login`、法律说明页、404。
-- 桌面与窄屏布局；窄屏会话通过全屏弹窗查看产物。
-
-## 明确不包含
-
-LLM 推理、真实 Browser 控制、Thread 工具执行、OAuth、真实登录、多用户权限、外部集成、付款、后台任务、调度与知识检索均未连接。相关控件展示说明或本地预览，**不会调用原站写接口**。
-
-分享采用本地文件导出，Skills 安装/导入、产物管理和计划配置已可本地操作；公共发布、真实授权、付款和实际自动化仍未连接。Documents、Workflows、Workspaces 增加的是本地扩展实现，不声称这些扩展完全等同于原站未采集的页面。HyperApps 保持显式空态。
-
-## 技术与运行
-
-React 18 + TypeScript + Vite 6 + lucide-react。使用浏览器 History API 的普通路径路由，**不使用 GitHub Pages 子路径或 hash 路由**。
-
-需要 Node.js 20.19+（建议 Node.js 24）。
-
-```bash
+```sh
 npm ci
 npm run dev
 ```
 
-默认开发地址 `http://localhost:5173`。本地 Vite 支持直接打开深层路由。
+Open **http://127.0.0.1:5173**. One foreground command starts Vite and the local
+API. On first use, create the single-owner password in the browser (12+ characters).
+No API keys or external database are needed. Keep the terminal running.
 
-```bash
-npm run build       # TypeScript 检查 + 生产构建
-npm run preview     # 本地预览生产构建
-npm run typecheck
-npm test            # Playwright 浏览器测试
+Normal mode starts empty: no fake threads, tool logs, assistant replies, or
+generated artifacts are inserted. Saving a message stores a user message and its
+context; **no assistant response is generated** while LLM execution is disconnected.
+
+### Persistent data
+
+- `.data/workspace.sqlite`: SQLite workspace state, revision, owner/password hash,
+  sessions, file metadata and share snapshots.
+- `.data/uploads/`: actual private uploaded bytes.
+- `.data` and `.env` are excluded from Git and the Docker build context.
+- Restarting the service or updating code does not reset the database.
+- Stop the service before copying the entire `.data` directory for a full backup.
+  JSON exports contain metadata, not a full binary-file backup.
+
+Workspace edits use a serialized save queue and optimistic UI. The storage bar
+reports **Saving / Saved / Error / Conflict**. A stale revision never silently
+overwrites another tab. Failed edits remain available for export or retry; reloading
+the server version requires confirmation before discarding unsaved edits.
+
+### Existing browser data
+
+Previous localStorage data is not erased or automatically uploaded. The application
+offers a preview with workspace/resource counts and explicit confirmation. Import
+appends copies under new workspace IDs rather than replacing server workspaces.
+Old demo examples may be present: review them before importing. Filenames from the
+old demo cannot recover file bytes that were never uploaded.
+
+## What is connected
+
+- Durable workspace/thread/message/project/Agent/skill/memory/artifact metadata.
+- Messages carry IDs, timestamps, saved preferences, context references and actual
+  attachment metadata; retries use stable request IDs rather than fake replies.
+- Upload/download private file bytes (UI maximum20MB), not merely file names.
+- Real thread rename/star/archive/fork/delete/project assignment.
+- Explicit Document/Webpage creation, editing, stored version history, restoration,
+  filtering, ordering and download; no fallback canvas content in normal mode.
+- Thread configuration and default preferences stored in the database.
+- Owner-created immutable public share snapshots and revocation. Public views do
+  not expose private attachment bytes, Agent prompts, credentials or whole workspaces.
+
+No LLM, browser runtime, OAuth, tool execution, scheduled worker, payment service or
+remote skill research/import is connected. Such actions are disabled or explicitly
+state that they are unavailable; they do not report fake successful execution.
+Existing fixture-only controls are not evidence that execution exists.
+
+## Optional environment configuration
+
+Copy `.env.example` to `.env`; `npm run dev`, `npm start` and `npm run preview`
+load it without replacing already exported variables. Never put secrets in variables
+prefixed `VITE_`. Tests use temporary data directories and skip the user's env file.
+
+Defaults: API127.0.0.1:8787, Vite127.0.0.1:5173, data`.data`. CLI `--port` and
+`--host` are accepted by the dev runner. Only loopback is enabled by default.
+
+### Using your existing domain or tunnel
+
+Initialize the owner through localhost first. Then explicitly configure, for this
+project, the exact trusted browser origin, for example:
+
+```dotenv
+APP_PUBLIC_ORIGIN=https://lp.chayu123.me
 ```
 
-首次运行测试需要安装浏览器：
+If Vite must listen beyond loopback, start it with an explicit host after owner
+initialization. The runner refuses public binding without a trusted origin and an
+initialized owner. Proxy `/api` through the same origin; do not expose an unprotected
+standalone write API. Host/Origin checks, session cookies and CSRF checks remain on.
+HTTPS/reverse-proxy security and host firewall configuration are your responsibility.
+Do not publish the data directory or owner environment file.
 
-```bash
-npx playwright install chromium
-# Linux CI 可使用 npx playwright install --with-deps chromium
+### Built preview
+
+```sh
+npm run build
+npm run preview
 ```
 
-## 路由规则
+The backend serves `dist` and API on the same loopback port8787. `npm start` runs
+API-only unless `APP_SERVE_DIST=1` is set. A frontend-only Nginx deployment no longer
+provides normal-mode data functionality.
 
-| 界面                     | 路径 / 状态                                                     |
-| ------------------------ | --------------------------------------------------------------- |
-| 新任务首页               | `/threads/new`；`/` 重定向至此                                  |
-| 会话列表 / 详情          | `/threads` / `/thread/:id`                                      |
-| 会话配置侧栏             | `/thread/:id?panel=settings`                                    |
-| Agent 列表 / 新建 / 编辑 | `/agents` / `/agents/new` / `/agents/:id`                       |
-| 房间列表 / 新建表单      | `/rooms` / `/rooms/new`                                         |
-| 技能                     | `/skills` / `/skills/:id` / `/skills/new` / `/skills/:id/edit`  |
-| 记忆                     | `/memories`；新增为不改变 URL 的弹窗                            |
-| 项目                     | `/projects` / `/projects/new` / `/projects/:id`                 |
-| 产物库                   | `/library`；点击卡片全屏预览，URL 不变                          |
-| 市场                     | `/marketplace` / `/marketplace/a/:id` / `/marketplace/s/:id`    |
-| 学习相关                 | `/inbox` / `/learning` / `/rubrics` / `/wiki`                   |
-| 运营概览                 | `/command-center`                                               |
-| 账户设置                 | 当前页面 `?settings=personalization` 等查询参数                 |
-| 集成设置兼容入口         | `/settings/integrations` → `/threads/new?settings=integrations` |
-| 公开参考界面             | `/marketing` / `/login` / `/terms` / `/privacy`                 |
-| 404                      | `/404` / `/signup` 与其他未知路径                               |
+### Docker (optional, not required for npm run dev)
 
-搜索、侧栏菜单、输入框菜单、Live 设置弹窗、Library 预览均不创建独立页面路由。Agent 五个页签也不改变 URL。完整说明见 [docs/UI-MAP.md](docs/UI-MAP.md)。
+The image runs Node24 with built frontend plus API, not static Nginx. Persist
+`/app/.data`; do not replace it on rebuild. Container binding requires an existing
+owner database or an explicitly supplied `APP_OWNER_PASSWORD` bootstrap (12+ chars,
+only used for an empty owner table). Set the exact `APP_PUBLIC_ORIGIN`; prefer a
+loopback-only published port behind an HTTPS reverse proxy. Mounted data must be
+writable by the image's non-root `node` user. Never bake real secrets into the image.
+Docker build/runtime has not been tested in the assistant sandbox.
 
-## 本地数据
+## Import and development-server safety
 
-内容通过 `WorkspaceProvider` 保存到 `hyperagents-demo:workspace-v1`；首次升级会读取 0.2 的旧内容键。多个工作区隔离保存 Skills、Agents、Projects、Memories、Rooms、Artifacts、Schedules 等内容。
+- Vite cannot serve `.data`, configured backend storage, SQLite sidecars, or public
+  symlink aliases to private data, including `/@fs/` and `?raw` requests.
+- Import preview checks the backup on the server. Missing live links are listed as
+  warnings before confirmation; records and historical context are preserved.
+  Backups containing binary attachment references are blocked before confirmation,
+  not silently stripped or replaced with invented files.
+- Import/reload waits for outstanding saves and temporarily locks editing. An old
+  save acknowledgement cannot replace an imported snapshot or drop intervening edits.
 
-- 数据只属于当前浏览器和站点 origin，没有服务器同步或多人协作。
-- 发消息仍只保存本地占位，不请求模型。
-- Agent 配置和 Skills 是可编辑数据；不运行代码或工具。
-- 计划只保存配置，明确显示执行关闭。
-- 文档变更可以保留和恢复版本；HTML 预览经过清理、sandbox 和 CSP 隔离。
-- `/workspaces` 提供 JSON 内容备份/恢复，导入先校验并要求确认替换。
-- 出现浏览器容量错误时会提示导出备份。导入文件有大小上限，适合小规模演示。
+## Tests
 
-演示身份使用 `Demo User / demo@example.com`，没有采集时的真实账户资料。清除本域浏览器数据将清除本地内容，操作前应导出备份。全局外观/资料偏好不在内容备份中。
-
-## 部署
-
-`dist/` 可部署到任意支持 SPA fallback 的普通静态站点。刷新 `/thread/...` 等路径时，服务器必须回退到 `index.html`，且静态资源仍按真实路径返回。
-
-仓库提供 Nginx 配置及多阶段 Dockerfile：
-
-```bash
-docker build -t hyperagents-ui .
-docker run --rm -p 8080:80 hyperagents-ui
+```sh
+npm run test:backend       # built-in Node tests; real temp SQLite/files/HTTP
+npm run test:fixtures     # existing UI regression suite in explicit fixture mode
+npm test                  # backend + fixture UI + real backend browser tests, in sequence
+npm run test:backend-flow  # real API + browser workflows in a temporary data directory
 ```
 
-Docker 容器配置已提供，但本次未实际执行 Docker 构建。GitHub Pages 自动发布已移除；原 pages.yml 改为手动构建分发包，不会部署 Pages。CI 在 main/PR 上执行构建和浏览器测试。
+The backend-flow suite exercises owner setup/sign-in, empty initial state,
+configuration, binary upload/download, message reload, artifact history/fork,
+public share/revoke, revision conflict and confirmation-only browser migration.
+Tests do not use the owner's `.data` directory. Fixture mode is available separately
+as `npm run dev:fixtures`; it is for UI regression samples, not normal operation.
 
-## 验证
-
-0.3 本地执行结果：TypeScript + 生产构建通过；56 项 Playwright 测试通过，覆盖直接路由、刷新/前后退、搜索与键盘、设置查询参数、Agent 身份保存、项目/记忆本地持久化、会话画布、移动端与无 API 调用边界。
-
-测试中的页面截图是渲染检查，**不是逐像素对比基准**。界面布局以采集截图为参考，字体在无网络时回退系统字体；没有复制商业字体文件。
-
-## 素材与来源
-
-导航与布局参考采集自 `https://hyperagent.com` 和 `https://www.hyperagent.com/`（2026-10-27）。`public/examples/*.svg` 内的位图是公开营销首页案例图的裁切，仅用于界面参考，版权归各自权利人。上线自有产品前应替换为自有/获许可素材与品牌名称。
-
-没有将私人会话截图、登录凭据、API keys 或采集资料包放入本仓库。
+See `docs/BACKEND-CONTRACT.md` for endpoints and security boundaries, and the earlier
+`docs/UI-FIDELITY-BATCH-*` audit notes for frontend replication history. Local sandbox
+npm access has been blocked by registry403, so full browser/build verification is
+reported from GitHub CI rather than falsely claimed as local execution.

@@ -1,4 +1,4 @@
-import type { DemoAgent, DemoMemory, DemoProject, DemoThread } from "./types";
+import type { DemoAgent, DemoMemory, DemoProject, DemoThread, WorkspacePreferences } from "./types";
 export type Skill = {
   id: string;
   name: string;
@@ -67,6 +67,7 @@ export type WorkspaceData = {
   rubrics: Rubric[];
   reviewedSuggestions: string[];
   connections: LocalConnection[];
+  preferences?: WorkspacePreferences;
 };
 export type WorkspaceState = {
   version: 1;

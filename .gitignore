@@ -5,3 +5,9 @@ dist
 *.log
 playwright-report/
 test-results/
+
+# Local durable data and secrets
+.data/
+.env
+.env.*
+!.env.example

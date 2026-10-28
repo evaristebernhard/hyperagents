@@ -737,7 +737,7 @@ export default function ResourcesUI(p: ResourceProps) {
                     <div className="actions">
                       <span className="muted">Active today</span>
                       <span className="badge">
-                        {threads.filter((t) => t.project === pr.id).length}{" "}
+                        {threads.filter((t) => (t.projectId || t.project) === pr.id).length}{" "}
                         threads
                       </span>
                       <span className="badge">0 files</span>
@@ -745,7 +745,7 @@ export default function ResourcesUI(p: ResourceProps) {
                   </a>
                   <h5 className="muted">RECENT THREADS</h5>
                   {threads
-                    .filter((t) => t.project === pr.id)
+                    .filter((t) => (t.projectId || t.project) === pr.id)
                     .map((t) => (
                       <button
                         className="rp-project-thread"
@@ -800,7 +800,7 @@ export default function ResourcesUI(p: ResourceProps) {
               >
                 {n} (
                 {i === 0
-                  ? threads.filter((t) => t.project === id).length
+                  ? threads.filter((t) => (t.projectId || t.project) === id).length
                   : i === 2
                     ? 1
                     : workspace.data.artifacts.filter(
@@ -808,7 +808,7 @@ export default function ResourcesUI(p: ResourceProps) {
                           !a.archived &&
                           (a.projectId === id ||
                             threads.some(
-                              (t) => t.id === a.threadId && t.project === id,
+                              (t) => t.id === a.threadId && (t.projectId || t.project) === id,
                             )),
                       ).length}
                 )
@@ -835,7 +835,7 @@ export default function ResourcesUI(p: ResourceProps) {
               {threads
                 .filter(
                   (t) =>
-                    t.project === id &&
+                    (t.projectId || t.project) === id &&
                     t.title.toLowerCase().includes(query.toLowerCase()),
                 )
                 .map((t) => (
@@ -868,7 +868,7 @@ export default function ResourcesUI(p: ResourceProps) {
                     !a.archived &&
                     (a.projectId === id ||
                       threads.some(
-                        (t) => t.id === a.threadId && t.project === id,
+                        (t) => t.id === a.threadId && (t.projectId || t.project) === id,
                       )),
                 )
                 .map((a) => (
@@ -1631,7 +1631,7 @@ export default function ResourcesUI(p: ResourceProps) {
                     setProjects(projects.filter((p) => p.id !== id));
                     p.setThreads(
                       threads.map((t) =>
-                        t.project === id ? { ...t, project: undefined } : t,
+                        (t.projectId || t.project) === id ? { ...t, project: undefined, projectId: undefined } : t,
                       ),
                     );
                     workspace.set("artifacts", (aa) =>
@@ -1701,7 +1701,7 @@ export default function ResourcesUI(p: ResourceProps) {
               onClick={() => {
                 p.setThreads(
                   threads.map((x) =>
-                    x.id === t.id ? { ...x, project: id } : x,
+                    x.id === t.id ? { ...x, project: workspace.mode === "fixture" ? id : undefined, projectId: workspace.mode === "server" ? id : x.projectId } : x,
                   ),
                 );
                 notify("Thread added to this project locally.");

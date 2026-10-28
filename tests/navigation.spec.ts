@@ -60,11 +60,11 @@ test("composer menus and local-only conversation persist", async ({ page }) => {
   await page.getByRole("button", { name: "Slides", exact: true }).click();
   await page.getByLabel("Task prompt").fill("Build a concise launch plan");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
-  await expect(page).toHaveURL(/\/thread\/local-/);
+  await expect(page).toHaveURL(/\/thread\/thread-/);
   await expect(page.locator(".conversation-scroll")).toContainText(
     "Build a concise launch plan",
   );
-  await expect(page.locator(".conversation-scroll")).toContainText("no LLM");
+  await expect(page.locator(".conversation-scroll .chat-bubble.assistant")).toHaveCount(0);
   await page.reload();
   await expect(page.locator(".conversation-scroll")).toContainText(
     "Build a concise launch plan",
@@ -338,7 +338,7 @@ test("demonstration flows make no API or model requests", async ({ page }) => {
   await page.goto("/threads/new");
   await page.getByLabel("Task prompt").fill("A local-only prompt");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
-  await expect(page).toHaveURL(/\/thread\/local-/);
+  await expect(page).toHaveURL(/\/thread\/thread-/);
   await page.goto("/threads/new?settings=ai-providers");
   await page.getByRole("button", { name: "◉ Connect with ChatGPT" }).click();
   await expect(

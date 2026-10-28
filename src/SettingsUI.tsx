@@ -37,6 +37,7 @@ import { safeRead } from "./data";
 import { useWorkspace } from "./workspace";
 import { uid, now } from "./local-model";
 import "./settings-ui.css";
+import ServerThreadDefaults from "./ServerThreadDefaults";
 const groups = [
   {
     label: "Account",
@@ -249,10 +250,7 @@ export default function SettingsUI({
   useEffect(() => {
     try {
       localStorage.setItem("hyperagents-demo:profile", JSON.stringify(profile));
-      localStorage.setItem(
-        "hyperagents-demo:defaults",
-        JSON.stringify(defaults),
-      );
+      if (workspace.mode === "fixture") localStorage.setItem("hyperagents-demo:defaults", JSON.stringify(defaults));
       localStorage.setItem(
         "hyperagents-demo:push-notifications",
         JSON.stringify(push),
@@ -438,6 +436,8 @@ export default function SettingsUI({
         </div>
       </section>
     );
+  else if (section === "thread-defaults" && workspace.mode === "server")
+    content = <ServerThreadDefaults />;
   else if (section === "thread-defaults")
     content = (
       <>

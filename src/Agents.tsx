@@ -31,6 +31,7 @@ import type { DemoAgent, PageProps } from "./types";
 import { IconButton, Modal } from "./ui";
 import { useWorkspace, download } from "./workspace";
 import Schedules from "./Schedules";
+import { uid } from "./local-model";
 import AgentPromptEditor, { sanitizePromptHtml } from "./AgentPromptEditor";
 import { readAgentDraft, writeAgentDraft, clearAgentDraft, knowledgeProfiles, normalizeMemoryProfile, type AgentCreationDraft } from "./agent-draft";
 import "./agent-creation.css";
@@ -50,6 +51,9 @@ export default function Agents({
   const initialProfile = normalizeMemoryProfile(editing?.memoryMode || draft.memoryMode);
   const [promptHtml, setPromptHtml] = useState(editing?.promptHtml || draft.promptHtml || "");
   const [promptOpen, setPromptOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [creationId] = useState(() => uid("agent"));
   const [executionNotice, setExecutionNotice] = useState("");
   const [draftWarning, setDraftWarning] = useState(false);
   const [memoryReadScope, setMemoryReadScope] = useState(editing?.memoryReadScope || draft.memoryReadScope || (initialProfile === "Read-only memory" || initialProfile === "Separate memory" ? "linked" : "all"));
@@ -254,7 +258,8 @@ export default function Agents({
         </button>
       </div>
     );
-  const save = () => {
+  const save = async () => {
+    if (saving) return;
     if (!name.trim() || !prompt.trim()) {
       notify("Add an agent name and system prompt first.");
       setTab("Identity");
@@ -263,7 +268,7 @@ export default function Agents({
     }
     const item = {
       ...editing,
-      id: editing?.id || "agent-" + Date.now(),
+      id: editing?.id || creationId,
       name: name.trim(),
       description,
       prompt,
@@ -280,14 +285,15 @@ export default function Agents({
       learning,
       libraryEnabled: library,
     };
-    setAgents(
-      editing
-        ? agents.map((a) => (a.id === item.id ? item : a))
-        : [...agents, item],
-    );
-    if (creating) clearAgentDraft(workspace.state.active);
-    notify("Agent saved locally. No runtime or automation is connected.");
-    navigate("/agents");
+    setSaving(true); setSaveError("");
+    try {
+      workspace.set("agents", items => items.some(a => a.id === item.id) ? items.map(a => a.id === item.id ? item : a) : [...items, item]);
+      await workspace.flush();
+      if (creating) clearAgentDraft(workspace.state.active);
+      notify(workspace.mode === "server" ? "Agent saved to the local server. Execution is not connected." : "Agent saved locally. No runtime or automation is connected.");
+      navigate("/agents");
+    } catch (e) { setSaveError(e instanceof Error ? e.message : "Could not confirm the save. Your creation draft is kept."); }
+    finally { setSaving(false); }
   };
   return (
     <div className="agent-editor" key={id}>
@@ -355,13 +361,14 @@ export default function Agents({
               </button>
             </>
           )}
-          <button className="btn primary" disabled={!name.trim() || !prompt.trim()} onClick={save}>
+          <button className="btn primary" disabled={saving || !name.trim() || !prompt.trim()} onClick={() => void save()}>
             {editing ? "Save changes" : "Create Agent"}
           </button>
         </div>
       </header>
       <div className="agent-editor-body">
         <section className="agent-form">
+          {saveError && <p role="alert" className="creation-warning">{saveError}</p>}
           {draftWarning && <p role="alert" className="creation-warning">Draft storage is unavailable. Keep this page open to retain your inputs.</p>}
           <nav className="agent-tabs" aria-label="Agent configuration">
             {tabs.map(([n, I]) => (

@@ -1,3 +1,4 @@
+import RealThread from "./RealThread";
 import { useState, useEffect, useRef } from "react";
 import {
   Star,
@@ -37,7 +38,7 @@ import { asset } from "./data";
 import { useWorkspace, download, safeImage } from "./workspace";
 import { uid, now } from "./local-model";
 import { ArtifactView, exportArtifact } from "./LibraryManager";
-export default function Thread({
+export function LegacyThread({
   thread,
   update,
   navigate,
@@ -118,10 +119,6 @@ export default function Thread({
       messages: [
         ...(thread.messages || []),
         { role: "user", text },
-        {
-          role: "assistant",
-          text: "Your message is saved locally. This frontend preview does not send requests to a model, browser, or tool service.",
-        },
       ],
     });
     setFollow(true);
@@ -1035,4 +1032,18 @@ export default function Thread({
 }
 function PuzzleLabel() {
   return <span className="skill-glyph">✣</span>;
+}
+
+export type ThreadProps = {
+  thread: DemoThread;
+  update: (thread: DemoThread) => void;
+  navigate: Navigate;
+  notify: (message: string) => void;
+  settingsPanel: boolean;
+  agents: string[];
+};
+
+export default function Thread(props: ThreadProps) {
+  const w = useWorkspace();
+  return w.mode === "fixture" ? <LegacyThread {...props} /> : <RealThread {...props} />;
 }

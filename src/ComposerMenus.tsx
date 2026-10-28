@@ -3,7 +3,7 @@ import {
   Brain, Gauge, GitBranch, Blocks, Plug, ArrowUpRight, ChevronRight,
   Check, Search, PencilLine, Sparkles, Bot, Zap,
 } from "lucide-react";
-import type { Navigate } from "./types";
+import type { Navigate, ThreadSettings } from "./types";
 
 const toolNames = [
   "Search", "Find Similar", "Exa Research", "Exa Websets", "Thread Search",
@@ -30,14 +30,25 @@ type Props = {
   agent: string;
   setAgent: (agent: string) => void;
   agents: string[];
+  settings?: ThreadSettings;
+  onSettingsChange?: (settings: ThreadSettings) => void;
+  savedAgents?: { id: string; name: string }[];
+  onAgentSelection?: (id?: string, starter?: string) => void;
+  dataOnly?: boolean;
 };
 
 /** Local UI state only. Never invokes a model, connector or browser tool. */
-export default function ComposerMenus({ menu, close, navigate, mode, setMode, model, agent, setAgent, agents }: Props) {
+export default function ComposerMenus({ menu, close, navigate, mode, setMode, model, agent, setAgent, agents, settings: controlled, onSettingsChange, savedAgents, onAgentSelection, dataOnly = false }: Props) {
   const [sub, setSub] = useState("");
-  const [effort, setEffort] = useState("Medium");
-  const [provider, setProvider] = useState("Any");
-  const [tools, setTools] = useState<string[]>(toolNames);
+  const [localEffort, setLocalEffort] = useState("Medium");
+  const [localProvider, setLocalProvider] = useState("Any");
+  const [localTools, setLocalTools] = useState<string[]>(toolNames);
+  const effort = controlled?.reasoning ?? localEffort;
+  const provider = controlled?.provider ?? localProvider;
+  const tools = controlled?.tools ?? localTools;
+  const setEffort = (value: string) => controlled ? onSettingsChange?.({ ...controlled, reasoning: value }) : setLocalEffort(value);
+  const setProvider = (value: string) => controlled ? onSettingsChange?.({ ...controlled, provider: value }) : setLocalProvider(value);
+  const setTools = (value: string[]) => controlled ? onSettingsChange?.({ ...controlled, tools: value }) : setLocalTools(value);
   const [agentQuery, setAgentQuery] = useState("");
   const root = useRef<HTMLDivElement>(null);
   const previousMenu = useRef("");
@@ -147,7 +158,8 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
         go(location.pathname + (location.pathname.startsWith("/thread/") ? "?panel=settings" : "?settings=thread-defaults"));
       }}><ArrowUpRight size={16} />Open full settings</button>
       {sub && <div className="popover composer-submenu" role="menu" aria-label={sub + " options"}>
-        {sub === "model" && <button type="button" role="menuitem" className="model-unlock" onClick={() => settings("billing")}>
+        {sub === "model" && dataOnly && <div className="menu-local-note"><p>Model execution is not connected. This identifier is saved as a preference only.</p><label>Model preference<input aria-label="Composer model preference" value={controlled?.model || ""} onChange={e => controlled && onSettingsChange?.({ ...controlled, model: e.target.value })} /></label></div>}
+        {sub === "model" && !dataOnly && <button type="button" role="menuitem" className="model-unlock" onClick={() => settings("billing")}>
           <span className="unlock-icon"><Sparkles size={18} /></span>
           <span><strong>Unlock every model</strong><small>Subscribe to a plan to pick more powerful models</small></span><ChevronRight size={14} />
         </button>}
@@ -195,14 +207,14 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
   if (menu === "agents") {
     const query = agentQuery.trim().toLowerCase();
     const starters = starterAgents.filter(([name, description]) => (name + " " + description).toLowerCase().includes(query));
-    const saved = agents.filter(name => name.toLowerCase().includes(query));
-    const choose = (name: string) => { setAgent(name); closeMenu(); };
+    const saved = (savedAgents || agents.map(name => ({ id: "", name }))).filter(item => item.name.toLowerCase().includes(query));
+    const choose = (name: string, id?: string, starter = false) => { setAgent(name); onAgentSelection?.(id || undefined, starter ? name : undefined); closeMenu(); };
     return <div ref={root} className="popover fidelity-agent-menu" role="menu" aria-label="Agent picker" onKeyDown={keyboard}>
       <label className="agent-picker-search"><Search size={16} /><input aria-label="Search agents" placeholder="Search agents..." value={agentQuery} onChange={e => setAgentQuery(e.target.value)} /></label>
       <div className="agent-picker-list">
-        {saved.length > 0 && <><small className="agent-picker-heading">YOUR AGENTS</small>{saved.map(name => <button type="button" role="menuitem" key={name} onClick={() => choose(name)}><span className="starter-avatar saved"><Bot size={16} /></span><span className="agent-picker-copy"><strong>{name}</strong><small>Saved in this local workspace</small></span>{agent === name && <Check size={14} />}</button>)}</>}
+        {saved.length > 0 && <><small className="agent-picker-heading">YOUR AGENTS</small>{saved.map(item => <button type="button" role="menuitem" key={item.id || item.name} onClick={() => choose(item.name, item.id)}><span className="starter-avatar saved"><Bot size={16} /></span><span className="agent-picker-copy"><strong>{item.name}</strong><small>Saved in this workspace</small></span>{agent === item.name && <Check size={14} />}</button>)}</>}
         {starters.length > 0 && <small className="agent-picker-heading">STARTER AGENTS</small>}
-        {starters.map(([name, description, emoji, color]) => <button type="button" role="menuitem" key={name} onClick={() => choose(name)}>
+        {starters.map(([name, description, emoji, color]) => <button type="button" role="menuitem" key={name} onClick={() => choose(name, undefined, true)}>
           <span className={"starter-avatar " + color} aria-hidden="true">{emoji}</span><span className="agent-picker-copy"><strong>{name}</strong><small>{description}</small></span>{agent === name && <Check size={14} />}
         </button>)}
         {!starters.length && !saved.length && <p className="agent-picker-empty" role="status">No agents found</p>}
