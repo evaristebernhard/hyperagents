@@ -4,6 +4,8 @@ import { existsSync } from 'node:fs';
 import { loadLocalEnv } from '../scripts/env.mjs';
 loadLocalEnv();
 const ownerPassword=process.env.APP_OWNER_PASSWORD;
+const deepseekApiKey=process.env.DEEPSEEK_API_KEY;
+delete process.env.DEEPSEEK_API_KEY;
 // Never pass the bootstrap secret to children or log it.
 delete process.env.APP_OWNER_PASSWORD;
 try {
@@ -14,6 +16,7 @@ try {
     publicOrigin:process.env.APP_PUBLIC_ORIGIN,
     maxFileBytes:process.env.APP_MAX_FILE_BYTES,
     ownerPassword,
+    deepseekApiKey,
     distDir:process.env.APP_SERVE_DIST==='1' && existsSync('dist/index.html') ? path.resolve('dist') : undefined,
   });
   const address=await app.listen();

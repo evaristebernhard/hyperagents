@@ -25,7 +25,7 @@ function parseSnapshot(value: unknown): PublicSnapshot {
   const artifacts = raw.artifacts.map((item: unknown, i: number) => {
     if (!item || typeof item !== "object") throw Error("This shared snapshot is invalid.");
     const a = item as Record<string, unknown>;
-    if (typeof a.title !== "string" || typeof a.content !== "string" || !["Document", "Webpage", "Image", "File"].includes(String(a.kind))) throw Error("This shared snapshot is invalid.");
+    if (typeof a.title !== "string" || typeof a.content !== "string" || !["Document", "Webpage", "Table", "Image", "File"].includes(String(a.kind))) throw Error("This shared snapshot is invalid.");
     // Deliberately use only the snapshot content, not historical versions or private IDs.
     return { id: "public-artifact-" + i, title: a.title, kind: a.kind, content: a.content, versions: [], createdAt: typeof a.createdAt === "string" ? a.createdAt : "", updatedAt: typeof a.updatedAt === "string" ? a.updatedAt : "" } as Artifact;
   });

@@ -161,7 +161,7 @@ const outputs = [
   ["Map", Map],
   ["Doc", FileText],
 ] as const;
-export function Composer({ navigate, onSend, notify, compact = false, agents = [], initialSettings, contextKey = "new" }: {
+export function Composer({ navigate, onSend, notify, compact = false, agents = [], initialSettings, contextKey = "new", disabled = false }: {
   navigate: Navigate;
   onSend: (text: string, context?: MessageContext, clientRequestId?: string) => void | Promise<void>;
   notify: (message: string) => void;
@@ -169,6 +169,7 @@ export function Composer({ navigate, onSend, notify, compact = false, agents = [
   agents?: string[];
   initialSettings?: ThreadSettings;
   contextKey?: string;
+  disabled?: boolean;
 }) {
   const w = useWorkspace();
   const server = w.mode === "server";
@@ -200,7 +201,7 @@ export function Composer({ navigate, onSend, notify, compact = false, agents = [
     return () => { document.removeEventListener("mousedown", click); document.removeEventListener("keydown", key); };
   }, []);
   const send = async () => {
-    if ((!text.trim() && !files.length) || busy.current || uploading) return;
+    if ((!text.trim() && !files.length) || busy.current || uploading || disabled) return;
     busy.current = true; setSending(true); setError("");
     try {
       const ensure = (ids: string[], available: { id: string }[], label: string) => { if (ids.some(id => !available.some(item => item.id === id))) throw Error("A selected " + label + " is no longer available. Remove it before sending."); };
@@ -229,7 +230,7 @@ export function Composer({ navigate, onSend, notify, compact = false, agents = [
     ...(projectId ? [{ key: "project:" + projectId, label: "Project: " + (w.data.projects.find(p => p.id === projectId)?.name || "Unavailable"), remove: () => setProjectId(undefined) }] : []),
   ];
   return <div className={"composer " + (server ? "server-composer " : "") + (compact ? "compact" : "")} ref={box}>
-    <textarea aria-label={compact ? "Follow-up message" : "Task prompt"} placeholder={compact ? "Add a message…" : "Ask anything or start a task…"} value={text} disabled={sending}
+    <textarea aria-label={compact ? "Follow-up message" : "Task prompt"} placeholder={compact ? "Add a message…" : "Ask anything or start a task…"} value={text} disabled={sending || disabled}
       onChange={e => { if (failed.current) { requestId.current = crypto.randomUUID(); failed.current = false; } setText(e.target.value); setError(""); }}
       onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
     {(files.length > 0 || contextChips.length > 0) && <div className="composer-context-chips">
@@ -246,7 +247,7 @@ export function Composer({ navigate, onSend, notify, compact = false, agents = [
     </div><div className="composer-bar-right">
       <button className="plain execution" aria-label="Execution mode" aria-haspopup="menu" aria-expanded={menu === "mode"} onClick={() => toggle("mode")}><Zap size={15} />{!compact && choices.mode}{!compact && <ChevronDown size={11} />}</button>
       <IconButton label="Safety and permissions" onClick={() => server ? toggle("safety") : notify("No external actions or tool execution are enabled.")}><LockKeyhole size={17} /></IconButton>
-      <button className="send-btn" aria-label="Send message" disabled={sending || uploading || (!text.trim() && !files.length)} onClick={() => void send()}><ArrowUp size={19} /></button>
+      <button className="send-btn" aria-label="Send message" disabled={sending || uploading || disabled || (!text.trim() && !files.length)} onClick={() => void send()}><ArrowUp size={19} /></button>
     </div></div>
     {!server && <button className="integration-strip" onClick={() => navigate(location.pathname + "?settings=integrations")}><span className="integration-logos"><b>◈</b><b>M</b><b>✣</b></span>Connect your integrations →</button>}
     <input ref={upload} type="file" multiple hidden aria-label="Attach files" disabled={sending || uploading} onChange={async e => {
@@ -271,8 +272,8 @@ export function Composer({ navigate, onSend, notify, compact = false, agents = [
       <button onClick={() => openContext("projects", "/projects")}><Folder size={15} />Add to a project</button>
     </div>}
     {menu === "output" && <div className="popover composer-popover">{outputs.map(([name, Icon]) => <button key={name} onClick={() => { setChoices(current => ({ ...current, outputFormat: name })); setMenu(""); }}><Icon size={15} />{name}</button>)}</div>}
-    {menu === "format-settings" && <div className="popover composer-popover"><label className="field">Visuals<select aria-label="Output visuals" value={choices.visuals || "Auto"} onChange={e => setChoices(current => ({ ...current, visuals: e.target.value }))}>{["Auto", "None", "AI enhanced", "Full AI render"].map(value => <option key={value}>{value}</option>)}</select></label><button onClick={() => { setChoices(current => ({ ...current, outputFormat: undefined, visuals: undefined })); setMenu(""); }}>Clear selection</button>{server && <small>Stored format preference only. No generation runs.</small>}</div>}
-    {menu === "safety" && <div className="popover composer-popover"><p>Single-owner local data service. Messages, files and preferences are persisted. No model, browser, integration or scheduled execution is connected.</p><button onClick={() => setMenu("")}>Close</button></div>}
+    {menu === "format-settings" && <div className="popover composer-popover"><label className="field">Visuals<select aria-label="Output visuals" value={choices.visuals || "Auto"} onChange={e => setChoices(current => ({ ...current, visuals: e.target.value }))}>{["Auto", "None", "AI enhanced", "Full AI render"].map(value => <option key={value}>{value}</option>)}</select></label><button onClick={() => { setChoices(current => ({ ...current, outputFormat: undefined, visuals: undefined })); setMenu(""); }}>Clear selection</button>{server && <small>Doc, Webpage and Table can create real saved artifacts with local tools enabled. No media, map or app services execute.</small>}</div>}
+    {menu === "safety" && <div className="popover composer-popover"><p>Single-owner local data service. Messages, files and preferences are persisted. DeepSeek receives your saved conversation and selected context when configured. No browser, integration or scheduled execution is connected.</p><button onClick={() => setMenu("")}>Close</button></div>}
     {server && pickerKinds.includes(menu as PickerKind) && <ComposerContextPicker kind={menu as PickerKind} close={() => setMenu("")} navigate={navigate} choose={id => {
       if (menu === "skills") add(setSkillIds, id); if (menu === "memories") add(setMemoryIds, id); if (menu === "assets") add(setArtifactIds, id); if (menu === "integrations") add(setIntegrationIds, id); if (menu === "projects") setProjectId(id);
     }} />}

@@ -23,7 +23,12 @@ import { uid, now } from "./local-model";
 import { useWorkspace, download, safeImage } from "./workspace";
 import { IconButton, Modal } from "./ui";
 import { Markdown } from "./ContentHub";
+import { parseTable, tableCsv } from "./table-utils";
 export function ArtifactView({ artifact }: { artifact: Artifact }) {
+  if (artifact.kind === "Table") {
+    try { const data = parseTable(artifact.content); return <div className="rt-answer-table"><table aria-label={artifact.title}><thead><tr>{data.columns.map((c,i)=><th key={i}>{c}</th>)}</tr></thead><tbody>{data.rows.map((row,i)=><tr key={i}>{row.map((c,j)=><td key={j}>{c}</td>)}</tr>)}</tbody></table></div>; }
+    catch (e) { return <p role="alert">{e instanceof Error ? e.message : "Invalid table"}</p>; }
+  }
   return artifact.kind === "Image" ? (
     safeImage(artifact.content) ? (
       <img
@@ -78,6 +83,7 @@ export function ArtifactView({ artifact }: { artifact: Artifact }) {
   );
 }
 export function exportArtifact(a: Artifact) {
+  if (a.kind === "Table") { download(a.title.replace(/\.csv$/i, "") + ".csv", "\uFEFF" + tableCsv(a.content), "text/csv;charset=utf-8"); return; }
   if (a.kind === "Image") {
     const url = safeImage(a.content);
     if (!url) return;
@@ -154,6 +160,7 @@ export default function LibraryManager({ path, navigate, notify }: PageProps) {
   };
   const save = () => {
     if (!title.trim()) return;
+    if (editKind === "Table") { try { parseTable(content); } catch (e) { notify(e instanceof Error ? e.message : "Invalid table"); return; } }
     const time = now();
     if (artifact) {
       w.set("artifacts", (aa) =>
@@ -274,7 +281,7 @@ export default function LibraryManager({ path, navigate, notify }: PageProps) {
           value={kind}
           onChange={(e) => setKind(e.target.value)}
         >
-          {["All", "Document", "Webpage", "Image", "File"].map((s) => (
+          {["All", "Document", "Webpage", "Table", "Image", "File"].map((s) => (
             <option key={s}>{s}</option>
           ))}
         </select>
@@ -407,6 +414,7 @@ export default function LibraryManager({ path, navigate, notify }: PageProps) {
               >
                 <option>Document</option>
                 <option>Webpage</option>
+                <option>Table</option>
                 <option>File</option>
                 {artifact?.kind === "Image" && <option>Image</option>}
               </select>

@@ -13,9 +13,10 @@ export type ThreadSettings = {
 };
 export type FileMeta = { id: string; name: string; size: number; mimeType: string; createdAt: string; workspaceId: string };
 export type MessageContext = { settings: ThreadSettings; skillIds: string[]; memoryIds: string[]; artifactIds: string[]; integrationIds: string[]; projectId?: string; attachments: FileMeta[] };
-export type DemoMessage = { id?: string; role: "user" | "assistant"; text: string; createdAt?: string; context?: MessageContext };
+export type ToolRun = { id: string; name: string; status: "running" | "success" | "error"; summary: string };
+export type DemoMessage = { id?: string; role: "user" | "assistant"; text: string; createdAt?: string; context?: MessageContext; toolRuns?: ToolRun[] };
 export type WorkspacePreferences = { defaultThreadSettings?: ThreadSettings; [key: string]: unknown };
-export const defaultThreadSettings: ThreadSettings = { model: "", reasoning: "Medium", provider: "Any", mode: "Execute", tools: [] };
+export const defaultThreadSettings: ThreadSettings = { model: "", reasoning: "Medium", provider: "Any", mode: "Execute", tools: ["Thread Search", "Documents", "Webpages", "Tables"] };
 export type DemoThread = {
   id: string;
   title: string;

@@ -79,3 +79,27 @@
 @media (max-width: 900px) { .rt-header { padding: 13px 16px; flex-wrap: wrap; } .rt-status { padding: 9px 16px; } .rt-columns, .rt-columns.has-settings { display: flex; flex-direction: column; overflow: auto; } .rt-conversation { min-height: 450px; flex-shrink: 0; } .rt-messages { max-height: 55vh; } .rt-artifacts { overflow: visible; border-left: 0; border-top: 1px solid var(--line, #ddd); flex-shrink: 0; } .rt-settings { overflow: visible; border-left: 0; border-top: 1px solid var(--line, #ddd); flex-shrink: 0; } .rt-columns.has-settings .rt-artifacts { display: block; } .rt-public { padding: 28px 20px 60px; } .rt-public header h1 { font-size: 25px; } }
 
 .rt-public { height: 100%; overflow-y: auto; width: 100%; }
+
+.rt-answer { font-size:14px; line-height:1.8; overflow-wrap:anywhere; padding-top:10px; }
+.rt-answer .md-view { max-width:none; }
+.rt-answer pre { white-space:pre-wrap; overflow-wrap:anywhere; background:var(--hover,#f5f5f5); padding:14px; border-radius:8px; }
+.rt-answer-actions { display:flex; gap:7px; flex-wrap:wrap; margin-top:16px; opacity:.8; }
+.rt-message.assistant { border-color:transparent; background:transparent; }
+.rt-message[aria-label="Streaming answer"] { border-left:2px solid var(--line,#ddd); border-radius:0; }
+.rt-message[aria-label="Streaming answer"] > button { margin-top:12px; }
+.rt-markdown p { margin:8px 0; white-space:pre-wrap; }
+.rt-markdown h2 { font-size:23px; margin:22px 0 10px; }
+.rt-markdown h3 { font-size:19px; margin:18px 0 8px; }
+.rt-markdown h4 { font-size:16px; margin:16px 0 6px; }
+.rt-markdown code { font:12px/1.7 ui-monospace,monospace; background:var(--hover,#f5f5f5); padding:2px 4px; border-radius:3px; }
+.rt-markdown pre code { padding:0; background:transparent; }
+.rt-markdown blockquote { margin:12px 0; padding-left:14px; border-left:3px solid var(--line,#ddd); color:var(--muted,#666); }
+.rt-answer-table { max-width:100%; overflow:auto; margin:12px 0; }
+.rt-answer-table table { border-collapse:collapse; min-width:100%; font-size:12px; }
+.rt-answer-table td,.rt-answer-table th { text-align:left; border:1px solid var(--line,#ddd); padding:8px 12px; }
+.rt-tool-history { display:flex; flex-direction:column; gap:7px; margin:14px 0; }
+.rt-tool { border:1px solid var(--line,#ddd); border-radius:8px; font-size:12px; background:var(--hover,#fafafa); }
+.rt-tool summary { cursor:pointer; padding:10px 12px; }
+.rt-tool small { color:var(--muted,#777); float:right; font-size:10px; }
+.rt-tool pre { margin:0; padding:12px; border-top:1px solid var(--line,#ddd); white-space:pre-wrap; overflow-wrap:anywhere; font:11px/1.7 ui-monospace,monospace; max-height:220px; overflow:auto; }
+.rt-tool.error { border-color:#c87a7a; }

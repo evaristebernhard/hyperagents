@@ -82,12 +82,17 @@ export function validateState(state, findFile = () => undefined) {
           if (!list(item.notes,n=> { keys(n,['id','text','createdAt']); return id(n.id) && str(n.text) && str(n.createdAt); })) fail();
         }
         if (key === 'artifacts') {
-          if (!['Document','Webpage','Image','File'].includes(item.kind) || !list(item.versions,v=> { keys(v,['id','content','createdAt']); return id(v.id) && str(v.content) && str(v.createdAt); })) fail();
+          if (item.kind === 'Table') {
+            let table;try {table=JSON.parse(item.content);}catch {fail('Invalid table JSON.');}
+            if(!obj(table) || Object.keys(table).some(k=>!['columns','rows'].includes(k)) || !Array.isArray(table.columns) || !table.columns.length || table.columns.length>30 || !table.columns.every(str) || !Array.isArray(table.rows) || table.rows.length>500 || !table.rows.every(row=>Array.isArray(row) && row.length===table.columns.length && row.every(str))) fail('Invalid table data.');
+          }
+          if (!['Document','Webpage','Table','Image','File'].includes(item.kind) || !list(item.versions,v=> { keys(v,['id','content','createdAt']); return id(v.id) && str(v.content) && str(v.createdAt); })) fail();
         }
         if (key === 'threads') {
           if (item.config !== undefined) settings(item.config);
           if (item.messages !== undefined && !list(item.messages,m=> {
-            keys(m,['id','role','text','createdAt','context']);
+            keys(m,['id','role','text','createdAt','context','toolRuns']);
+            if(m.toolRuns!==undefined && (!Array.isArray(m.toolRuns) || m.toolRuns.length>30 || !m.toolRuns.every(t=>{keys(t,['id','name','status','summary']);return id(t.id) && str(t.name) && ['running','success','error'].includes(t.status) && str(t.summary) && t.summary.length<=1600;}))) fail('Invalid tool history.');
             if (m.id !== undefined && !id(m.id)) fail();
             if (m.createdAt !== undefined && !str(m.createdAt)) fail();
             if (m.context !== undefined) {

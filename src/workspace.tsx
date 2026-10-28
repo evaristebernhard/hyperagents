@@ -209,7 +209,7 @@ export function validateSnapshot(input: unknown): WorkspaceState {
           throw Error("Invalid room");
         if (
           key === "artifacts" &&
-          (!["Document", "Webpage", "Image", "File"].includes(item.kind) ||
+          (!["Document", "Webpage", "Table", "Image", "File"].includes(item.kind) ||
             !Array.isArray(item.versions) ||
             item.versions.some(
               (v: any) =>

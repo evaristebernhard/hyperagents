@@ -229,6 +229,7 @@ export default function App() {
     };
     workspace.set("threads", items => items.some(item => item.id === id) ? items : [t, ...items]);
     await workspace.flush();
+    if (workspace.mode === "server" && t.messages?.[0]?.id) sessionStorage.setItem("llm-pending:" + workspace.state.active + ":" + id, t.messages[0].id);
     navigate("/thread/" + id);
   };
   const link = (
@@ -344,7 +345,7 @@ export default function App() {
         <Thread
           key={id}
           thread={thread}
-          update={(t) => setThreads(threads.map((x) => (x.id === id ? t : x)))}
+          update={(t) => workspace.set("threads", current => current.map(x => x.id === id ? t : x))}
           navigate={navigate}
           notify={notify}
           settingsPanel={query.get("panel") === "settings"}

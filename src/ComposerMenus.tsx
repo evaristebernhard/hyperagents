@@ -4,6 +4,7 @@ import {
   Check, Search, PencilLine, Sparkles, Bot, Zap,
 } from "lucide-react";
 import type { Navigate, ThreadSettings } from "./types";
+import { currentModels } from "./llm-client";
 
 const toolNames = [
   "Search", "Find Similar", "Exa Research", "Exa Websets", "Thread Search",
@@ -158,7 +159,7 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
         go(location.pathname + (location.pathname.startsWith("/thread/") ? "?panel=settings" : "?settings=thread-defaults"));
       }}><ArrowUpRight size={16} />Open full settings</button>
       {sub && <div className="popover composer-submenu" role="menu" aria-label={sub + " options"}>
-        {sub === "model" && dataOnly && <div className="menu-local-note"><p>Model execution is not connected. This identifier is saved as a preference only.</p><label>Model preference<input aria-label="Composer model preference" value={controlled?.model || ""} onChange={e => controlled && onSettingsChange?.({ ...controlled, model: e.target.value })} /></label></div>}
+        {sub === "model" && dataOnly && <><small className="menu-local-note">DeepSeek · requires a server-side API key</small>{["", ...currentModels].map(value => <button type="button" role="menuitemradio" aria-checked={(controlled?.model || "") === value} key={value} onClick={() => { if (controlled) onSettingsChange?.({ ...controlled, model: value, provider: "DeepSeek" }); closeSub("model"); }}><span>{value || "Default · DeepSeek Flash"}</span>{(controlled?.model || "") === value && <Check size={14} />}</button>)}</>}
         {sub === "model" && !dataOnly && <button type="button" role="menuitem" className="model-unlock" onClick={() => settings("billing")}>
           <span className="unlock-icon"><Sparkles size={18} /></span>
           <span><strong>Unlock every model</strong><small>Subscribe to a plan to pick more powerful models</small></span><ChevronRight size={14} />
@@ -167,13 +168,13 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
           <span>{value}</span>{effort === value && <Check size={14} />}
         </button>)}
         {sub === "provider" && <>
-          <small className="menu-local-note">Local preview choices</small>
-          {["Any", "OpenAI", "Anthropic", "Google"].map(value => <button type="button" role="menuitemradio" aria-checked={provider === value} key={value} onClick={() => { setProvider(value); closeSub("provider"); }}>
+          <small className="menu-local-note">{dataOnly ? "Only DeepSeek is connected in this build" : "Local preview choices"}</small>
+          {(dataOnly ? ["DeepSeek"] : ["Any", "OpenAI", "Anthropic", "Google"]).map(value => <button type="button" role="menuitemradio" aria-checked={provider === value} key={value} onClick={() => { setProvider(value); closeSub("provider"); }}>
             <span>{value}</span>{provider === value && <Check size={14} />}
           </button>)}
         </>}
         {sub === "tools" && <>
-          <small className="menu-local-note">Local preview · no tools execute</small>
+          <small className="menu-local-note">Local execution: Thread Search, Documents, Webpages, Tables. Other tools are not connected.</small>
           {toolNames.map(value => <button type="button" role="menuitemcheckbox" aria-checked={tools.includes(value)} key={value} onClick={() => setTools(tools.includes(value) ? tools.filter(t => t !== value) : [...tools, value])}>
             <span>{value}</span>{tools.includes(value) && <Check size={14} />}
           </button>)}
@@ -200,7 +201,7 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
       </div>
       {sub === "policy" && <div className="popover composer-submenu" role="menu" aria-label="Execution policy options">
         <button type="button" role="menuitemradio" aria-checked="true" onClick={() => closeSub("policy")}><Zap size={15} />Auto<Check size={14} /></button>
-        <small className="menu-local-note">Only the observed Auto state is shown. Execution is not connected.</small>
+        <small className="menu-local-note">Text generation only. No browser or external action is performed.</small>
       </div>}
     </div>
   );

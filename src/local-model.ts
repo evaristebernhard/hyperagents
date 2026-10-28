@@ -37,7 +37,7 @@ export type ArtifactVersion = {
 export type Artifact = {
   id: string;
   title: string;
-  kind: "Document" | "Webpage" | "Image" | "File";
+  kind: "Document" | "Webpage" | "Table" | "Image" | "File";
   content: string;
   threadId?: string;
   projectId?: string;

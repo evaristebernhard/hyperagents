@@ -32,6 +32,9 @@ export async function api<T>(path: string, options: { method?: string; body?: un
   if (path === "/api/logout") csrf = "";
   return body;
 }
+export function authenticatedStream(path: string, body: unknown, signal: AbortSignal) {
+  return fetch(path, { method: "POST", credentials: "same-origin", cache: "no-store", signal, headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf }, body: JSON.stringify(body) });
+}
 export const getState = () => api<{ state: WorkspaceState; revision: number }>("/api/state");
 export const saveState = (state: WorkspaceState, revision: number) => api<{ revision: number }>("/api/state", { method: "PUT", body: { state }, revision });
 export const previewMigration = (state: WorkspaceState) => api<{ warnings: string[]; workspaceCount: number }>("/api/migrate/preview", { method: "POST", body: { state } });

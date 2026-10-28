@@ -2,7 +2,7 @@
 
 Independent recreation of Hyperagent's web UI, now with a real local data service.
 It is not the official application, does not include its private implementation,
-and does not call an LLM, control a browser, or execute integrations.
+and optionally calls DeepSeek through the authenticated server. It does not control a browser or execute external integrations.
 
 ## Run locally
 
@@ -15,11 +15,11 @@ npm run dev
 
 Open **http://127.0.0.1:5173**. One foreground command starts Vite and the local
 API. On first use, create the single-owner password in the browser (12+ characters).
-No API keys or external database are needed. Keep the terminal running.
+No external database is needed. A server-side DeepSeek key is required only for generated replies. Keep the terminal running.
 
 Normal mode starts empty: no fake threads, tool logs, assistant replies, or
 generated artifacts are inserted. Saving a message stores a user message and its
-context; **no assistant response is generated** while LLM execution is disconnected.
+context. With DEEPSEEK_API_KEY configured, it requests a real streamed reply; without it, the message is saved and the UI explains how to enable generation.
 
 ### Persistent data
 
@@ -51,16 +51,25 @@ old demo cannot recover file bytes that were never uploaded.
   attachment metadata; retries use stable request IDs rather than fake replies.
 - Upload/download private file bytes (UI maximum20MB), not merely file names.
 - Real thread rename/star/archive/fork/delete/project assignment.
+- DeepSeek tool calling for saved workspace search/read and Document/Webpage/Table creation and updates.
+- Tool activity history, saved table previews and formula-safe CSV export.
 - Explicit Document/Webpage creation, editing, stored version history, restoration,
   filtering, ordering and download; no fallback canvas content in normal mode.
 - Thread configuration and default preferences stored in the database.
 - Owner-created immutable public share snapshots and revocation. Public views do
   not expose private attachment bytes, Agent prompts, credentials or whole workspaces.
 
-No LLM, browser runtime, OAuth, tool execution, scheduled worker, payment service or
+Local workspace tools execute; no browser runtime, OAuth, external service actions, scheduled worker, payment service or
 remote skill research/import is connected. Such actions are disabled or explicitly
 state that they are unavailable; they do not report fake successful execution.
 Existing fixture-only controls are not evidence that execution exists.
+
+## DeepSeek generation
+
+See [docs/DEEPSEEK.md](docs/DEEPSEEK.md) for setup, supported models, context boundaries,
+streaming/stop behavior, and the verified-vs-unverified test boundary. The key lives only
+in the server environment or untracked .env, never in Git, SQLite preferences, browser
+storage, client requests, VITE_ variables, or Docker build arguments.
 
 ## Optional environment configuration
 

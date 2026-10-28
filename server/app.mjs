@@ -8,6 +8,7 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { ApiError, emptyState, validateState } from './validation.mjs';
 import { prepareLegacy } from './legacy.mjs';
+import { createLlm } from './llm.mjs';
 const scrypt = promisify(scryptCallback);
 const hash = value => createHash('sha256').update(value).digest('hex');
 const random = () => randomBytes(32).toString('base64url');
@@ -75,6 +76,23 @@ export async function createApp(options = {}) {
   const load = () => { const row=db.prepare('SELECT * FROM workspace WHERE id=1').get(); return {state:JSON.parse(row.state),revision:row.revision}; };
   const meta = row => row && ({id:row.id,workspaceId:row.workspace_id,name:row.name,size:row.size,mimeType:row.mime_type,createdAt:row.created_at});
   const findFile = (id,workspaceId) => meta(db.prepare('SELECT * FROM files WHERE id=? AND workspace_id=?').get(id,workspaceId));
+  // Only authenticated chat execution can read saved, workspace-owned UTF-8 text.
+  const llm=createLlm({apiKey:options.deepseekApiKey,fetchImpl:options.llmFetch,load,readAttachment:async(f,workspaceId)=> {
+    if (!/^file-[a-f0-9-]{36}$/.test(f.id)) return null;
+    const stored=findFile(f.id,workspaceId);
+    if (!stored || ['name','size','mimeType','createdAt','workspaceId'].some(k=>stored[k]!==f[k]) || stored.size>16384) return null;
+    if (!/^(?:text\/[a-z0-9!#$&^_.+-]+|application\/(?:json|ld\+json|xml|javascript|x-yaml|yaml))(?:;|$)/i.test(stored.mimeType)) return null;
+    let handle;
+    try {
+      handle=await open(path.join(uploadsDir,stored.id),constants.O_RDONLY|constants.O_NOFOLLOW);
+      const st=await handle.stat();if(!st.isFile() || st.size!==stored.size)return null;
+      const buffer=Buffer.alloc(stored.size+1);
+      const {bytesRead}=await handle.read(buffer,0,buffer.length,0);
+      if(bytesRead!==stored.size)return null;
+      const text=new TextDecoder('utf-8',{fatal:true}).decode(buffer.subarray(0,bytesRead));
+      return text.includes('\u0000')?null:text;
+    } catch {return null;} finally {if(handle)await handle.close().catch(()=>{});}
+  }});
   const workspace = id => { const w=load().state.workspaces.find(w=>w.id===id); if (!w) err(422,'Invalid workspace.'); return w; };
   const commit = (state, revision) => {
     if (!Number.isSafeInteger(revision) || revision<0) err(400,'A valid revision is required.');
@@ -181,6 +199,8 @@ export async function createApp(options = {}) {
         res.setHeader('Set-Cookie',`hyperagents_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure?'; Secure':''}`);
         return send(res,200,{authenticated:false,setupRequired:false});
       }
+      if (route==='/api/llm/config' && method==='GET') return send(res,200,llm.config());
+      if (route==='/api/llm/chat' && method==='POST') return await llm.chat(req,res,await body(req,4096));
       if (route==='/api/state' && method==='GET') return send(res,200,load());
       if (route==='/api/state' && method==='PUT') {
         const match=req.headers['if-match'];
@@ -263,7 +283,7 @@ export async function createApp(options = {}) {
     } catch(e) {
       if (res.headersSent) { res.destroy(); return; }
       const status=e instanceof ApiError?e.status:500;
-      if (status===429) res.setHeader('Retry-After','900');
+      if (status===429) res.setHeader('Retry-After',req.url?.startsWith('/api/llm/')?'60':'900');
       if (!req.complete) {
         res.setHeader('Connection','close');
         res.once('finish',()=>req.destroy());
