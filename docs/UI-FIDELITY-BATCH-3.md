@@ -58,3 +58,11 @@ This is a bounded workflow-fidelity improvement, not a claim that the entire app
 - Four more regressions bring this batch to 18 new tests: multiline type/paste round-trip, an existing legacy-agent fixture, cleared Casting draft restore, and confirmation keyboard containment/focus return.
 
 The prior a729fc0 commit's build/typecheck and full Playwright test step passed in GitHub Actions. The follow-up commit requires its own CI result; the older result is not evidence for the new changes.
+
+## Existing-agent save layout regression
+
+The added legacy-agent round-trip exposed a pre-existing header rule that stacked
+all editing actions vertically. Save could sit behind the scrolling editor body.
+Editing actions now wrap horizontally within an auto-sized, non-shrinking header;
+narrow layouts stack the title and action row deliberately. The legacy-agent test
+also checks that the enabled Save button is inside its header before clicking it.

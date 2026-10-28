@@ -143,7 +143,13 @@ test("existing legacy Skills learning preference stays disabled when editing and
   const nav = page.getByRole("navigation", { name: "Agent configuration" });
   await nav.getByRole("button", { name: "Knowledge", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "Skill suggestions", exact: true })).toHaveValue("Disabled");
-  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  const save = page.getByRole("button", { name: "Save changes", exact: true });
+  await expect(save).toBeEnabled();
+  const headerBounds = await page.locator(".agent-editor-header").boundingBox();
+  const saveBounds = await save.boundingBox();
+  expect(saveBounds!.y).toBeGreaterThanOrEqual(headerBounds!.y);
+  expect(saveBounds!.y + saveBounds!.height).toBeLessThanOrEqual(headerBounds!.y + headerBounds!.height);
+  await save.click();
   await page.goto("/agents/legacy-learning");
   await nav.getByRole("button", { name: "Knowledge", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "Skill suggestions", exact: true })).toHaveValue("Disabled");
