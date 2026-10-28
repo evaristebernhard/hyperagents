@@ -5,6 +5,9 @@ import { loadLocalEnv } from '../scripts/env.mjs';
 loadLocalEnv();
 const ownerPassword=process.env.APP_OWNER_PASSWORD;
 const deepseekApiKey=process.env.DEEPSEEK_API_KEY;
+const openAlexApiKey=process.env.OPENALEX_API_KEY;
+const publicUserAgent=process.env.PUBLIC_API_USER_AGENT || "Hyperagents-Replica/0.1";
+delete process.env.OPENALEX_API_KEY;
 delete process.env.DEEPSEEK_API_KEY;
 // Never pass the bootstrap secret to children or log it.
 delete process.env.APP_OWNER_PASSWORD;
@@ -16,7 +19,7 @@ try {
     publicOrigin:process.env.APP_PUBLIC_ORIGIN,
     maxFileBytes:process.env.APP_MAX_FILE_BYTES,
     ownerPassword,
-    deepseekApiKey,
+    deepseekApiKey,openAlexApiKey,publicUserAgent,
     distDir:process.env.APP_SERVE_DIST==='1' && existsSync('dist/index.html') ? path.resolve('dist') : undefined,
   });
   const address=await app.listen();

@@ -59,6 +59,7 @@ import ContentHub from "./ContentHub";
 import Rooms from "./Rooms";
 import LibraryManager from "./LibraryManager";
 import LocalWorkspace from "./LocalWorkspace";
+import Marketplace from "./Marketplace";
 
 function useSaved<T>(key: string, initial: T) {
   const [v, setV] = useState<T>(() => safeRead(key, initial));
@@ -267,6 +268,8 @@ export default function App() {
       return <LibraryManager path={path} navigate={navigate} notify={notify} />;
     if (path === "/workspaces" || path === "/workflows")
       return <LocalWorkspace path={path} navigate={navigate} notify={notify} />;
+
+    if (workspace.mode === "server" && path.startsWith("/marketplace")) return <Marketplace path={path} navigate={navigate} notify={notify} />;
 
     if (path === "/threads/new" || path === "/home" || path === "/")
       return (

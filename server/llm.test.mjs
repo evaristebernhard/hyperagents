@@ -64,7 +64,7 @@ test('streams split UTF-8, reasoning and usage; fixed endpoint, server context, 
   assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/text\/event-stream/);
   assert.deepEqual(events(await response.text()),[{type:'reasoning',text:'Thinking'},{type:'delta',text:'Hello 🌍'},{type:'done',model:'deepseek-v4-pro',usage:{prompt_tokens:10,completion_tokens:5,total_tokens:15}}]);
   assert.equal(payload.model,'deepseek-v4-pro');assert.equal(payload.max_tokens,8192);assert.equal(payload.stream,true);
-  assert.equal(payload.messages.at(-1).content,'Saved question');assert.match(payload.messages[0].content,/no actual external tools/);
+  assert.equal(payload.messages.at(-1).content,'Saved question');assert.match(payload.messages[0].content,/no browser control, generic network browsing/);
   assert.equal(payload.tools,undefined);assert.doesNotMatch(JSON.stringify(payload),/test-only-placeholder/);
   assert.deepEqual(await (await h.call('/api/state')).json(),before);
   assert.equal((await h.chat()).status,409);
@@ -194,4 +194,22 @@ test('tool loop executes search, creates and updates real artifact data, and pas
   // Client applies these exact patches through the existing authenticated revision-checked API.
   const current=await (await h.call('/api/state')).json();current.state.workspaces[0].data.artifacts.push(...artifacts);await h.save(current.state);
   assert.equal((await (await h.call('/api/state')).json()).state.workspaces[0].data.artifacts.length,2);
+});
+
+test('selected installed weather skill exposes and executes an actual API adapter through model tool loop',async t=>{
+  const {marketplaceCatalog}=await import('./marketplace.mjs');
+  const source=marketplaceCatalog.entries.find(e=>e.name==='US National Weather Service API');let round=0,network=0;
+  const h=await harness(t,{deepseekApiKey:'test-only-placeholder',publicUserAgent:'Hyperagents-Test/1.0',publicFetch:async url=>{
+    network++;
+    if(String(url).includes('/points/'))return new Response(JSON.stringify({properties:{forecast:'https://api.weather.gov/gridpoints/LWX/97,71/forecast',relativeLocation:{properties:{city:'Washington',state:'DC'}}}}),{headers:{'content-type':'application/geo+json'}});
+    return new Response(JSON.stringify({properties:{updated:'2026-10-28T09:00:00Z',units:'us',periods:[{number:1,name:'Today',startTime:'2026-10-28T06:00:00-04:00',endTime:'2026-10-28T18:00:00-04:00',temperature:69,temperatureUnit:'F',shortForecast:'Partly sunny'}]}}),{headers:{'content-type':'application/geo+json'}});
+  },llmFetch:async(_url,init)=>{
+    const body=JSON.parse(init.body);round++;assert.ok(body.tools.some(t=>t.function.name==='weather_forecast'));
+    if(round===1)return new Response(frame({choices:[{delta:{tool_calls:[{index:0,id:'call-weather',type:'function',function:{name:'weather_forecast',arguments:JSON.stringify({latitude:38.8977,longitude:-77.0365})}}]},finish_reason:'tool_calls'}]})+frame('[DONE]'),{headers:{'content-type':'text/event-stream'}});
+    assert.equal(JSON.parse(body.messages.find(m=>m.role==='tool').content).service,'Weather');return success();
+  }});
+  await h.setup();const s=snapshot(),d=s.workspaces[0].data;
+  d.skills.push({id:'installed-weather',sourceId:source.sourceId,name:source.name,description:source.summary,documentation:source.implementation.documentation,whenToUse:'Forecast',author:'Independent replica implementation',tags:source.categories,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+  d.threads[0].messages[0].context={skillIds:['installed-weather']};await h.save(s);
+  const res=await h.chat();const result=events(await res.text());assert.equal(network,2);assert.equal(round,2);assert.equal(result.at(-1).type,'done',JSON.stringify(result));assert.ok(result.some(e=>e.type==='tool' && e.name==='weather_forecast' && e.status==='success'));
 });

@@ -60,7 +60,7 @@ Artifact changes are staged until the complete run succeeds. The UI validates th
 
 ## Not equivalent to all of Hyperagent
 
-Browser control is intentionally excluded. External web search/research providers, image/video/audio/avatar generation, transcription, maps, executable apps, OAuth connectors, unattended schedules/live runs, multi-user permissions and billing are not implemented by this increment. Their existing configuration UI is not evidence of execution. This is a functional text-and-local-tools agent, not complete non-browser feature parity or a durable unattended runner.
+Browser control is intentionally excluded. General web search/research providers, image/video/audio/avatar generation, transcription, maps, executable apps, OAuth connectors, unattended schedules/live runs, multi-user permissions and billing are not implemented by this increment. Their existing configuration UI is not evidence of execution. This is a functional text-and-local-tools agent, not complete non-browser feature parity or a durable unattended runner.
 
 ## Verification boundary
 
@@ -68,3 +68,8 @@ Backend tests use isolated temporary SQLite/files/HTTP servers and injected prov
 
 
 Local verification for this increment: production build passes; backend suite covers provider streaming and actual local tool execution; browser protocol tests cover persistence, partial responses, navigation cancellation, staged tool commits, versions, table rendering and CSV download. Provider transport in automated tests is mocked; local tool functions, SQLite writes and download bytes are real. The fixture suite covers pre-existing UI flows, not provider authorization. An overloaded parallel settings test was rerun successfully in isolation.
+
+
+## Marketplace skills and public data
+
+Selected independently installed Marketplace skills can bind the fixed read-only World Bank, NWS and configured OpenAlex tools. The server re-resolves the source template and selected installation; it does not execute arbitrary code embedded in skill documentation. See MARKETPLACE-INTEGRATION.md for the complete dated inventory, per-item coverage, live NWS test, World Bank WAF failure and unconfigured OpenAlex boundary.

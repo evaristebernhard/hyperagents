@@ -9,6 +9,7 @@ import { pipeline } from 'node:stream/promises';
 import { ApiError, emptyState, validateState } from './validation.mjs';
 import { prepareLegacy } from './legacy.mjs';
 import { createLlm } from './llm.mjs';
+import { marketplaceCapabilities, marketplaceCatalog } from './marketplace.mjs';
 const scrypt = promisify(scryptCallback);
 const hash = value => createHash('sha256').update(value).digest('hex');
 const random = () => randomBytes(32).toString('base64url');
@@ -77,7 +78,7 @@ export async function createApp(options = {}) {
   const meta = row => row && ({id:row.id,workspaceId:row.workspace_id,name:row.name,size:row.size,mimeType:row.mime_type,createdAt:row.created_at});
   const findFile = (id,workspaceId) => meta(db.prepare('SELECT * FROM files WHERE id=? AND workspace_id=?').get(id,workspaceId));
   // Only authenticated chat execution can read saved, workspace-owned UTF-8 text.
-  const llm=createLlm({apiKey:options.deepseekApiKey,fetchImpl:options.llmFetch,load,readAttachment:async(f,workspaceId)=> {
+  const llm=createLlm({apiKey:options.deepseekApiKey,fetchImpl:options.llmFetch,publicFetch:options.publicFetch,openAlexApiKey:options.openAlexApiKey,publicUserAgent:options.publicUserAgent,load,readAttachment:async(f,workspaceId)=> {
     if (!/^file-[a-f0-9-]{36}$/.test(f.id)) return null;
     const stored=findFile(f.id,workspaceId);
     if (!stored || ['name','size','mimeType','createdAt','workspaceId'].some(k=>stored[k]!==f[k]) || stored.size>16384) return null;
@@ -199,6 +200,8 @@ export async function createApp(options = {}) {
         res.setHeader('Set-Cookie',`hyperagents_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure?'; Secure':''}`);
         return send(res,200,{authenticated:false,setupRequired:false});
       }
+      if (route==='/api/marketplace/capabilities' && method==='GET') return send(res,200,marketplaceCapabilities({deepseekConfigured:llm.config().configured,openAlexApiKey:options.openAlexApiKey,userAgent:options.publicUserAgent}));
+      if (route==='/api/marketplace/catalog' && method==='GET') return send(res,200,marketplaceCatalog);
       if (route==='/api/llm/config' && method==='GET') return send(res,200,llm.config());
       if (route==='/api/llm/chat' && method==='POST') return await llm.chat(req,res,await body(req,4096));
       if (route==='/api/state' && method==='GET') return send(res,200,load());

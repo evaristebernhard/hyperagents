@@ -174,8 +174,8 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
           </button>)}
         </>}
         {sub === "tools" && <>
-          <small className="menu-local-note">Local execution: Thread Search, Documents, Webpages, Tables. Other tools are not connected.</small>
-          {toolNames.map(value => <button type="button" role="menuitemcheckbox" aria-checked={tools.includes(value)} key={value} onClick={() => setTools(tools.includes(value) ? tools.filter(t => t !== value) : [...tools, value])}>
+          <small className="menu-local-note">Local tools plus World Bank / Weather public data. OpenAlex needs server configuration. Other providers are not connected.</small>
+          {(dataOnly ? [...toolNames, "World Bank", "Weather", "OpenAlex"] : toolNames).map(value => <button type="button" role="menuitemcheckbox" aria-checked={tools.includes(value)} key={value} onClick={() => setTools(tools.includes(value) ? tools.filter(t => t !== value) : [...tools, value])}>
             <span>{value}</span>{tools.includes(value) && <Check size={14} />}
           </button>)}
         </>}

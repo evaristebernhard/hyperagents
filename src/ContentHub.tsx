@@ -19,6 +19,7 @@ import {
 import type { PageProps } from "./types";
 import type { Skill, Rubric } from "./local-model";
 import { communitySkills, uid, now } from "./local-model";
+import { marketplaceCatalog } from "./marketplace-catalog";
 import { useWorkspace, download } from "./workspace";
 import { IconButton, Modal } from "./ui";
 import "./local.css";
@@ -49,6 +50,7 @@ export function Markdown({ content }: { content: string }) {
 export default function ContentHub({ path, navigate, notify }: PageProps) {
   const w = useWorkspace(),
     { skills, memories, rubrics } = w.data;
+  const discoverSkills = w.mode === "server" ? marketplaceCatalog.filter(e => e.kind === "skill" && e.implementation).slice(0, 6).map(e => ({ id: e.sourceId, name: e.name, author: "Independent implementation", description: e.summary })) : communitySkills;
   const section = path.split("/")[1],
     id = path.split("/")[2];
   const skill = skills.find((s) => s.id === id),
@@ -499,7 +501,7 @@ export default function ContentHub({ path, navigate, notify }: PageProps) {
               </button>
             </div>
             <div className="rp-skill-cards">
-              {communitySkills.map((s) => (
+              {discoverSkills.map((s) => (
                 <article className="card rp-skill-card" key={s.id}>
                   <a
                     href={"/marketplace/s/" + s.id}
@@ -515,11 +517,12 @@ export default function ContentHub({ path, navigate, notify }: PageProps) {
                   <button
                     className="btn small"
                     onClick={() => {
+                      if (w.mode === "server") { navigate("/marketplace/s/" + s.id); return; }
                       const installedId = w.installSkill(s.id);
                       navigate("/skills/" + installedId);
                     }}
                   >
-                    {skills.some((i) => i.sourceId === s.id || i.id === s.id)
+                    {w.mode === "server" ? "View implementation" : skills.some((i) => i.sourceId === s.id || i.id === s.id)
                       ? "Open installed skill"
                       : "Add skill"}
                   </button>

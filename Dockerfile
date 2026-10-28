@@ -8,6 +8,7 @@ RUN npm run build
 FROM node:24-alpine
 WORKDIR /app
 COPY --from=build /app/server ./server
+COPY --from=build /app/shared ./shared
 COPY --from=build /app/scripts/env.mjs ./scripts/env.mjs
 COPY --from=build /app/dist ./dist
 RUN mkdir -p /app/.data && chown -R node:node /app

@@ -64,6 +64,15 @@ remote skill research/import is connected. Such actions are disabled or explicit
 state that they are unavailable; they do not report fake successful execution.
 Existing fixture-only controls are not evidence that execution exists.
 
+## Skills and Marketplace
+
+Server mode includes the observed 61-entry source catalog, category/search/readiness filters,
+explicit saved installations, independent recipe previews and per-tool availability. See
+[docs/MARKETPLACE-INTEGRATION.md](docs/MARKETPLACE-INTEGRATION.md) for the per-item
+coverage ledger and limitations. Thirteen independently written implementations are included;
+source-only entries are not misrepresented as working packages. Public-data tools include
+NWS, World Bank (upstream access must be checked) and server-configured OpenAlex.
+
 ## DeepSeek generation
 
 See [docs/DEEPSEEK.md](docs/DEEPSEEK.md) for setup, supported models, context boundaries,

@@ -1,0 +1,1316 @@
+{
+  "categories": [
+    {
+      "id": "sales-outreach",
+      "name": "Sales & outreach"
+    },
+    {
+      "id": "research",
+      "name": "Research"
+    },
+    {
+      "id": "recruiting",
+      "name": "Recruiting"
+    },
+    {
+      "id": "investment-finance",
+      "name": "Investment & finance"
+    },
+    {
+      "id": "development-engineering",
+      "name": "Development & engineering"
+    },
+    {
+      "id": "content-creation",
+      "name": "Content creation"
+    },
+    {
+      "id": "data-analytics",
+      "name": "Data & analytics"
+    },
+    {
+      "id": "ops-workflow",
+      "name": "Ops & workflow"
+    }
+  ],
+  "entries": [
+    {
+      "sourceId": "cca01M5CJP51P_X1PRQP81YVQBJVMX",
+      "kind": "agent",
+      "name": "Prospector",
+      "creator": "Corey Ganim",
+      "summary": "Builds verified local-business prospect lists for a chosen metropolitan area, including contact information and review metrics.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01M5CJP51P_X1PRQP81YVQBJVMX",
+      "categories": [
+        "sales-outreach",
+        "research"
+      ],
+      "dependencies": [
+        "Web Search",
+        "Google Places"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01M5CJQ7NP_HA3FJAMPXE789A73",
+      "kind": "agent",
+      "name": "Sitesmith",
+      "creator": "Corey Ganim",
+      "summary": "Creates and publishes a mobile-friendly single-page business website centered on phone calls using verified listing information.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01M5CJQ7NP_HA3FJAMPXE789A73",
+      "categories": [
+        "sales-outreach",
+        "content-creation"
+      ],
+      "dependencies": [
+        "Web Search",
+        "Webpages"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01M5CJQT8A_QJPM3AJ84CM931MB",
+      "kind": "agent",
+      "name": "Opener",
+      "creator": "Corey Ganim",
+      "summary": "Drafts conversational cold messages for local business owners and supplies follow-up reply scripts.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01M5CJQT8A_QJPM3AJ84CM931MB",
+      "categories": [
+        "sales-outreach"
+      ],
+      "dependencies": [
+        "Documents"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01M3ME7X3F_NFMPVR6QZDMVFSN7",
+      "kind": "agent",
+      "name": "Marisol",
+      "creator": "Hyperagent Team",
+      "summary": "Supports small-business loyalty through review requests and responses, approved testimonials, referrals and repeat-customer reminders.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01M3ME7X3F_NFMPVR6QZDMVFSN7",
+      "categories": [
+        "sales-outreach",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Email",
+        "Scheduler"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01M3MEBNXR_N8DTEYN3NJQ9YNWT",
+      "kind": "agent",
+      "name": "Theo",
+      "creator": "Hyperagent Team",
+      "summary": "Converts customer photos or project briefs into scoped, rate-card-based quotes with branded pages and approved follow-up.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01M3MEBNXR_N8DTEYN3NJQ9YNWT",
+      "categories": [
+        "sales-outreach",
+        "data-analytics",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Images",
+        "Email",
+        "Webpages"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01M3MEDMZ5_06PSGNJZJG29MY5F",
+      "kind": "agent",
+      "name": "Priya",
+      "creator": "Hyperagent Team",
+      "summary": "Manages small-business lead discovery, fast inbound replies, tailored outbound outreach and a regularly summarized sales pipeline.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01M3MEDMZ5_06PSGNJZJG29MY5F",
+      "categories": [
+        "sales-outreach",
+        "data-analytics",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Web Search",
+        "Email",
+        "Scheduler"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01M3MEDWS8_PYVSSQV9SB9ZE81J",
+      "kind": "agent",
+      "name": "Yuki",
+      "creator": "Hyperagent Team",
+      "summary": "Develops business-specific Meta and X advertising, prepares previews and paused Meta campaigns, and reports observed results.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01M3MEDWS8_PYVSSQV9SB9ZE81J",
+      "categories": [
+        "sales-outreach",
+        "content-creation"
+      ],
+      "dependencies": [
+        "Meta Ads",
+        "Images",
+        "Web Search"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01M00X3F2G_ZBGY79RTGGC8K9GB",
+      "kind": "agent",
+      "name": "Bali Event Concierge (Lead Qualification)",
+      "creator": "Liam Ottley",
+      "summary": "Enriches Bali event applications from public information, assesses fit and emails booking invitations to approved applicants.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01M00X3F2G_ZBGY79RTGGC8K9GB",
+      "categories": [
+        "sales-outreach",
+        "research"
+      ],
+      "dependencies": [
+        "Web Search",
+        "Email"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01KYXN50ND_03507PD81PKRWZXM",
+      "kind": "agent",
+      "name": "Funnel",
+      "creator": "Hyperagent Team",
+      "summary": "Coordinates an ongoing performance-marketing process spanning Meta ads, creative, landing pages, measurement and documented experiments.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01KYXN50ND_03507PD81PKRWZXM",
+      "categories": [
+        "sales-outreach",
+        "data-analytics",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Meta Ads",
+        "Images",
+        "Scheduler"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01KYXMSYZG_BAZDV0JKTZ7WYZH1",
+      "kind": "agent",
+      "name": "Redline: Sales Coach",
+      "creator": "Hyperagent Team",
+      "summary": "Reviews timestamped sales-call transcripts to identify strong execution, important misses and a focused next practice action.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01KYXMSYZG_BAZDV0JKTZ7WYZH1",
+      "categories": [
+        "sales-outreach",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Documents"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "implementation": {
+        "documentation": "# Redline: Sales Coach — independent replica implementation\n\nThis workflow was independently written for this application. It is not the original publisher's skill package, scripts or system prompt. Source marketplace listing is attribution and functional reference only.\n\nRead only the user-supplied, permissioned call transcript. If timestamps are absent, cite short quoted passages or section numbers and do not invent timestamps. Identify the customer's stated needs, questions, objections, commitments and unresolved next steps. Separate observable language from your interpretation. Highlight two strengths and the most consequential missed opportunity, then propose one measurable practice exercise and a concise next-call plan. Save the review as a document. No live call recording, transcription service, outreach sending or external CRM writes are available.\n\n## Execution boundaries\nTranscript-based coaching only; the user supplies authorized text. No audio transcription or CRM integration.\nOnly claim results returned by the enabled tools. Never claim external work, publication, sending, screenshots, model-generated media or code execution that did not occur. Save final deliverables with artifact tools and preserve existing versions when revising.",
+        "tools": [
+          "Documents"
+        ],
+        "limitations": "Transcript-based coaching only; the user supplies authorized text. No audio transcription or CRM integration.",
+        "coverage": "workflow"
+      },
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01KY2P548K_MD7GCZGRBCW6DPEK",
+      "kind": "agent",
+      "name": "Inbound",
+      "creator": "Hyperagent Team",
+      "summary": "Turns inbound sales emails into scheduled meetings and produces private prospect-research briefs for the human attending.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01KY2P548K_MD7GCZGRBCW6DPEK",
+      "categories": [
+        "sales-outreach",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Email",
+        "Calendar",
+        "Web Search"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01KXSKA7NH_7FNNEJKT1FAWMCJR",
+      "kind": "agent",
+      "name": "Automated Network Watering",
+      "creator": "Nicole DeTommaso",
+      "summary": "Finds long-neglected Airtable relationships and prepares personalized Gmail reconnection drafts based on prior conversations.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01KXSKA7NH_7FNNEJKT1FAWMCJR",
+      "categories": [
+        "sales-outreach"
+      ],
+      "dependencies": [
+        "Airtable",
+        "Email",
+        "Scheduler"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01KX3XM2A9_HJCJZXBEFDEXFDBQ",
+      "kind": "agent",
+      "name": "Momentum: Growth Marketing",
+      "creator": "Ideabrowser.com",
+      "summary": "Helps early-stage founders produce practical growth assets across positioning, brand, acquisition, launches, conversion copy and competitor research.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01KX3XM2A9_HJCJZXBEFDEXFDBQ",
+      "categories": [
+        "sales-outreach",
+        "research",
+        "content-creation"
+      ],
+      "dependencies": [
+        "Web Search",
+        "Images"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01M5JFCGW4_AH40WENAF7JFGS8V",
+      "kind": "skill",
+      "name": "Personalized Outbound Assets",
+      "creator": "Hyperagent Team",
+      "summary": "Produces recipient-specific branded visual outreach assets using company research, accurate logos, image creation and reviewable hosted previews.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01M5JFCGW4_AH40WENAF7JFGS8V",
+      "categories": [
+        "sales-outreach"
+      ],
+      "dependencies": [
+        "Web Search",
+        "Images"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01M28E4GGA_88HW1GQ51J1MMNQN",
+      "kind": "skill",
+      "name": "Before and After Transformation",
+      "creator": "Hyperagent Team",
+      "summary": "Packages a real starting condition and a proposed improvement into a visual sales proposal with scope and pricing context.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01M28E4GGA_88HW1GQ51J1MMNQN",
+      "categories": [
+        "sales-outreach",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Images",
+        "Webpages"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01M28E9RP4_4J9G68V59WSWGN1A",
+      "kind": "skill",
+      "name": "Lead Response",
+      "creator": "Hyperagent Team",
+      "summary": "Qualifies inbound email inquiries through useful follow-up questions and hands ready leads to the owner within defined sending limits.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01M28E9RP4_4J9G68V59WSWGN1A",
+      "categories": [
+        "sales-outreach",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Email"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01M28EKB6X_A6XSDSQ5SVJQS6V3",
+      "kind": "skill",
+      "name": "Meta Campaign Launch",
+      "creator": "Hyperagent Team",
+      "summary": "Researches competitor advertising, creates original image ads and submits an explicitly approved small-business Meta campaign.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01M28EKB6X_A6XSDSQ5SVJQS6V3",
+      "categories": [
+        "sales-outreach",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Meta Ads",
+        "Images",
+        "Web Search"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01M28EMKC9_D32B0YQ10HW9K49G",
+      "kind": "skill",
+      "name": "Visual Quotes",
+      "creator": "Hyperagent Team",
+      "summary": "Turns an approved estimate into an interactive proposal where customers can compare priced options and select scope preferences.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01M28EMKC9_D32B0YQ10HW9K49G",
+      "categories": [
+        "sales-outreach",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Webpages",
+        "Customer Responses"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01M28ENH3F_TPG4TAZ401G7ZMVY",
+      "kind": "skill",
+      "name": "Lead Revival",
+      "creator": "Hyperagent Team",
+      "summary": "Reassesses dormant first-party leads and handles permission-checked reactivation messages and replies with owner alerts.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01M28ENH3F_TPG4TAZ401G7ZMVY",
+      "categories": [
+        "sales-outreach",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Email",
+        "Scheduler"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01M00X72R8_X9CN8C4B2F6JH93R",
+      "kind": "skill",
+      "name": "Daily Lead Warm-Up — Score, Rank & Send",
+      "creator": "Liam Ottley",
+      "summary": "Rescores and ranks a lead list each morning using conversation history, then drafts personalized outreach for approval.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01M00X72R8_X9CN8C4B2F6JH93R",
+      "categories": [
+        "sales-outreach"
+      ],
+      "dependencies": [
+        "Email",
+        "Scheduler"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KWD5P8B9_R6V4J0H5DEP88A2N",
+      "kind": "skill",
+      "name": "Small Biz Website Builder",
+      "creator": "Corey Ganim",
+      "summary": "Finds well-reviewed local businesses with weak or missing websites and builds concept sites in a pitching dashboard.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KWD5P8B9_R6V4J0H5DEP88A2N",
+      "categories": [
+        "sales-outreach",
+        "development-engineering",
+        "content-creation"
+      ],
+      "dependencies": [
+        "Web Search",
+        "Google Places",
+        "Browser",
+        "Webpages"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDKQYEG_24WX5741812RBTGG",
+      "kind": "skill",
+      "name": "NYC Subway Campaign",
+      "creator": "Hyperagent Team",
+      "summary": "Creates a consistent branded set of photorealistic NYC subway advertising mockups and presents them in a campaign case-study page.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDKQYEG_24WX5741812RBTGG",
+      "categories": [
+        "sales-outreach",
+        "content-creation"
+      ],
+      "dependencies": [
+        "Images",
+        "Webpages"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDKCD84_WM4B6FDNHHR88S6B",
+      "kind": "skill",
+      "name": "Landscaping Design and Quote",
+      "creator": "Hyperagent Team",
+      "summary": "Builds an interactive landscaping proposal from a yard photo and address, with alternative designs and an adjustable itemized quote.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDKCD84_WM4B6FDNHHR88S6B",
+      "categories": [
+        "sales-outreach",
+        "content-creation",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Images",
+        "Maps",
+        "Webpages"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01KXVV12TE_RYH7F0YCA1R20A2N",
+      "kind": "agent",
+      "name": "Script Lab",
+      "creator": "Sarah",
+      "summary": "Adapts Sarah Chieng source material into researched short technical video scripts with varied hooks, citations and filming guidance.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01KXVV12TE_RYH7F0YCA1R20A2N",
+      "categories": [
+        "research",
+        "content-creation"
+      ],
+      "dependencies": [
+        "Web Search",
+        "Documents"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01M4993R34_KBD7MJ1AHXBZA9C7",
+      "kind": "skill",
+      "name": "Frame Scout",
+      "creator": "Oren John",
+      "summary": "Finds verified nearby filming locations and rentable studios for an address, then suggests vertical-video shot coverage.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01M4993R34_KBD7MJ1AHXBZA9C7",
+      "categories": [
+        "research",
+        "content-creation"
+      ],
+      "dependencies": [
+        "Web Search",
+        "Maps"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KYMX0HJV_ZZ83EWK5KX2P2NJC",
+      "kind": "skill",
+      "name": "PG-Style Pitch Review",
+      "creator": "Robert Scoble",
+      "summary": "Evaluates a startup pitch with a plain-language rewrite, a numerical score, interview-style questions and a prioritized improvement.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KYMX0HJV_ZZ83EWK5KX2P2NJC",
+      "categories": [
+        "research",
+        "investment-finance"
+      ],
+      "dependencies": [
+        "Documents"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "implementation": {
+        "documentation": "# PG-Style Pitch Review — independent replica implementation\n\nThis workflow was independently written for this application. It is not the original publisher's skill package, scripts or system prompt. Source marketplace listing is attribution and functional reference only.\n\nReview the actual pitch supplied by the user. Ask for missing audience, product stage and intended action only if these materially affect the assessment. Give a plain-language one-sentence product description, the customer/problem/solution/evidence/business-model/ask gaps, and scores with explicit criteria rather than arbitrary confidence. Ask five concrete investor-style questions whose answers would change the decision. Prioritize one fix and rewrite a concise pitch that preserves only supported claims. Save the review and revised pitch as a document. Do not impersonate a named investor, imply endorsement, invent traction or promise funding.\n\n## Execution boundaries\nIndependent pitch-review workflow; no external company verification or investor endorsement.\nOnly claim results returned by the enabled tools. Never claim external work, publication, sending, screenshots, model-generated media or code execution that did not occur. Save final deliverables with artifact tools and preserve existing versions when revising.",
+        "tools": [
+          "Documents"
+        ],
+        "limitations": "Independent pitch-review workflow; no external company verification or investor endorsement.",
+        "coverage": "workflow"
+      },
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KXE6517H_XZ5CR1ZSYW20X9WQ",
+      "kind": "skill",
+      "name": "wiki-builder",
+      "creator": "Elvis Saravia",
+      "summary": "Creates and maintains configurable research wikis with reusable source collections, compiled pages and per-wiki organization.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KXE6517H_XZ5CR1ZSYW20X9WQ",
+      "categories": [
+        "research",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Thread Search",
+        "Documents"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "implementation": {
+        "documentation": "# wiki-builder — independent replica implementation\n\nThis workflow was independently written for this application. It is not the original publisher's skill package, scripts or system prompt. Source marketplace listing is attribution and functional reference only.\n\n## Organize\nAgree a topic and a small page map (index, sources, concepts and open questions). Use workspace_search to find relevant saved documents, then resource_read to inspect actual text. Keep facts linked to their supplied source or saved resource ID. Mark unknowns explicitly.\n## Build\nCreate separate Document artifacts for the index and substantive pages, each with a purpose, source notes, claim/evidence mapping, cross-reference titles and revision notes. Keep created artifact IDs in the index. Use update_artifact for revisions instead of making ambiguous copies. Only update documents belonging to the current thread; ask the user to continue in the source thread when necessary.\n## Query\nAnswer from the actual saved pages. Distinguish quotations, synthesis and unresolved contradictions. Do not call the result a filesystem folder or claim a git commit. Save new findings and update the index only after supported tool results.\n\n## Execution boundaries\nDocument-based wiki in the current thread, with search and versioned updates; does not install a standalone filesystem wiki or execute publisher scripts.\nOnly claim results returned by the enabled tools. Never claim external work, publication, sending, screenshots, model-generated media or code execution that did not occur. Save final deliverables with artifact tools and preserve existing versions when revising.",
+        "tools": [
+          "Thread Search",
+          "Documents",
+          "Webpages",
+          "Tables"
+        ],
+        "limitations": "Document-based wiki in the current thread, with search and versioned updates; does not install a standalone filesystem wiki or execute publisher scripts.",
+        "coverage": "partial"
+      },
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KWCXR3W4_XRNS6AAXVZBT0617",
+      "kind": "skill",
+      "name": "Roast My Idea",
+      "creator": "Nate Herk",
+      "summary": "Tests an idea through multiple simulated critical and supportive perspectives and returns a verdict, main risks and a cheap validation experiment.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KWCXR3W4_XRNS6AAXVZBT0617",
+      "categories": [
+        "research",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Documents"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "implementation": {
+        "documentation": "# Roast My Idea — independent replica implementation\n\nThis workflow was independently written for this application. It is not the original publisher's skill package, scripts or system prompt. Source marketplace listing is attribution and functional reference only.\n\n## Inputs\nAsk for customer, problem, proposed solution, price/distribution assumptions and supplied evidence. If little context is available, state assumptions rather than inventing market research.\n## Work\nAssess the idea through five explicit lenses: failure/risk, upside, causal logic, evidence quality and buyer willingness. These are simulated reasoning lenses inside one model response, NOT five independently executed agents or independent validation. For each lens state the strongest concrete claim and what evidence would overturn it. Separate supplied facts from estimates. Resolve disagreements instead of averaging ratings.\n## Deliver\nCreate one document containing a GO / RESHAPE / STOP verdict, a concise rationale, biggest falsifiable risk, unit-economics assumptions, and a low-cost 48-hour experiment with budget, measurable success/failure thresholds and next decision. Cite only sources actually supplied or returned by available tools. Never manufacture research citations.\n\n## Execution boundaries\nSingle-model structured critique using supplied evidence; no external research or parallel-agent execution.\nOnly claim results returned by the enabled tools. Never claim external work, publication, sending, screenshots, model-generated media or code execution that did not occur. Save final deliverables with artifact tools and preserve existing versions when revising.",
+        "tools": [
+          "Documents"
+        ],
+        "limitations": "Single-model structured critique using supplied evidence; no external research or parallel-agent execution.",
+        "coverage": "workflow"
+      },
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVX6CENX_KF5WZ6FV56Z2BAX9",
+      "kind": "skill",
+      "name": "Landing Page Teardown",
+      "creator": "Hyperagent Team",
+      "summary": "Analyzes and compares landing pages using cropped visual evidence, annotated hero sections and a consolidated findings page.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVX6CENX_KF5WZ6FV56Z2BAX9",
+      "categories": [
+        "research",
+        "content-creation",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Browser",
+        "Images",
+        "Webpages"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDTRA0W_R6FWEKF5Q01K9VP7",
+      "kind": "skill",
+      "name": "OpenAlex API",
+      "creator": "Andrew Busse",
+      "summary": "Searches and analyzes scholarly works, authors and institutions through OpenAlex with entity lookups, filters and aggregate counts.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDTRA0W_R6FWEKF5Q01K9VP7",
+      "categories": [
+        "research",
+        "data-analytics"
+      ],
+      "dependencies": [
+        "OpenAlex"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "implementation": {
+        "documentation": "# OpenAlex API — independent replica implementation\n\nThis workflow was independently written for this application. It is not the original publisher's skill package, scripts or system prompt. Source marketplace listing is attribution and functional reference only.\n\nUse openalex_search for scholarly results after a server-side API key has been configured. Confirm the research question, search terms and desired scope. For each result retain title, authors when returned, publication year, DOI/OpenAlex URL and citation count with retrieval time. Citation count is not an evidence-quality score. Compare findings only from available metadata; do not claim to have read full papers. Use create_table for bibliographies and a document for a sourced summary. Report empty results, limits and authentication errors honestly; never fabricate publications or DOIs.\n\n## Execution boundaries\nRequires the server OpenAlex configuration expected by current API documentation. Metadata search only; no paywall bypass or full-text-paper reader.\nOnly claim results returned by the enabled tools. Never claim external work, publication, sending, screenshots, model-generated media or code execution that did not occur. Save final deliverables with artifact tools and preserve existing versions when revising.",
+        "tools": [
+          "OpenAlex",
+          "Tables",
+          "Documents"
+        ],
+        "limitations": "Requires the server OpenAlex configuration expected by current API documentation. Metadata search only; no paywall bypass or full-text-paper reader.",
+        "coverage": "workflow"
+      },
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDTYNVE_FHMBHKQ2CFP97ZVH",
+      "kind": "skill",
+      "name": "World Bank Indicators API",
+      "creator": "Andrew Busse",
+      "summary": "Retrieves and explores international development indicators and reference metadata across countries, periods and World Bank datasets.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDTYNVE_FHMBHKQ2CFP97ZVH",
+      "categories": [
+        "research",
+        "investment-finance",
+        "data-analytics"
+      ],
+      "dependencies": [
+        "World Bank"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "implementation": {
+        "documentation": "# World Bank Indicators API — independent replica implementation\n\nThis workflow was independently written for this application. It is not the original publisher's skill package, scripts or system prompt. Source marketplace listing is attribution and functional reference only.\n\nUse world_bank_indicator for actual data. Confirm the country code, indicator code and year range; do not guess an indicator definition when the code is unknown. Return values with country, year, unit, indicator label, sourceUrl and retrieval time. Preserve null/missing observations, distinguish revisions from real changes and never interpolate silently. Use create_table for useful rows and a document for methodology. Keep the query within tool bounds and report API errors honestly. Describe correlations rather than claiming causation.\n\n## Execution boundaries\nLive read-only World Bank data when the upstream service is reachable; no credentials required.\nOnly claim results returned by the enabled tools. Never claim external work, publication, sending, screenshots, model-generated media or code execution that did not occur. Save final deliverables with artifact tools and preserve existing versions when revising.",
+        "tools": [
+          "World Bank",
+          "Tables",
+          "Documents"
+        ],
+        "limitations": "Live read-only World Bank data when the upstream service is reachable; no credentials required.",
+        "coverage": "workflow"
+      },
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDV179B_B42RH02QKH5E5303",
+      "kind": "skill",
+      "name": "SEC EDGAR API",
+      "creator": "Andrew Busse",
+      "summary": "Researches US public-company filings and structured financial facts using company identifiers, disclosure history and filing-text searches.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDV179B_B42RH02QKH5E5303",
+      "categories": [
+        "research",
+        "investment-finance",
+        "data-analytics"
+      ],
+      "dependencies": [
+        "SEC EDGAR"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01M3MEAYVB_CZVPH8SEEW8VP416",
+      "kind": "agent",
+      "name": "Callum",
+      "creator": "Hyperagent Team",
+      "summary": "Assists small businesses with job posts, candidate sourcing and screening, structured interviews, offers and first-week plans while leaving decisions to owners.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01M3MEAYVB_CZVPH8SEEW8VP416",
+      "categories": [
+        "recruiting",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Web Search",
+        "Email"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01KWYVSMWK_M740XZMR2ZV26WM1",
+      "kind": "agent",
+      "name": "Job Hunt Copilot",
+      "creator": "Abhijay Vuyyuuru",
+      "summary": "Matches fresh job openings to a resume and drafts targeted contact outreach and role-specific resume improvements for approval.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01KWYVSMWK_M740XZMR2ZV26WM1",
+      "categories": [
+        "recruiting",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Web Search",
+        "Email"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01M3X1VZHG_MZ85XF4767CBC3VY",
+      "kind": "agent",
+      "name": "Sizzle",
+      "creator": "Hyperagent Team",
+      "summary": "Produces editable software demo videos by recreating product screens, staging realistic interactions and exporting a finished MP4.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01M3X1VZHG_MZ85XF4767CBC3VY",
+      "categories": [
+        "development-engineering",
+        "content-creation"
+      ],
+      "dependencies": [
+        "Browser",
+        "Code Execution",
+        "Video"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KYTQ4NDJ_R2BX7VN35Y16CR97",
+      "kind": "skill",
+      "name": "Loopy API (Loop Library Skill)",
+      "creator": "Matthew Berman",
+      "summary": "Helps GitHub Copilot users discover, evaluate, execute and share reusable agent loops.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KYTQ4NDJ_R2BX7VN35Y16CR97",
+      "categories": [
+        "development-engineering",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Loopy",
+        "Code Execution"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KYRG5K2F_SMVVEYTDM5279DT5",
+      "kind": "skill",
+      "name": "Agent self-explainer",
+      "creator": "Alex McDonnell",
+      "summary": "Creates an animated one-screen explanation of an agent’s tools, workflows, recurring operation and human handoffs.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KYRG5K2F_SMVVEYTDM5279DT5",
+      "categories": [
+        "development-engineering",
+        "content-creation",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Webpages",
+        "Video"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KXRGSZP3_H0M2QXN44FE6749H",
+      "kind": "skill",
+      "name": "Easing Curves",
+      "creator": "Hyperagent Team",
+      "summary": "Provides standard easing functions and spring-animation helpers for more deliberate interface and graphic motion.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KXRGSZP3_H0M2QXN44FE6749H",
+      "categories": [
+        "development-engineering",
+        "content-creation"
+      ],
+      "dependencies": [
+        "Webpages"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "implementation": {
+        "documentation": "# Easing Curves — independent replica implementation\n\nThis workflow was independently written for this application. It is not the original publisher's skill package, scripts or system prompt. Source marketplace listing is attribution and functional reference only.\n\nAsk what moves, why, and how quickly the interaction must feel. Provide concrete CSS cubic-bezier values for entrance, exit and repositioning, explaining overshoot and continuity. Generate a self-contained CSS-only comparison webpage (keyframes, no scripts) with labelled swatches and reduced-motion support, plus a reference document with timing values and implementation snippets. Distinguish a CSS approximation from a physical spring solver. Do not claim to execute JavaScript, simulate physics or render video.\n\n## Execution boundaries\nCSS-only easing examples and reference material; no JavaScript spring runtime or video renderer.\nOnly claim results returned by the enabled tools. Never claim external work, publication, sending, screenshots, model-generated media or code execution that did not occur. Save final deliverables with artifact tools and preserve existing versions when revising.",
+        "tools": [
+          "Documents",
+          "Webpages"
+        ],
+        "limitations": "CSS-only easing examples and reference material; no JavaScript spring runtime or video renderer.",
+        "coverage": "partial"
+      },
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDKJSHG_WY8R9N89QBT5B7ZD",
+      "kind": "skill",
+      "name": "Swiss Grid Design",
+      "creator": "Hyperagent Team",
+      "summary": "Builds Swiss-modernist editorial webpages with a measurable modular grid, baseline alignment and browser-based layout verification.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDKJSHG_WY8R9N89QBT5B7ZD",
+      "categories": [
+        "development-engineering",
+        "content-creation"
+      ],
+      "dependencies": [
+        "Webpages",
+        "Browser"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "implementation": {
+        "documentation": "# Swiss Grid Design — independent replica implementation\n\nThis workflow was independently written for this application. It is not the original publisher's skill package, scripts or system prompt. Source marketplace listing is attribution and functional reference only.\n\nDefine the content hierarchy and a small modular grid before writing markup. Build a self-contained responsive HTML artifact with CSS grid, a consistent spacing rhythm, restrained typography and clear reading order. Use CSS variables as a shared source for grid columns/gaps and an optional CSS-only grid overlay controlled by a labelled checkbox. The overlay and content must share the same padded content box. Prefer readable reflow to fixed desktop widths. Document alignment assumptions and viewport limitations. Use create_artifact/update_artifact; do not claim a Puppeteer measurement, optical-alignment script or screenshot if no browser runtime returned that evidence.\n\n## Execution boundaries\nIndependent CSS-grid webpage implementation; no publisher scaffold scripts or browser-based zero-pixel verification.\nOnly claim results returned by the enabled tools. Never claim external work, publication, sending, screenshots, model-generated media or code execution that did not occur. Save final deliverables with artifact tools and preserve existing versions when revising.",
+        "tools": [
+          "Webpages"
+        ],
+        "limitations": "Independent CSS-grid webpage implementation; no publisher scaffold scripts or browser-based zero-pixel verification.",
+        "coverage": "partial"
+      },
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01KXH6E0YP_PVVB158ZT7QBV45X",
+      "kind": "agent",
+      "name": "Taste Test",
+      "creator": "Jamey Gannon",
+      "summary": "Scores submitted visual work and explains its strengths and weaknesses across layout, typography, color, concept and execution.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01KXH6E0YP_PVVB158ZT7QBV45X",
+      "categories": [
+        "content-creation"
+      ],
+      "dependencies": [
+        "Vision"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01KVDHD4PN_EXY2FESTJ6RGTNNJ",
+      "kind": "agent",
+      "name": "Nora: Video Producer",
+      "creator": "Hyperagent Team",
+      "summary": "Creates launch-video MP4s by combining generated cinematic clips with coded typography and motion graphics in multiple formats.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01KVDHD4PN_EXY2FESTJ6RGTNNJ",
+      "categories": [
+        "content-creation",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Images",
+        "Video",
+        "Audio",
+        "Code Execution"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01KVDH3YD0_QJMZP9XMV72DQ6TH",
+      "kind": "agent",
+      "name": "Folio: Product Merchandising",
+      "creator": "Hyperagent Team",
+      "summary": "Creates product lookbooks and visual merchandising presentations for brands across physical-goods categories.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01KVDH3YD0_QJMZP9XMV72DQ6TH",
+      "categories": [
+        "content-creation"
+      ],
+      "dependencies": [
+        "Images",
+        "Webpages"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01M28EAT2E_CFKK454858PGDK5X",
+      "kind": "skill",
+      "name": "Picture-to-Portfolio",
+      "creator": "Hyperagent Team",
+      "summary": "Repurposes approved project photos and notes into a coordinated website feature and social-content package for owner review.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01M28EAT2E_CFKK454858PGDK5X",
+      "categories": [
+        "content-creation",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Vision",
+        "Images"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KYNC769N_HSAZNEVNY77MREJZ",
+      "kind": "skill",
+      "name": "Instagram Insights -> Google Sheets",
+      "creator": "Oren John",
+      "summary": "Transfers owned Instagram post-performance data to Google Sheets and supplements it with authenticated insights views.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KYNC769N_HSAZNEVNY77MREJZ",
+      "categories": [
+        "content-creation",
+        "data-analytics"
+      ],
+      "dependencies": [
+        "Instagram",
+        "Google Sheets"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KXKBZ32S_Q8RP2Y40Y4MR7FTW",
+      "kind": "skill",
+      "name": "Design Shuffle",
+      "creator": "Hyperagent Team",
+      "summary": "Researches contemporary design references and presents five contrasting art directions for the same project in one comparison.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KXKBZ32S_Q8RP2Y40Y4MR7FTW",
+      "categories": [
+        "content-creation",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Web Search",
+        "Images",
+        "Webpages"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KWW9863B_K2WF34HK4MHCBT5N",
+      "kind": "skill",
+      "name": "B-Roll Generator",
+      "creator": "Matt Wolfe",
+      "summary": "Converts a script into timed generated footage and motion graphics, then edits the cutaways around the original narration.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KWW9863B_K2WF34HK4MHCBT5N",
+      "categories": [
+        "content-creation",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Video",
+        "Audio",
+        "Code Execution"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDKYYTD_GVRHHKFWWB5N9ZSW",
+      "kind": "skill",
+      "name": "Vignelli Canon Design System",
+      "creator": "Hyperagent Team",
+      "summary": "Applies Vignelli-inspired grid, typography and identity principles to designing or critiquing visual systems across media.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDKYYTD_GVRHHKFWWB5N9ZSW",
+      "categories": [
+        "content-creation"
+      ],
+      "dependencies": [
+        "Documents",
+        "Webpages"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "implementation": {
+        "documentation": "# Vignelli Canon Design System — independent replica implementation\n\nThis workflow was independently written for this application. It is not the original publisher's skill package, scripts or system prompt. Source marketplace listing is attribution and functional reference only.\n\nInventory the user's content, audience and media before choosing a system. Define a small justified set of typography roles, spacing values, alignment rules, colors and reusable page components. Show how the system handles dense information, long labels and a narrow screen. Produce a Document specification and a self-contained HTML specimen using inline CSS, original copy and user-supplied assets only. Explain tradeoffs and violations in an audit checklist. Present this as an independent design interpretation, not an official or licensed brand package.\n\n## Execution boundaries\nIndependent design-system document and HTML specimen; no publisher assets or automatic external brand audit.\nOnly claim results returned by the enabled tools. Never claim external work, publication, sending, screenshots, model-generated media or code execution that did not occur. Save final deliverables with artifact tools and preserve existing versions when revising.",
+        "tools": [
+          "Documents",
+          "Webpages"
+        ],
+        "limitations": "Independent design-system document and HTML specimen; no publisher assets or automatic external brand audit.",
+        "coverage": "partial"
+      },
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDKXRCM_GBWQXD5XDXGPRB9A",
+      "kind": "skill",
+      "name": "Veo + Hyperframes Videos",
+      "creator": "Hyperagent Team",
+      "summary": "Plans and assembles launch videos whose generated footage leaves intentional space for animated text overlays.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDKXRCM_GBWQXD5XDXGPRB9A",
+      "categories": [
+        "content-creation",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Video",
+        "Images",
+        "Code Execution"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDKVFQH_V2C26Q7XJQP49P9X",
+      "kind": "skill",
+      "name": "NYT Data Viz",
+      "creator": "Hyperagent Team",
+      "summary": "Applies newsroom-style chart selection, typography, color and annotation to data visualizations and analytical webpages.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDKVFQH_V2C26Q7XJQP49P9X",
+      "categories": [
+        "content-creation",
+        "data-analytics"
+      ],
+      "dependencies": [
+        "Tables",
+        "Webpages"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "implementation": {
+        "documentation": "# NYT Data Viz — independent replica implementation\n\nThis workflow was independently written for this application. It is not the original publisher's skill package, scripts or system prompt. Source marketplace listing is attribution and functional reference only.\n\nInspect supplied tabular data, units, time range and question. Use create_table to preserve the usable data. Select bars for comparisons, lines for time and scatter for two continuous quantities; avoid misleading scales and explain missing data. Build an original static editorial SVG chart embedded in a self-contained HTML page using create_artifact. Include a meaningful headline, readable labels and units, a source/method note and direct annotations. Keep numeric values consistent with the table, draw axes from actual minima/maxima, avoid color-only distinctions and test mentally for narrow-screen readability. Do not claim to have executed Python, loaded D3 or browser-tested the page. Use only inline SVG and CSS supported by the sandbox. On revision, read the current artifact before updating it.\n\n## Execution boundaries\nOriginal static SVG chart workflow; publisher Python helpers, D3 interactions and automated visual verification are not bundled.\nOnly claim results returned by the enabled tools. Never claim external work, publication, sending, screenshots, model-generated media or code execution that did not occur. Save final deliverables with artifact tools and preserve existing versions when revising.",
+        "tools": [
+          "Tables",
+          "Webpages"
+        ],
+        "limitations": "Original static SVG chart workflow; publisher Python helpers, D3 interactions and automated visual verification are not bundled.",
+        "coverage": "partial"
+      },
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDKBEGW_DZ20GZN2YYY3W92J",
+      "kind": "skill",
+      "name": "Claymation Podcast Clips",
+      "creator": "Hyperagent Team",
+      "summary": "Turns a podcast excerpt and speaker portrait into a claymation-style captioned video while preserving the original audio.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDKBEGW_DZ20GZN2YYY3W92J",
+      "categories": [
+        "content-creation",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Video",
+        "Audio",
+        "Code Execution"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDK9Y6H_2T0WDXCBN1VCYED6",
+      "kind": "skill",
+      "name": "Claymation Explainer",
+      "creator": "Hyperagent Team",
+      "summary": "Builds character-consistent claymation explainer videos from a storyboard, generated scenes and a single voiceover.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDK9Y6H_2T0WDXCBN1VCYED6",
+      "categories": [
+        "content-creation"
+      ],
+      "dependencies": [
+        "Video",
+        "Images",
+        "Audio"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDK85FW_XJSBFK0ZC77AWC13",
+      "kind": "skill",
+      "name": "Morning Briefing Movie Trailer",
+      "creator": "Hyperagent Team",
+      "summary": "Converts a real schedule and communications into a short cinematic briefing with generated footage and on-screen text.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDK85FW_XJSBFK0ZC77AWC13",
+      "categories": [
+        "content-creation",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Calendar",
+        "Email",
+        "Video"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDK6KWA_GHNT3CD64AM3YM2W",
+      "kind": "skill",
+      "name": "Brand Book Generator",
+      "creator": "Hyperagent Team",
+      "summary": "Presents three contrasting app-brand concepts with switchable logos, mockups, palette, typography and voice in one screen.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDK6KWA_GHNT3CD64AM3YM2W",
+      "categories": [
+        "content-creation"
+      ],
+      "dependencies": [
+        "Webpages"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "implementation": {
+        "documentation": "# Brand Book Generator — independent replica implementation\n\nThis workflow was independently written for this application. It is not the original publisher's skill package, scripts or system prompt. Source marketplace listing is attribution and functional reference only.\n\nCollect brand name, audience, product truth and constraints. Create three intentionally different concepts with concise positioning, original wordmarks drawn as text/inline SVG, accessible color pairs, typography roles, tone examples and usage rules. Build one self-contained HTML comparison page; CSS-only radio controls may switch concept sections, and all essential information must remain accessible without scripts. Save a compact document explaining the selection criteria and next tests. Do not invent user research, generate pretend product photographs or assert trademark clearance. Clearly label all marks as original draft concepts requiring review.\n\n## Execution boundaries\nOriginal text/SVG/CSS brand concepts; no generated photography, trademark clearance or image-generation service.\nOnly claim results returned by the enabled tools. Never claim external work, publication, sending, screenshots, model-generated media or code execution that did not occur. Save final deliverables with artifact tools and preserve existing versions when revising.",
+        "tools": [
+          "Documents",
+          "Webpages"
+        ],
+        "limitations": "Original text/SVG/CSS brand concepts; no generated photography, trademark clearance or image-generation service.",
+        "coverage": "partial"
+      },
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01M5CJPSH6_63JT7XQGDRKTZRQ3",
+      "kind": "agent",
+      "name": "Bottleneck Audit",
+      "creator": "Corey Ganim",
+      "summary": "Analyzes client-call transcripts to identify operational friction and propose specific AI tools and lightweight workflow fixes.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01M5CJPSH6_63JT7XQGDRKTZRQ3",
+      "categories": [
+        "data-analytics",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Documents"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "implementation": {
+        "documentation": "# Bottleneck Audit — independent replica implementation\n\nThis workflow was independently written for this application. It is not the original publisher's skill package, scripts or system prompt. Source marketplace listing is attribution and functional reference only.\n\nAnalyze the user's supplied process notes or authorized client-call transcript. Map the current workflow with owners, inputs, outputs, handoffs and wait states. Cite evidence for each claimed bottleneck and label estimates. Rank improvements by impact, effort, risk and confidence; distinguish process fixes from automation. Propose a smallest safe pilot with success metrics, manual fallback and explicit human approval points. Save an actionable audit document, not a claim that integrations have been deployed. Never recommend unrestricted autonomous access to customer systems.\n\n## Execution boundaries\nEvidence-based audit from supplied text; does not connect, purchase or deploy recommended external services.\nOnly claim results returned by the enabled tools. Never claim external work, publication, sending, screenshots, model-generated media or code execution that did not occur. Save final deliverables with artifact tools and preserve existing versions when revising.",
+        "tools": [
+          "Documents"
+        ],
+        "limitations": "Evidence-based audit from supplied text; does not connect, purchase or deploy recommended external services.",
+        "coverage": "workflow"
+      },
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01M3MF8DCV_Q0VJ45E8R41DEDYP",
+      "kind": "agent",
+      "name": "Dmitri",
+      "creator": "Hyperagent Team",
+      "summary": "Coordinates small-business schedules, staffing and resources while adapting appointments and field-work plans to disruptions.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01M3MF8DCV_Q0VJ45E8R41DEDYP",
+      "categories": [
+        "data-analytics",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Calendar",
+        "Scheduler",
+        "Maps"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01KXP1P1EN_VCVAD2CXGRK2WHZH",
+      "kind": "agent",
+      "name": "AdPilot",
+      "creator": "Mariah Brunner",
+      "summary": "Monitors Meta advertising daily and adjusts campaign budgets toward better returns within limits set by the user.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01KXP1P1EN_VCVAD2CXGRK2WHZH",
+      "categories": [
+        "data-analytics",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Meta Ads",
+        "Scheduler"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01KVDGZC1E_1KA0AYATHMBFBBEZ",
+      "kind": "agent",
+      "name": "Vera: Data Analyst",
+      "creator": "Hyperagent Team",
+      "summary": "Answers natural-language business questions with warehouse-backed analysis and visualizations informed by company metric definitions.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01KVDGZC1E_1KA0AYATHMBFBBEZ",
+      "categories": [
+        "data-analytics",
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Warehouse",
+        "Tables"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDT0G2W_NTH1SY1DTE25C7DG",
+      "kind": "skill",
+      "name": "US National Weather Service API",
+      "creator": "Andrew Busse",
+      "summary": "Retrieves U.S. forecasts, weather observations and alerts for named places or coordinates without an API key.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDT0G2W_NTH1SY1DTE25C7DG",
+      "categories": [
+        "data-analytics"
+      ],
+      "dependencies": [
+        "Weather"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "implementation": {
+        "documentation": "# US National Weather Service API — independent replica implementation\n\nThis workflow was independently written for this application. It is not the original publisher's skill package, scripts or system prompt. Source marketplace listing is attribution and functional reference only.\n\nUse weather_forecast only for user-confirmed U.S. latitude/longitude. If only a place name is given, ask for coordinates instead of claiming geocoding. Report forecast location, update/retrieval time, period names, temperatures and units, precipitation where returned, wind and source URLs. Distinguish forecast from observed weather and never invent unavailable alerts or observations. Explain that the NWS service covers the United States and may reject offshore or non-U.S. coordinates. For safety-critical decisions direct the user to the linked official forecast and local alerts. Save a brief only if requested.\n\n## Execution boundaries\nLive NWS point forecast; no automatic address geocoder, no global weather coverage and no background alert monitoring.\nOnly claim results returned by the enabled tools. Never claim external work, publication, sending, screenshots, model-generated media or code execution that did not occur. Save final deliverables with artifact tools and preserve existing versions when revising.",
+        "tools": [
+          "Weather",
+          "Documents"
+        ],
+        "limitations": "Live NWS point forecast; no automatic address geocoder, no global weather coverage and no background alert monitoring.",
+        "coverage": "workflow"
+      },
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "cca01KYJC2CEH_Y41EW8MH88HZ2SJD",
+      "kind": "agent",
+      "name": "French Translator",
+      "creator": "Santiago Valdarrama",
+      "summary": "Translates incoming Slack messages into fluent French.",
+      "sourceUrl": "https://hyperagent.com/marketplace/a/cca01KYJC2CEH_Y41EW8MH88HZ2SJD",
+      "categories": [
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Slack"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KWWB5PT3_X6B42D9DTHZB2ZFD",
+      "kind": "skill",
+      "name": "Daily Focus",
+      "creator": "Maverick Maltin",
+      "summary": "Reviews the day’s calendar and messages to recommend one highest-priority task and a ranked list of remaining concerns.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KWWB5PT3_X6B42D9DTHZB2ZFD",
+      "categories": [
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Calendar",
+        "Email"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    },
+    {
+      "sourceId": "ccs01KVDJA2SF_B9G0PXF4NPHJNEBK",
+      "kind": "skill",
+      "name": "Airtable Kanban Work Tracker",
+      "creator": "Hyperagent Team",
+      "summary": "Tracks work as Airtable Kanban records, linking each task to a thread and updating its status through review readiness.",
+      "sourceUrl": "https://hyperagent.com/marketplace/s/ccs01KVDJA2SF_B9G0PXF4NPHJNEBK",
+      "categories": [
+        "ops-workflow"
+      ],
+      "dependencies": [
+        "Airtable"
+      ],
+      "dependencyBasis": "Inferred from visible functional listing; not an official package manifest.",
+      "cataloguedAt": "2026-10-28",
+      "contentPolicy": "Listing metadata and independently authored functional implementation only. Original publisher scripts/prompts are not redistributed."
+    }
+  ]
+}

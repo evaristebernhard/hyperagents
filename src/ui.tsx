@@ -1,3 +1,4 @@
+import { catalogSkill } from "./marketplace-catalog";
 import type { ReactNode } from "react";
 import {
   X,
@@ -275,10 +276,14 @@ export function Composer({ navigate, onSend, notify, compact = false, agents = [
     {menu === "format-settings" && <div className="popover composer-popover"><label className="field">Visuals<select aria-label="Output visuals" value={choices.visuals || "Auto"} onChange={e => setChoices(current => ({ ...current, visuals: e.target.value }))}>{["Auto", "None", "AI enhanced", "Full AI render"].map(value => <option key={value}>{value}</option>)}</select></label><button onClick={() => { setChoices(current => ({ ...current, outputFormat: undefined, visuals: undefined })); setMenu(""); }}>Clear selection</button>{server && <small>Doc, Webpage and Table can create real saved artifacts with local tools enabled. No media, map or app services execute.</small>}</div>}
     {menu === "safety" && <div className="popover composer-popover"><p>Single-owner local data service. Messages, files and preferences are persisted. DeepSeek receives your saved conversation and selected context when configured. No browser, integration or scheduled execution is connected.</p><button onClick={() => setMenu("")}>Close</button></div>}
     {server && pickerKinds.includes(menu as PickerKind) && <ComposerContextPicker kind={menu as PickerKind} close={() => setMenu("")} navigate={navigate} choose={id => {
-      if (menu === "skills") add(setSkillIds, id); if (menu === "memories") add(setMemoryIds, id); if (menu === "assets") add(setArtifactIds, id); if (menu === "integrations") add(setIntegrationIds, id); if (menu === "projects") setProjectId(id);
+      if (menu === "skills") {
+        add(setSkillIds, id);
+        const selected = w.data.skills.find(skill => skill.id === id), source = catalogSkill(selected?.sourceId);
+        if (source?.implementation) setChoices(current => ({ ...current, tools: [...new Set([...current.tools, ...source.implementation!.tools])] }));
+      } if (menu === "memories") add(setMemoryIds, id); if (menu === "assets") add(setArtifactIds, id); if (menu === "integrations") add(setIntegrationIds, id); if (menu === "projects") setProjectId(id);
     }} />}
     <ComposerMenus menu={menu} close={() => setMenu("")} navigate={navigate} mode={choices.mode} setMode={mode => setChoices(current => ({ ...current, mode }))} model={choices.model || "Choose your model"} agent={agent} setAgent={setAgent} agents={agents}
       settings={server ? choices : undefined} onSettingsChange={setChoices} dataOnly={server} savedAgents={server ? w.data.agents.filter(a => !a.archived).map(a => ({ id: a.id, name: a.name })) : undefined}
-      onAgentSelection={(agentId, starterAgentName) => setChoices(current => ({ ...current, agentId, starterAgentName }))} />
+      onAgentSelection={(agentId, starterAgentName) => setChoices(current => ({ ...current, agentId, starterAgentName, tools: [...new Set([...current.tools, ...(w.data.agents.find(agent => agent.id === agentId)?.tools || [])])] }))} />
   </div>;
 }
