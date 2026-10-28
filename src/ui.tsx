@@ -66,6 +66,7 @@ export function Modal({
   footer,
   wide = false,
   headerless = false,
+  dialogRole = "dialog",
 }: {
   title: string;
   children: ReactNode;
@@ -73,6 +74,7 @@ export function Modal({
   footer?: ReactNode;
   wide?: boolean;
   headerless?: boolean;
+  dialogRole?: "dialog" | "alertdialog";
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -85,10 +87,15 @@ export function Modal({
         closeRef.current();
       }
       if (e.key === "Tab") {
-        const nodes = ref.current?.querySelectorAll<HTMLElement>(
-          'button,input,select,textarea,a[href],[tabindex="0"]',
-        );
-        if (!nodes?.length) return;
+        const nodes = [...(ref.current?.querySelectorAll<HTMLElement>(
+          'button,input,select,textarea,a[href],[tabindex="0"],[contenteditable="true"]',
+        ) || [])].filter(node => !node.hasAttribute("disabled") && node.getClientRects().length > 0 && node.getAttribute("type") !== "hidden");
+        if (!nodes.length) return;
+        if (document.activeElement === ref.current || !ref.current?.contains(document.activeElement)) {
+          e.preventDefault();
+          (e.shiftKey ? nodes[nodes.length - 1] : nodes[0]).focus();
+          return;
+        }
         const first = nodes[0],
           last = nodes[nodes.length - 1];
         if (e.shiftKey && document.activeElement === first) {
@@ -101,10 +108,11 @@ export function Modal({
       }
     };
     document.addEventListener("keydown", listener);
-    const firstInput = ref.current?.querySelector<HTMLElement>(
-      "input:not([type=hidden]),textarea,select",
-    );
-    (firstInput || ref.current)?.focus();
+    const focusable = [...(ref.current?.querySelectorAll<HTMLElement>(
+      'input:not([type=hidden]),textarea,select,button,a[href],[tabindex="0"],[contenteditable="true"]',
+    ) || [])].filter(node => !node.hasAttribute("disabled") && node.getClientRects().length > 0);
+    const firstInput = focusable.find(node => ["INPUT", "TEXTAREA", "SELECT"].includes(node.tagName) || node.isContentEditable);
+    (firstInput || focusable[0] || ref.current)?.focus();
     return () => {
       document.removeEventListener("keydown", listener);
       prev?.focus();
@@ -120,7 +128,7 @@ export function Modal({
       <div
         ref={ref}
         className={"modal-dialog " + (wide ? "wide" : "")}
-        role="dialog"
+        role={dialogRole}
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}

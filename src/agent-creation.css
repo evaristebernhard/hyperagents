@@ -1,0 +1,72 @@
+.agent-editor .trust-profile-button,
+.agent-editor .agent-prompt-trigger {
+  width: 100%; text-align: left; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 14px 16px; font-size: 14px; line-height: 22px;
+}
+.agent-editor .trust-profile-button { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.agent-editor .trust-profile-button strong { display: block; font-weight: 500; }
+.agent-editor .trust-profile-button small { display: block; color: var(--muted); line-height: 20px; margin-top: 4px; }
+.agent-editor .agent-prompt-trigger { min-height: 96px; color: var(--muted); }
+.agent-editor .agent-prompt-preview { max-height: 220px; overflow: auto; color: var(--ink); overflow-wrap: anywhere; }
+.agent-editor .agent-prompt-preview p:last-child { margin-bottom: 0; }
+.agent-editor .creation-redraft-hint { font-size: 13px; line-height: 21px; margin: 18px 0 8px; }
+.creation-notice, .creation-warning { padding: 12px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); font-size: 13px; line-height: 21px; }
+.creation-warning { border-color: #bb8a38; }
+.prompt-editor-toolbar { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+.prompt-editor-toolbar .btn { font-size: 12px; }
+.prompt-rich-editor { min-height: 260px; max-height: min(480px, 45dvh); overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; padding: 16px; font-size: 14px; line-height: 24px; overflow-wrap: anywhere; }
+.prompt-rich-editor:focus { outline: 2px solid #91a6c6; outline-offset: 2px; }
+.prompt-rich-editor p { margin: 0 0 12px; }
+.prompt-rich-editor pre, .agent-prompt-preview pre { background: var(--soft); padding: 12px; overflow-x: auto; }
+.knowledge-profile-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin: 16px 0 28px; }
+.knowledge-profile-grid > label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.knowledge-profile-grid > label.selected { background: var(--soft); border-color: var(--ink); }
+.knowledge-profile-grid strong { font-size: 14px; font-weight: 500; }
+.knowledge-profile-grid p { font-size: 12px; line-height: 20px; margin: 6px 0 0; }
+.agent-editor .setting-line small { display: block; font-size: 12px; color: var(--muted); margin-top: 3px; }
+.casting-page { max-width: 850px; padding: 28px 40px 64px; margin: 0 auto; }
+.casting-page header { margin: 32px 0; }
+.casting-page header h1 { font-size: 36px; letter-spacing: -1px; line-height: 44px; margin: 12px 0; }
+.casting-page header p { max-width: 650px; color: var(--muted); font-size: 16px; line-height: 25px; }
+.casting-page form > section { margin: 28px 0; }
+.casting-page h3 { font-size: 14px; font-weight: 500; margin-bottom: 12px; }
+.casting-job-chips, .casting-world-chips, .casting-lenses { display: flex; flex-wrap: wrap; gap: 8px; }
+.casting-job-chips > button, .casting-world-chips > button, .casting-lenses > button { border: 1px solid var(--line); padding: 9px 12px; border-radius: 8px; text-align: left; background: var(--bg); font-size: 13px; line-height: 20px; }
+.casting-job-chips > button:hover, .casting-world-chips > button:hover { background: var(--soft); }
+.casting-lenses > button.selected, .casting-world-chips > button.selected { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.casting-page .muted { font-size: 13px; line-height: 21px; margin-top: 12px; }
+.casting-page footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 32px 0 16px; }
+.casting-page footer a { font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
+@media(max-width: 760px) {
+  .casting-page { padding: 24px 20px 48px; }
+  .casting-page header h1 { font-size: 30px; line-height: 38px; }
+  .casting-lenses > button { flex: 1 0 40%; text-align: center; }
+  .knowledge-profile-grid { grid-template-columns: 1fr; }
+  .prompt-editor-toolbar .btn { padding: 5px 7px; }
+  .prompt-rich-editor { min-height: 180px; }
+}
+
+/* Editing adds Export/Archive/Delete beside Save. Do not inherit the title
+   column layout: stacked actions can extend behind the scrolling body. */
+.agent-editor > .agent-editor-header {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 80px;
+  gap: 16px;
+}
+.agent-editor .agent-editor-header > .actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+@media (max-width: 760px) {
+  .agent-editor > .agent-editor-header {
+    flex-direction: column;
+    align-items: stretch;
+    min-height: 70px;
+  }
+  .agent-editor .agent-editor-header > .actions {
+    justify-content: flex-start;
+  }
+}

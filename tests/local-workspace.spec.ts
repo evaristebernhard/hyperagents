@@ -1,3 +1,4 @@
+import { setSystemPrompt } from "./helpers";
 import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs/promises";
 async function createSkill(page: Page, name = "Launch checklist") {
@@ -24,9 +25,7 @@ async function createAgent(page: Page, name = "Local researcher") {
   await page
     .getByLabel("Description", { exact: true })
     .fill("Research carefully");
-  await page
-    .getByLabel("System prompt", { exact: true })
-    .fill("Verify facts. Ask before external actions.");
+  await setSystemPrompt(page, "Verify facts. Ask before external actions.");
 }
 async function newArtifact(
   page: Page,
@@ -148,7 +147,7 @@ test("agent configuration tabs and skill assignments persist together", async ({
   await page
     .getByRole("checkbox", { name: "Launch checklist", exact: true })
     .check();
-  await page.getByRole("radio", { name: /Recall-only memory/ }).check();
+  await page.getByRole("radio", { name: /Read-only memory/ }).check();
   await nav
     .getByRole("button", { name: "Tools & integrations", exact: true })
     .click();
@@ -168,7 +167,7 @@ test("agent configuration tabs and skill assignments persist together", async ({
     page.getByRole("checkbox", { name: "Launch checklist", exact: true }),
   ).toBeChecked();
   await expect(
-    page.getByRole("radio", { name: /Recall-only memory/ }),
+    page.getByRole("radio", { name: /Read-only memory/ }),
   ).toBeChecked();
   await page.goto("/skills");
   await expect(

@@ -25,6 +25,10 @@ export type DemoAgent = {
   name: string;
   description: string;
   prompt: string;
+  promptHtml?: string;
+  memoryReadScope?: string;
+  memorySaveTarget?: string;
+  learnsAutomatically?: boolean;
   model?: string;
   provider?: string;
   reasoning?: string;

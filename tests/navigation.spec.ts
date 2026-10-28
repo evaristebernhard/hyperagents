@@ -1,3 +1,4 @@
+import { setSystemPrompt } from "./helpers";
 import { test, expect } from "@playwright/test";
 const routes = [
   ["/threads/new", "Let's get to work."],
@@ -146,9 +147,7 @@ test("agent identity save, tabs and edit round trip", async ({ page }) => {
   await page
     .getByLabel("Description", { exact: true })
     .fill("Research thoughtfully");
-  await page
-    .getByLabel("System prompt", { exact: true })
-    .fill("Verify facts and ask before outward-facing actions.");
+  await setSystemPrompt(page, "Verify facts and ask before outward-facing actions.");
   for (const n of [
     "Model",
     "Tools & integrations",
