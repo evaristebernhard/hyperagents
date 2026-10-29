@@ -1,8 +1,10 @@
+import { buildCapabilityManifest } from './capability-authority.mjs';
 import catalog from '../shared/marketplace-catalog.json' with { type: 'json' };
 import { createPublicTools } from './public-tools.mjs';
 export const marketplaceCatalog = catalog;
 export function marketplaceCapabilities({deepseekConfigured=false,openAlexApiKey,userAgent}={}) {
-  const capabilities=Object.fromEntries(['Thread Search','Documents','Webpages','Tables'].map(name=>[name,{available:true,reason:'Implemented local workspace tool.'}]));
+  const manifest=buildCapabilityManifest({deepseekConfigured,openAlexApiKey,userAgent});
+  const capabilities=Object.fromEntries(manifest.capabilities.map(c=>[c.label,{available:c.implemented&&c.configured,reason:c.reason || (c.executable?'Executable tool is available.':'Implemented but not authorized for this run.')} ]));
   capabilities.LLM={available:deepseekConfigured,reason:deepseekConfigured?'Server-side DeepSeek key is present; provider authorization is verified only by a real request.':'Set DEEPSEEK_API_KEY on the server before running a skill.'};
   for(const item of createPublicTools({enabled:["World Bank","Weather","OpenAlex"],openAlexApiKey,userAgent}).capabilities) capabilities[item.service]={available:item.configured,reason:item.reason + " Adapter configuration only; upstream reachability is checked on use."};
   for(const entry of catalog.entries)for(const name of entry.dependencies)if(!capabilities[name])capabilities[name]={available:false,reason:'Not implemented or connected in this replica. No execution is simulated.'};

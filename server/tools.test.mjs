@@ -56,7 +56,7 @@ test('refuses foreign-thread updates and unauthorized artifact kinds', async () 
   await assert.rejects(r.execute('create_table', { title: 'x', columns: ['a'], rows: [] }), /disabled/);
   assert.deepEqual(r.patches(), []);
   const search = runtime({ enabled: ['Thread Search'] });
-  assert.deepEqual(search.definitions.map(d => d.function.name), ['workspace_search', 'resource_read']);
+  assert.deepEqual(search.definitions.map(d => d.function.name), ['workspace_search', 'resource_read', 'resource_read_page']);
   await assert.rejects(search.execute('update_artifact', { id: 'a', content: 'bad' }), /disabled/);
   const none = runtime({ enabled: ['Browser'] });
   assert.deepEqual(none.definitions, []);

@@ -1,6 +1,6 @@
 const plain = value => value!==null && typeof value==='object' && !Array.isArray(value) && [Object.prototype,null].includes(Object.getPrototypeOf(value));
 const clone = value => structuredClone(value);
-const sources = new Set(['workspace','public-api','integration','shell','managed']);
+const sources = new Set(['workspace','public-api','moli','integration','shell','managed']);
 const effects = new Set(['read-only','local-staged','approval-gated','mixed','orchestration']);
 const fail = message => { throw new Error(message); };
 
@@ -67,7 +67,7 @@ export function createToolRegistry(bindings=[], options={}) {
     const query=(args.query||'').toLowerCase(),offset=args.offset||0,limit=args.limit||12;
     const all=[...entries.values()].filter(e=>(!args.source || e.source===args.source) && (!query || (e.definition.function.name+' '+e.definition.function.description).toLowerCase().includes(query)));
     const tools=all.slice(offset,offset+limit).map(e=>({name:e.definition.function.name,description:e.definition.function.description,source:e.source,effect:e.effect,...(args.includeSchemas?{parameters:clone(e.definition.function.parameters)}:{})}));
-    return {scope:'authorized-tools-for-this-run',tools,total:all.length,nextOffset:offset+tools.length,hasMore:offset+tools.length<all.length,notice:'Only currently bound tools are shown. Adapter availability is not proof of upstream reachability. Approval-gated tools do not perform writes without their existing human approval flow.'};
+    return {scope:'authorized-tools-for-this-run',query:args.query||'',tools,matchedToolCount:all.length,authorizedToolCount:entries.size,total:all.length,nextOffset:offset+tools.length,hasMore:offset+tools.length<all.length,notice:query?'No tools matched this query' : 'Only currently bound tools are shown. Adapter availability is not proof of upstream reachability. Approval-gated tools do not perform writes without their existing human approval flow.'};
   }
   return {
     definitions:()=>[...[...entries.values()].map(e=>clone(e.definition)),...(hasCatalog?[clone(catalogDefinition)]:[])],

@@ -8,6 +8,7 @@ import {buildConversation,MODELS} from './llm.mjs';
 import {createShellRuntime} from './shell-runtime.mjs';
 
 const terminal=new Set(['succeeded','failed','cancelled','interrupted']);
+const MAX_CHILDREN=8, MAX_DEPTH=3, MAX_TREE=32;
 const active=new Set(['queued','running','waiting_approval']);
 const stamp=()=>new Date().toISOString();
 const fail=(status,message)=>{throw new ApiError(status,message,'AGENT_RUN');};
@@ -27,11 +28,13 @@ export function createRunManager({dataDir,llm,load,persist,readAttachment,valida
   if(version!==0 && version!==1){db.close();throw Error('Unsupported run database version.');}
   if(version===0 && db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all().length){db.close();throw Error('Unrecognized run database.');}
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
-    CREATE TABLE IF NOT EXISTS agent_runs (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, thread_id TEXT NOT NULL, message_id TEXT NOT NULL, source_hash TEXT NOT NULL, request TEXT NOT NULL, status TEXT NOT NULL, created TEXT NOT NULL, started TEXT, finished TEXT, model TEXT, error TEXT, tool_count INTEGER NOT NULL DEFAULT 0, usage TEXT, plan TEXT, result_saved INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE IF NOT EXISTS agent_runs (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, thread_id TEXT NOT NULL, message_id TEXT NOT NULL, source_hash TEXT NOT NULL, request TEXT NOT NULL, status TEXT NOT NULL, created TEXT NOT NULL, started TEXT, finished TEXT, model TEXT, error TEXT, tool_count INTEGER NOT NULL DEFAULT 0, usage TEXT, plan TEXT, result_saved INTEGER NOT NULL DEFAULT 0, parent_run_id TEXT REFERENCES agent_runs(id), root_run_id TEXT, depth INTEGER NOT NULL DEFAULT 0, child_count INTEGER NOT NULL DEFAULT 0);
     CREATE INDEX IF NOT EXISTS runs_thread ON agent_runs(workspace_id,thread_id,created);
     CREATE TABLE IF NOT EXISTS run_events (run_id TEXT NOT NULL REFERENCES agent_runs(id), seq INTEGER NOT NULL, event TEXT NOT NULL, PRIMARY KEY(run_id,seq));
     CREATE TABLE IF NOT EXISTS shell_actions (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES agent_runs(id), args TEXT NOT NULL, status TEXT NOT NULL, created TEXT NOT NULL);
     PRAGMA user_version=1;`);
+  for (const [name, ddl] of [['parent_run_id','ALTER TABLE agent_runs ADD COLUMN parent_run_id TEXT REFERENCES agent_runs(id)'],['root_run_id','ALTER TABLE agent_runs ADD COLUMN root_run_id TEXT'],['depth','ALTER TABLE agent_runs ADD COLUMN depth INTEGER NOT NULL DEFAULT 0'],['child_count','ALTER TABLE agent_runs ADD COLUMN child_count INTEGER NOT NULL DEFAULT 0']]) { if(!db.prepare('PRAGMA table_info(agent_runs)').all().some(c=>c.name===name)) db.exec(ddl); }
+  db.exec('CREATE INDEX IF NOT EXISTS runs_parent ON agent_runs(parent_run_id,created);');
   if(!db.prepare('PRAGMA table_info(agent_runs)').all().some(c=>c.name==='plan'))db.exec('ALTER TABLE agent_runs ADD COLUMN plan TEXT');
   const raw=id=>db.prepare('SELECT * FROM agent_runs WHERE id=?').get(id);
   const controls=new Map(),eventBudgets=new Map();let closed=false,pumping=false;
@@ -50,7 +53,7 @@ export function createRunManager({dataDir,llm,load,persist,readAttachment,valida
     const w=load().state.workspaces.find(w=>w.id===row.workspace_id),t=w?.data.threads.find(t=>t.id===row.thread_id&&!t.archived);
     if(!t)fail(404,'Run thread is unavailable.');return t;
   }
-  function info(row){return {id:row.id,workspaceId:row.workspace_id,threadId:row.thread_id,userMessageId:row.message_id,status:row.status,createdAt:row.created,...(row.started?{startedAt:row.started}:{}),...(row.finished?{finishedAt:row.finished}:{}),...(row.model?{model:row.model}:{}),...(row.error?{error:row.error}:{}),toolCount:row.tool_count,...(row.usage?{usage:JSON.parse(row.usage)}:{}),resultSaved:!!row.result_saved,...(row.plan?{plan:JSON.parse(row.plan)}:{}),approvals:db.prepare('SELECT id,args,status FROM shell_actions WHERE run_id=? ORDER BY created').all(row.id).map(a=>({id:a.id,status:a.status,...JSON.parse(a.args)}))};}
+  function info(row){return {id:row.id,workspaceId:row.workspace_id,threadId:row.thread_id,userMessageId:row.message_id,status:row.status,createdAt:row.created,...(row.started?{startedAt:row.started}:{}),...(row.finished?{finishedAt:row.finished}:{}),...(row.model?{model:row.model}:{}),...(row.error?{error:row.error}:{}),toolCount:row.tool_count,...(row.usage?{usage:JSON.parse(row.usage)}:{}),resultSaved:!!row.result_saved,...(row.plan?{plan:JSON.parse(row.plan)}:{}),...(row.parent_run_id?{parentRunId:row.parent_run_id}:{}),...(row.root_run_id?{rootRunId:row.root_run_id}:{}),depth:row.depth ?? 0,childCount:row.child_count ?? 0,approvals:db.prepare('SELECT id,args,status FROM shell_actions WHERE run_id=? ORDER BY created').all(row.id).map(a=>({id:a.id,status:a.status,...JSON.parse(a.args)}))};}
   function setStatus(id,status){db.prepare('UPDATE agent_runs SET status=? WHERE id=?').run(status,id);append(id,{type:'run_status',status});}
   async function propose(id,args,signal){
     scope(raw(id));const normalized=shell.normalize(args),actionId=randomUUID();
@@ -136,18 +139,20 @@ export function createRunManager({dataDir,llm,load,persist,readAttachment,valida
       if(closed)fail(503,'Run service is closing.');
       // Validate fields and workspace resources before looking up or queuing work.
       if(!llm.config().configured)fail(503,'DeepSeek is not configured.');
-      if(!request || typeof request!=='object' || Array.isArray(request) || Object.keys(request).some(k=>!['workspaceId','threadId','userMessageId','model'].includes(k)) || !['workspaceId','threadId','userMessageId'].every(k=>typeof request[k]==='string' && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(request[k])))fail(400,'Invalid run request.');
+      if(!request || typeof request!=='object' || Array.isArray(request) || Object.keys(request).some(k=>!['workspaceId','threadId','userMessageId','model','parentRunId'].includes(k)) || !['workspaceId','threadId','userMessageId'].every(k=>typeof request[k]==='string' && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(request[k])))fail(400,'Invalid run request.');
       if(Object.hasOwn(request,'model') && !MODELS.includes(request.model))fail(422,'Unsupported model.');
+      let parent=null, depth=0, rootRunId=null;
+      if(request.parentRunId!==undefined){ parent=raw(request.parentRunId);scope(parent,{workspaceId:request.workspaceId,threadId:request.threadId}); if(terminal.has(parent.status))fail(409,'Parent run is no longer active.'); if(parent.depth>=MAX_DEPTH)fail(429,'Child run depth budget exhausted.'); if(parent.child_count>=MAX_CHILDREN)fail(429,'Parent child budget exhausted.'); depth=parent.depth+1; rootRunId=parent.root_run_id||parent.id; }
       const existing=db.prepare('SELECT * FROM agent_runs WHERE workspace_id=? AND thread_id=? AND message_id=? ORDER BY created DESC,rowid DESC LIMIT 1').get(request.workspaceId,request.threadId,request.userMessageId);
       if(existing){scope(existing);return info(existing);}
       const conversation=await buildConversation(load().state,request,readAttachment);
       if(validateAdmission)validateAdmission(load().state,request);
       const raced=db.prepare('SELECT * FROM agent_runs WHERE workspace_id=? AND thread_id=? AND message_id=? ORDER BY created DESC,rowid DESC LIMIT 1').get(request.workspaceId,request.threadId,request.userMessageId);
       if(raced){scope(raced);return info(raced);}
-      if(db.prepare("SELECT id FROM agent_runs WHERE workspace_id=? AND thread_id=? AND status IN ('queued','running','waiting_approval')").get(request.workspaceId,request.threadId))fail(409,'This thread already has an active run.');
+      if(!parent && db.prepare("SELECT id FROM agent_runs WHERE workspace_id=? AND thread_id=? AND status IN ('queued','running','waiting_approval')").get(request.workspaceId,request.threadId))fail(409,'This thread already has an active run.');
       if(db.prepare("SELECT count(*) AS n FROM agent_runs WHERE status IN ('queued','running','waiting_approval')").get().n>=20)fail(429,'Run queue is full.');
       const snapshot=load().state,thread=snapshot.workspaces.find(w=>w.id===request.workspaceId).data.threads.find(t=>t.id===request.threadId);
-      const id=randomUUID();db.prepare('INSERT INTO agent_runs (id,workspace_id,thread_id,message_id,source_hash,request,status,created,model) VALUES (?,?,?,?,?,?,?,?,?)').run(id,request.workspaceId,request.threadId,request.userMessageId,digest(thread.messages.at(-1).text),JSON.stringify(request),'queued',stamp(),conversation.model);
+      const id=randomUUID();const tx=db;try{tx.exec('BEGIN IMMEDIATE');if(parent){const live=tx.prepare('SELECT child_count,depth,status FROM agent_runs WHERE id=?').get(parent.id);if(!live||terminal.has(live.status)||live.depth>=MAX_DEPTH||live.child_count>=MAX_CHILDREN)throw new ApiError(429,'Child admission budget exhausted.');tx.prepare('UPDATE agent_runs SET child_count=child_count+1 WHERE id=?').run(parent.id);}tx.prepare('INSERT INTO agent_runs (id,workspace_id,thread_id,message_id,source_hash,request,status,created,model,parent_run_id,root_run_id,depth) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(id,request.workspaceId,request.threadId,request.userMessageId,digest(thread.messages.at(-1).text),JSON.stringify(request),'queued',stamp(),conversation.model,parent?.id||null,rootRunId,depth);tx.exec('COMMIT');}catch(e){try{tx.exec('ROLLBACK')}catch{};throw e;}finally{}
       append(id,{type:'run_status',status:'queued'});queueMicrotask(pump);return info(raw(id));
     },
     list(request){
@@ -162,7 +167,7 @@ export function createRunManager({dataDir,llm,load,persist,readAttachment,valida
       const nextCursor=events.at(-1)?.seq ?? after;
       return {run:info(row),events,nextCursor,hasMore:!!db.prepare('SELECT 1 FROM run_events WHERE run_id=? AND seq>? LIMIT 1').get(id,nextCursor)};
     },
-    cancel(id,request){const row=raw(id);scope(row,request);if(terminal.has(row.status))return info(row);const ctl=controls.get(id);if(ctl)ctl.controller.abort();else{db.prepare('UPDATE agent_runs SET status=?,finished=?,error=? WHERE id=?').run('cancelled',stamp(),'Run cancelled before execution.',id);append(id,{type:'run_status',status:'cancelled'});}return info(raw(id));},
+    cancel(id,request){const row=raw(id);scope(row,request);const ids=db.prepare(`WITH RECURSIVE tree(id) AS (SELECT ? UNION ALL SELECT r.id FROM agent_runs r JOIN tree t ON r.parent_run_id=t.id) SELECT id FROM tree`).all(id).map(x=>x.id);for(const childId of ids){const child=raw(childId);if(!child||terminal.has(child.status))continue;const ctl=controls.get(childId);if(ctl)ctl.controller.abort();else{db.prepare("UPDATE agent_runs SET status='cancelled',finished=?,error=? WHERE id=?").run(stamp(),'Run cancelled with its parent.',childId);append(childId,{type:'run_status',status:'cancelled'});}}return info(raw(id));},
     decide(id,actionId,request){
       const row=raw(id);scope(row,request);if(!['approve','deny'].includes(request.decision))fail(422,'Decision must be approve or deny.');
       const action=db.prepare('SELECT * FROM shell_actions WHERE id=? AND run_id=?').get(actionId,id);if(!action)fail(404,'Approval not found.');
@@ -170,6 +175,8 @@ export function createRunManager({dataDir,llm,load,persist,readAttachment,valida
       const ctl=controls.get(id);if(!ctl?.decision||ctl.decision.actionId!==actionId||terminal.has(row.status))fail(409,'Approval is no longer active.');
       db.prepare('UPDATE shell_actions SET status=? WHERE id=?').run(request.decision==='approve'?'approved':'denied',actionId);ctl.decision.resolve(request.decision==='approve');return info(raw(id));
     },
+    tree(id,request){const row=raw(id);scope(row,request);const root=row.root_run_id||row.id;const rows=db.prepare(`WITH RECURSIVE tree(id) AS (SELECT ? UNION ALL SELECT r.id FROM agent_runs r JOIN tree t ON r.parent_run_id=t.id) SELECT * FROM agent_runs WHERE id IN (SELECT id FROM tree) ORDER BY depth,created LIMIT ${MAX_TREE}`).all(root);return {rootRunId:root,runs:rows.map(info),truncated:rows.length>=MAX_TREE};},
+    createChild(parentId,request){return this.create({...request,parentRunId:parentId});},
     capabilities:()=>({durable:true,concurrency:maxConcurrent,maxRunSeconds:timeoutMs/1000,maxToolCalls:64,maxRounds:24,shell:{available:true,root:shellRoot,approvalRequired:true,maxCommandSeconds:300},browser:false}),
     async close(){closed=true;for(const ctl of controls.values())ctl.controller.abort();while(controls.size)await new Promise(resolve=>setTimeout(resolve,10));db.close();}
   };

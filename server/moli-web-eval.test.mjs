@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {validateWebEval,createMoliWebEvalTools} from './moli-web-eval.mjs';
+test('web eval only allows fixed read properties',()=>{assert.equal(validateWebEval('document.title'),'document.title');for(const x of ['document.title=1','fetch("x")','document.cookie','document.body.innerHTML','window.location.href'])assert.throws(()=>validateWebEval(x));assert.equal(createMoliWebEvalTools({enabled:[]}).definitions.length,0);});

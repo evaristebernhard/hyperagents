@@ -5,10 +5,11 @@ import {
 } from "lucide-react";
 import type { Navigate, ThreadSettings } from "./types";
 import { currentModels } from "./llm-client";
+import { api } from "./backend-client";
 
 const toolNames = [
   "Search", "Find Similar", "Exa Research", "Exa Websets", "Thread Search",
-  "Browser", "Webpages", "Slides", "Tables", "Documents", "Images", "Video",
+  "Browser", "Web Fetch", "Web Semantic Tree", "Web Eval", "Visual Output", "Webpages", "Slides", "Tables", "Documents", "Images", "Video",
   "Audio", "Transcribe", "Avatar", "Maps",
 ];
 export const starterAgents = [
@@ -44,9 +45,12 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
   const [localEffort, setLocalEffort] = useState("Medium");
   const [localProvider, setLocalProvider] = useState("Any");
   const [localTools, setLocalTools] = useState<string[]>(toolNames);
+  const [capabilityTools, setCapabilityTools] = useState<string[] | null>(null);
+  useEffect(() => { let alive = true; void api<{ capabilities?: { label: string; executable: boolean; surfaces?: { composer?: boolean } }[] }>("/api/capabilities").then(result => { if (alive) setCapabilityTools((result.capabilities || []).filter(c => c.executable && c.surfaces?.composer !== false).map(c => c.label)); }).catch(() => {}); return () => { alive = false; }; }, []);
   const effort = controlled?.reasoning ?? localEffort;
   const provider = controlled?.provider ?? localProvider;
   const tools = controlled?.tools ?? localTools;
+  const availableToolNames = capabilityTools?.length ? capabilityTools : toolNames;
   const setEffort = (value: string) => controlled ? onSettingsChange?.({ ...controlled, reasoning: value }) : setLocalEffort(value);
   const setProvider = (value: string) => controlled ? onSettingsChange?.({ ...controlled, provider: value }) : setLocalProvider(value);
   const setTools = (value: string[]) => controlled ? onSettingsChange?.({ ...controlled, tools: value }) : setLocalTools(value);
@@ -174,8 +178,8 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
           </button>)}
         </>}
         {sub === "tools" && <>
-          <small className="menu-local-note">Local tools plus World Bank / Weather public data. OpenAlex needs server configuration. Other providers are not connected.</small>
-          {(dataOnly ? [...toolNames, "World Bank", "Weather", "OpenAlex"] : toolNames).map(value => <button type="button" role="menuitemcheckbox" aria-checked={tools.includes(value)} key={value} onClick={() => setTools(tools.includes(value) ? tools.filter(t => t !== value) : [...tools, value])}>
+          <small className="menu-local-note">Local tools plus Moli Web Fetch, World Bank / Weather public data. OpenAlex needs server configuration. Other providers are not connected.</small>
+          {(dataOnly ? [...availableToolNames, "World Bank", "Weather", "OpenAlex"] : availableToolNames).filter((value, index, list) => list.indexOf(value) === index).map(value => <button type="button" role="menuitemcheckbox" aria-checked={tools.includes(value)} key={value} onClick={() => setTools(tools.includes(value) ? tools.filter(t => t !== value) : [...tools, value])}>
             <span>{value}</span>{tools.includes(value) && <Check size={14} />}
           </button>)}
         </>}

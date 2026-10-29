@@ -20,7 +20,7 @@ IMPORTANT: This is full authority of the Linux user, NOT a security sandbox. Cwd
 
 ## Not implemented in this phase
 
-No browser automation, image/video generation, new external credentials, webhook/live/schedule executor, multi-agent delegation, cross-server worker recovery, or unrestricted autonomous shell access. Tool calls remain sequential. Token counts and elapsed time are recorded; no dollar cost is invented.
+No browser automation, image/video generation, new external credentials, webhook/live/schedule executor, multi-agent delegation, cross-server worker recovery, or unrestricted autonomous shell access. A read-only Web Fetch tool can use a local Moli binary when explicitly enabled. Tool calls remain sequential. Token counts and elapsed time are recorded; no dollar cost is invented.
 
 ## Validation
 

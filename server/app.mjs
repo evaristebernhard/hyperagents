@@ -12,6 +12,7 @@ import { createLlm } from './llm.mjs';
 import { createRunManager } from './agent-runs.mjs';
 import { createProviderProbe } from './provider-probe.mjs';
 import { marketplaceCapabilities, marketplaceCatalog } from './marketplace.mjs';
+import { buildCapabilityManifest } from './capability-authority.mjs';
 import { createIntegrationRegistry } from './integrations.mjs';
 import { createApprovalBroker } from './integration-approvals.mjs';
 const scrypt = promisify(scryptCallback);
@@ -101,8 +102,18 @@ export async function createApp(options = {}) {
       return text.includes('\u0000')?null:text;
     } catch {return null;} finally {if(handle)await handle.close().catch(()=>{});}
   };
-  const llm=createLlm({apiKey:options.deepseekApiKey,integrationRegistry,approvalBroker,fetchImpl:options.llmFetch,publicFetch:options.publicFetch,openAlexApiKey:options.openAlexApiKey,publicUserAgent:options.publicUserAgent,load,readAttachment});
   const workspace = id => { const w=load().state.workspaces.find(w=>w.id===id); if (!w) err(422,'Invalid workspace.'); return w; };
+  const persistVisual=async({bytes,mimeType,filename,workspaceId})=>{
+    workspace(workspaceId);
+    if(!Buffer.isBuffer(bytes) || bytes.length<1 || bytes.length>maxFileBytes) throw Error('Generated visual is too large.');
+    if(typeof filename!=='string' || !/^[A-Za-z0-9._-]{1,180}$/.test(filename)) throw Error('Invalid generated filename.');
+    if(typeof mimeType!=='string' || !/^(?:image\/png|application\/pdf)$/.test(mimeType)) throw Error('Invalid generated MIME type.');
+    const id='file-'+randomUUID(),temp=path.join(uploadsDir,'.tmp-'+randomUUID()),target=path.join(uploadsDir,id),createdAt=now();
+    let handle,moved=false;
+    try { handle=await open(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600); await handle.writeFile(bytes); await handle.sync(); await handle.close(); handle=undefined; await rename(temp,target); moved=true; db.prepare('INSERT INTO files VALUES (?,?,?,?,?,?)').run(id,workspaceId,filename,bytes.length,mimeType,createdAt); return {type:'file',id,name:filename,size:bytes.length,mimeType,createdAt,workspaceId}; }
+    catch(e){if(handle)await handle.close().catch(()=>{});await unlink(moved?target:temp).catch(()=>{});throw e;}
+  };
+  const llm=createLlm({apiKey:options.deepseekApiKey,integrationRegistry,approvalBroker,fetchImpl:options.llmFetch,publicFetch:options.publicFetch,openAlexApiKey:options.openAlexApiKey,publicUserAgent:options.publicUserAgent,moliPath:options.moliPath,persistVisual,load,readAttachment});
   const commit = (state, revision) => {
     if (!Number.isSafeInteger(revision) || revision<0) err(400,'A valid revision is required.');
     const data=JSON.stringify(state); if (Buffer.byteLength(data)>maxStateBytes) err(413,'Workspace is too large.');
@@ -247,6 +258,7 @@ export async function createApp(options = {}) {
         const b=await body(req,70000);exactBody(b,['token','confirmed','workspaceId','threadId']);if(b.confirmed!==true)err(422,'Explicit confirmation is required.','CONFIRMATION');
         rate('integration-writes',60);try{return send(res,200,await approvalBroker.execute(b.token,{workspaceId:b.workspaceId,threadId:b.threadId}));}catch(e){err(422,e.message,'INTEGRATION_ACTION');}
       }
+      if (route==='/api/capabilities' && method==='GET') return send(res,200,buildCapabilityManifest({openAlexApiKey:options.openAlexApiKey,userAgent:options.publicUserAgent,moliPath:options.moliPath}));
       if (route==='/api/marketplace/capabilities' && method==='GET') {
         const result=marketplaceCapabilities({deepseekConfigured:llm.config().configured,openAlexApiKey:options.openAlexApiKey,userAgent:options.publicUserAgent});
         for(const provider of integrationRegistry.statuses().providers)result.capabilities[provider.name]={available:provider.configured,reason:provider.configured?'Server API adapter configured; select a tested workspace connection. Write operations still need per-action confirmation.':'API adapter implemented; configure '+provider.env.join(' / ')+' and test the provider access.'};
@@ -266,12 +278,14 @@ export async function createApp(options = {}) {
       if(route==='/api/runtime' && method==='GET')return send(res,200,runs.capabilities());
       if(route==='/api/runs' && method==='POST') { const b=await body(req,4096);return send(res,202,{run:await runs.create(b)}); }
       if(route==='/api/runs' && method==='GET')return send(res,200,{runs:runs.list({workspaceId:url.searchParams.get('workspaceId'),threadId:url.searchParams.get('threadId')})});
-      const runMatch=route.match(/^\/api\/runs\/([a-f0-9-]{36})(?:\/(events|cancel|approvals)(?:\/([a-f0-9-]{36}))?)?$/);
+      const runMatch=route.match(/^\/api\/runs\/([a-f0-9-]{36})(?:\/(events|cancel|approvals|tree|children)(?:\/([a-f0-9-]{36}))?)?$/);
       if(runMatch) {
         const [,id,action,approvalId]=runMatch;
         const scope={workspaceId:url.searchParams.get('workspaceId') ?? undefined,threadId:url.searchParams.get('threadId') ?? undefined};
         if(method==='GET' && !action)return send(res,200,{run:runs.get(id,scope)});
         if(method==='GET' && action==='events'){const after=url.searchParams.get('after') ?? '0';if(!/^\d{1,10}$/.test(after))err(400,'Invalid event cursor.');return send(res,200,runs.events(id,scope,Number(after)));}
+        if(method==='GET' && action==='tree')return send(res,200,runs.tree(id,scope));
+        if(method==='POST' && action==='children'){const b=await body(req,4096);exactBody(b,['workspaceId','threadId','userMessageId','model']);return send(res,202,{run:await runs.createChild(id,b)});}
         if(method==='POST' && action==='cancel' && !approvalId){const b=await body(req,4096);exactBody(b,['workspaceId','threadId']);if(!b.workspaceId||!b.threadId)err(400,'Workspace and thread required.');return send(res,200,{run:runs.cancel(id,b)});}
         if(method==='POST' && action==='approvals' && approvalId){const b=await body(req,4096);exactBody(b,['workspaceId','threadId','decision']);if(!b.workspaceId||!b.threadId)err(400,'Workspace and thread required.');return send(res,200,{run:runs.decide(id,approvalId,b)});}
       }
