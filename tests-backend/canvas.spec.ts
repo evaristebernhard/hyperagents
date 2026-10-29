@@ -116,3 +116,18 @@ test("canvas: minimizing a focused draft requires discard approval and moves foc
   await expect(canvas(page).locator(".rt-artifact-editor h3")).toHaveText("Canvas webpage");
   await expect(canvas(page).locator(".rt-artifact-editor iframe")).toHaveAttribute("sandbox", "");
 });
+
+test("canvas: first reorder follows title sort and keeps docked slots stable", async ({ page }) => {
+  await seed(page); await canvas(page).getByRole("button", { name: "Tile layout", exact: true }).click(); await saved(page);
+  await page.getByLabel("Sort artifacts", { exact: true }).selectOption("title");
+  const titles = canvas(page).locator(".ac-card-header strong");
+  await expect(titles).toHaveText(["Canvas document", "Canvas table", "Canvas webpage"]);
+  await canvas(page).getByRole("button", { name: "Move later: Canvas document", exact: true }).click(); await saved(page);
+  await expect(titles).toHaveText(["Canvas table", "Canvas document", "Canvas webpage"]);
+  await canvas(page).getByRole("button", { name: "Minimize: Canvas document", exact: true }).click(); await saved(page);
+  await canvas(page).getByRole("button", { name: "Move later: Canvas table", exact: true }).click(); await saved(page);
+  await expect(titles).toHaveText(["Canvas webpage", "Canvas table"]);
+  await canvas(page).getByRole("button", { name: "Restore: Canvas document", exact: true }).click(); await saved(page);
+  await expect(titles).toHaveText(["Canvas webpage", "Canvas document", "Canvas table"]);
+  await page.reload(); await expect(titles).toHaveText(["Canvas webpage", "Canvas document", "Canvas table"]);
+});

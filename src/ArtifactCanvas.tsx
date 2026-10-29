@@ -4,6 +4,7 @@ import type { Artifact } from "./local-model";
 import type { CanvasPreferences } from "./types";
 import { ArtifactView, exportArtifact } from "./LibraryManager";
 import { IconButton, Modal } from "./ui";
+import { moveVisibleArtifact } from "./canvas-order";
 import "./artifact-canvas.css";
 
 type Props = { artifacts: Artifact[]; allArtifacts: Artifact[]; selectedId: string; value?: CanvasPreferences; disabled?: boolean; onChange: (value: CanvasPreferences) => void; onSelect: (id: string) => boolean; children: ReactNode };
@@ -26,10 +27,9 @@ export default function ArtifactCanvas({ artifacts, allArtifacts, selectedId, va
   }
   function restore(id: string) { change({ hidden: hidden.filter(x => x !== id) }); }
   function move(id: string, destination: string) {
-    const list = [...allArtifacts].sort((a, b) => (rank.get(a.id) ?? order.length) - (rank.get(b.id) ?? order.length)).map(a => a.id);
-    const from = list.indexOf(id), to = list.indexOf(destination);
-    if (from < 0 || to < 0 || from === to) return;
-    list.splice(from, 1); list.splice(to, 0, id); change({ order: list });
+    const all = [...allArtifacts].sort((a, b) => (rank.get(a.id) ?? order.length) - (rank.get(b.id) ?? order.length)).map(a => a.id);
+    const next = moveVisibleArtifact(all, ordered.map(a => a.id), id, destination);
+    if (next) change({ order: next });
   }
   function stepSpotlight(delta: number) {
     const index = ordered.findIndex(a => a.id === spotlightId);

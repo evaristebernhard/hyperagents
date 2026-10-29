@@ -59,7 +59,8 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
   const latest = useRef(thread);
   latest.current = thread;
   const linked = w.data.artifacts.filter(a => a.threadId === thread.id && !a.archived);
-  const visible = linked.filter(a => (kind === "All" || a.kind === kind) && a.title.toLowerCase().includes(search.toLowerCase())).sort((a, b) => sort === "title" ? a.title.localeCompare(b.title) : (sort === "created" ? b.createdAt.localeCompare(a.createdAt) : b.updatedAt.localeCompare(a.updatedAt)));
+  const sortedArtifacts = [...linked].sort((a, b) => sort === "title" ? a.title.localeCompare(b.title) : (sort === "created" ? b.createdAt.localeCompare(a.createdAt) : b.updatedAt.localeCompare(a.updatedAt)));
+  const visible = sortedArtifacts.filter(a => (kind === "All" || a.kind === kind) && a.title.toLowerCase().includes(search.toLowerCase()));
   const canvasOrder = new Map((thread.canvas?.order || []).map((id, i) => [id, i]));
   const canvasVisible = visible.filter(a => !thread.canvas?.hidden.includes(a.id)).sort((a, b) => (canvasOrder.get(a.id) ?? canvasOrder.size) - (canvasOrder.get(b.id) ?? canvasOrder.size));
   const selected = linked.find(a => a.id === selectedId);
@@ -276,7 +277,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
         {thread.canvas?.collapsed ? <button className="rt-canvas-restore" onClick={() => void perform(() => saveThread({ canvas: { ...thread.canvas!, collapsed: false } }))}><PanelRightOpen size={17} />Show canvas</button> : <>
         <div className="rt-section-heading"><h2>Artifacts <span>{linked.length}</span></h2><div className="rt-actions"><button className="btn small" disabled={busy} onClick={() => void perform(() => newArtifact("Document"))}>New document</button><button className="btn small" disabled={busy} onClick={() => void perform(() => newArtifact("Webpage"))}>New webpage</button></div></div>
         <div className="rt-artifact-filters"><input aria-label="Filter artifacts" placeholder="Filter artifacts…" value={search} onChange={e => setSearch(e.target.value)} /><select aria-label="Artifact type" value={kind} onChange={e => setKind(e.target.value)}>{["All", "Document", "Webpage", "Table", "Image", "File"].map(k => <option key={k}>{k}</option>)}</select><select aria-label="Sort artifacts" value={sort} onChange={e => setSort(e.target.value)}><option value="updated">Last updated</option><option value="created">Newest first</option><option value="title">Title A–Z</option></select></div>
-        <ArtifactCanvas artifacts={visible} allArtifacts={linked} selectedId={selectedId} value={thread.canvas} disabled={busy} onSelect={selectArtifact} onChange={canvas => void perform(() => saveThread({ canvas }))}>
+        <ArtifactCanvas artifacts={visible} allArtifacts={sortedArtifacts} selectedId={selectedId} value={thread.canvas} disabled={busy} onSelect={selectArtifact} onChange={canvas => void perform(() => saveThread({ canvas }))}>
         {!linked.length ? <div className="rt-empty"><h3>No linked artifacts</h3><p>Create a document or webpage to start. This thread has no generated or sample content.</p></div> : !canvasVisible.length ? <p className="rt-empty">No visible artifacts match these filters. Restore docked items below.</p> : <nav className="rt-artifact-list" aria-label="Select artifact">{canvasVisible.map(a => <button key={a.id} className={a.id === selectedId ? "active" : ""} onClick={() => selectArtifact(a.id)}><span>{a.title}</span><small>{a.kind}</small></button>)}</nav>}
         {selected ? <div className="rt-artifact-editor">
           <div className="rt-section-heading"><h3>{selected.title}</h3><button className="btn small" onClick={() => exportArtifact(preview!)}>Download</button></div>
