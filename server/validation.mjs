@@ -17,7 +17,7 @@ function json(x, depth = 0) {
   for (const [k,v] of Object.entries(x)) { if (['__proto__','prototype','constructor'].includes(k)) fail(); json(v,depth+1); }
 }
 const specs = {
-  threads: {required:'title summary time', strings:'project roomId notes createdAt updatedAt projectId', bools:'starred archived excluded', extra:'messages config'},
+  threads: {required:'title summary time', strings:'project roomId notes createdAt updatedAt projectId', bools:'starred archived excluded', extra:'messages config canvas'},
   projects: {required:'name description goal', strings:'',bools:'archived'},
   agents: {required:'name description prompt', strings:'promptHtml memoryReadScope memorySaveTarget model provider reasoning memoryMode',bools:'learnsAutomatically libraryEnabled archived starred',extra:'tools skillIds learning'},
   memories: {required:'content category',strings:'whenToUse scope',bools:'pinned',extra:'importance tags'},
@@ -90,6 +90,11 @@ export function validateState(state, findFile = () => undefined) {
         }
         if (key === 'threads') {
           if (item.config !== undefined) settings(item.config);
+          if (item.canvas !== undefined) {
+            const c=item.canvas; keys(c,['layout','hidden','order','collapsed']);
+            if (!['focus','tiles','carousel'].includes(c.layout) || (c.collapsed!==undefined && typeof c.collapsed!=='boolean')) fail('Invalid canvas preferences.');
+            for (const field of ['hidden','order']) if (!list(c[field],id) || new Set(c[field]).size!==c[field].length) fail('Invalid canvas artifact IDs.');
+          }
           if (item.messages !== undefined && !list(item.messages,m=> {
             keys(m,['id','role','text','createdAt','context','toolRuns','actionRequests']);
             if(m.actionRequests!==undefined && (!Array.isArray(m.actionRequests)||m.actionRequests.length>12||!m.actionRequests.every(a=>{keys(a,['id','token','provider','operation','summary','args','status','result']);return id(a.id)&&str(a.token)&&a.token.length<=66000&&str(a.provider)&&str(a.operation)&&str(a.summary)&&obj(a.args)&&['pending','completed','failed','dismissed'].includes(a.status)&&(a.result===undefined||str(a.result));}))) fail('Invalid action request.');

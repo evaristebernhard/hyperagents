@@ -9,6 +9,7 @@ import { pipeline } from 'node:stream/promises';
 import { ApiError, emptyState, validateState } from './validation.mjs';
 import { prepareLegacy } from './legacy.mjs';
 import { createLlm } from './llm.mjs';
+import { createProviderProbe } from './provider-probe.mjs';
 import { marketplaceCapabilities, marketplaceCatalog } from './marketplace.mjs';
 import { createIntegrationRegistry } from './integrations.mjs';
 import { createApprovalBroker } from './integration-approvals.mjs';
@@ -82,6 +83,7 @@ export async function createApp(options = {}) {
   const integrationRegistry=createIntegrationRegistry({credentials:options.integrationCredentials,fetchImpl:options.integrationFetch,load});
   const approvalBroker=createApprovalBroker({load,registry:integrationRegistry});
   // Only authenticated chat execution can read saved, workspace-owned UTF-8 text.
+  const probeProvider=createProviderProbe({apiKey:options.deepseekApiKey,fetchImpl:options.llmProbeFetch});
   const llm=createLlm({apiKey:options.deepseekApiKey,integrationRegistry,approvalBroker,fetchImpl:options.llmFetch,publicFetch:options.publicFetch,openAlexApiKey:options.openAlexApiKey,publicUserAgent:options.publicUserAgent,load,readAttachment:async(f,workspaceId)=> {
     if (!/^file-[a-f0-9-]{36}$/.test(f.id)) return null;
     const stored=findFile(f.id,workspaceId);
@@ -220,6 +222,14 @@ export async function createApp(options = {}) {
         result.capabilities.Email={available:false,reason:'Gmail supports reads and approval-gated drafts, not direct outbound email sending. See the Gmail capability.'};result.capabilities.Calendar=result.capabilities['Google Calendar'];return send(res,200,result);
       }
       if (route==='/api/marketplace/catalog' && method==='GET') return send(res,200,marketplaceCatalog);
+      if (route==='/api/diagnostics' && method==='GET') {
+        const row=db.prepare('SELECT revision FROM workspace WHERE id=1').get();
+        return send(res,200,{api:{status:'ready'},database:{status:row?'ready':'unavailable',engine:'SQLite',revision:row?.revision ?? null},provider:{name:'DeepSeek',configured:llm.config().configured,models:llm.config().models},runtime:{node:process.versions.node}});
+      }
+      if (route==='/api/llm/test' && method==='POST') {
+        rate('provider-tests',6);
+        return send(res,200,await probeProvider(await body(req,4096)));
+      }
       if (route==='/api/llm/config' && method==='GET') return send(res,200,llm.config());
       if (route==='/api/llm/chat' && method==='POST') return await llm.chat(req,res,await body(req,4096));
       if (route==='/api/state' && method==='GET') return send(res,200,load());

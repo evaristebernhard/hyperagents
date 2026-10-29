@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Star, SlidersHorizontal, Share2, GitFork, Archive, Trash2, Pencil, X } from "lucide-react";
+import { Star, SlidersHorizontal, Share2, GitFork, Archive, Trash2, Pencil, X, Activity, PanelRightClose, PanelRightOpen } from "lucide-react";
 import type { ThreadProps } from "./Thread";
 import type { DemoMessage, MessageContext, ThreadSettings, ToolRun, IntegrationApproval } from "./types";
 import { defaultThreadSettings } from "./types";
@@ -12,6 +12,8 @@ import { api, fileDownloadUrl } from "./backend-client";
 import { streamChat, pendingKey, artifactFromAnswer, currentModels, type LlmConfig, type ArtifactPatch } from "./llm-client";
 import AnswerMarkdown from "./AnswerMarkdown";
 import { parseTable } from "./table-utils";
+import ArtifactCanvas from "./ArtifactCanvas";
+import ProviderDiagnostics from "./ProviderDiagnostics";
 import IntegrationApprovals from "./IntegrationApprovals";
 import "./real-thread.css";
 
@@ -58,7 +60,14 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
   latest.current = thread;
   const linked = w.data.artifacts.filter(a => a.threadId === thread.id && !a.archived);
   const visible = linked.filter(a => (kind === "All" || a.kind === kind) && a.title.toLowerCase().includes(search.toLowerCase())).sort((a, b) => sort === "title" ? a.title.localeCompare(b.title) : (sort === "created" ? b.createdAt.localeCompare(a.createdAt) : b.updatedAt.localeCompare(a.updatedAt)));
+  const canvasOrder = new Map((thread.canvas?.order || []).map((id, i) => [id, i]));
+  const canvasVisible = visible.filter(a => !thread.canvas?.hidden.includes(a.id)).sort((a, b) => (canvasOrder.get(a.id) ?? canvasOrder.size) - (canvasOrder.get(b.id) ?? canvasOrder.size));
   const selected = linked.find(a => a.id === selectedId);
+  function selectArtifact(id: string) {
+    if (id === selectedId) return true;
+    if (editing && selected && (content !== selected.content || artifactTitle !== selected.title) && !window.confirm("Discard unsaved artifact edits before opening another artifact?")) return false;
+    setSelectedId(id); return true;
+  }
   const historical = selected?.versions.find(v => v.id === versionId);
   const preview = selected && historical ? { ...selected, content: historical.content } : selected;
 
@@ -195,7 +204,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     const allArtifacts = w.data.artifacts.filter(a => a.threadId === thread.id);
     const ids = new Map(allArtifacts.map(a => [a.id, uid("artifact")]));
     const copies = allArtifacts.map(a => ({ ...structuredClone(a), id: ids.get(a.id)!, threadId: id, versions: a.versions.map(v => ({ ...v, id: uid("version") })), createdAt: timestamp, updatedAt: timestamp }));
-    const copy = { ...structuredClone(thread), id, title: thread.title + " (fork)", starred: false, archived: false, createdAt: timestamp, updatedAt: timestamp, messages: (thread.messages || []).map(m => ({ ...structuredClone(m), id: crypto.randomUUID(), ...(m.actionRequests ? { actionRequests: m.actionRequests.map(a => ({ ...a, token: "", status: a.status === "pending" ? "dismissed" as const : a.status })) } : {}), ...(m.context ? { context: { ...structuredClone(m.context), artifactIds: (m.context.artifactIds || []).map(a => ids.get(a) || a) } } : {}) })) };
+    const copy = { ...structuredClone(thread), ...(thread.canvas ? { canvas: { ...thread.canvas, hidden: thread.canvas.hidden.flatMap(a => ids.has(a) ? [ids.get(a)!] : []), order: thread.canvas.order.flatMap(a => ids.has(a) ? [ids.get(a)!] : []) } } : {}), id, title: thread.title + " (fork)", starred: false, archived: false, createdAt: timestamp, updatedAt: timestamp, messages: (thread.messages || []).map(m => ({ ...structuredClone(m), id: crypto.randomUUID(), ...(m.actionRequests ? { actionRequests: m.actionRequests.map(a => ({ ...a, token: "", status: a.status === "pending" ? "dismissed" as const : a.status })) } : {}), ...(m.context ? { context: { ...structuredClone(m.context), artifactIds: (m.context.artifactIds || []).map(a => ids.get(a) || a) } } : {}) })) };
     w.set("threads", items => [...items, copy]);
     w.set("artifacts", items => [...items, ...copies]);
     await w.flush(); navigate("/thread/" + id);
@@ -229,6 +238,8 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     <header className="rt-header">
       <div className="rt-title"><h1>{thread.title}</h1>{thread.archived && <span className="rt-badge">Archived</span>}</div>
       <div className="rt-actions">
+        <IconButton label={thread.canvas?.collapsed ? "Show canvas" : "Hide canvas"} onClick={() => void perform(() => saveThread({ canvas: { layout: "focus", hidden: [], order: [], ...thread.canvas, collapsed: !thread.canvas?.collapsed } }))}>{thread.canvas?.collapsed ? <PanelRightOpen size={17} /> : <PanelRightClose size={17} />}</IconButton>
+        <IconButton label="Connection diagnostics" onClick={() => setModal("diagnostics")}><Activity size={17} /></IconButton>
         <IconButton label={thread.starred ? "Unstar thread" : "Star thread"} onClick={() => void perform(() => saveThread({ starred: !thread.starred }))}><Star size={17} fill={thread.starred ? "currentColor" : "none"} /></IconButton>
         <IconButton label="Rename thread" onClick={() => { setTitle(thread.title); setModal("rename"); }}><Pencil size={17} /></IconButton>
         <IconButton label="Fork thread" onClick={() => void perform(fork)}><GitFork size={17} /></IconButton>
@@ -238,12 +249,12 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
         <IconButton label="Thread configuration" onClick={() => navigate("/thread/" + thread.id + (settingsPanel ? "" : "?panel=settings"))}><SlidersHorizontal size={17} /></IconButton>
       </div>
     </header>
-    <div className="rt-status"><span>{llm?.configured ? "DeepSeek connected · Text generation and saved context" : llmError ? "Model status unavailable" : llm ? "DeepSeek not configured · Messages are still saved" : "Checking model connection…"}</span><span role="status">{busy ? "Saving…" : w.persistence === "saved" ? "Saved" : w.persistence}</span></div>
+    <div className="rt-status"><span>{llm?.configured ? "DeepSeek configured · Connection not verified" : llmError ? "Model status unavailable" : llm ? "DeepSeek not configured · Messages are still saved" : "Checking model connection…"}</span><span role="status">{busy ? "Saving…" : w.persistence === "saved" ? "Saved" : w.persistence}</span></div>
     {llm && !llm.configured && <p className="rt-notice">To enable real replies, set DEEPSEEK_API_KEY in the server’s private .env or deployment environment and restart the service. Never commit a key or use a VITE_ secret. Local tools and selected public-data APIs are available when enabled. Selected configured integrations can read actual APIs. Writes require your per-action confirmation. Browser, generic web search, media and schedules are not executed.</p>}
     {llmError && <p className="rt-error" role="alert">{llmError}</p>}
     {error && <div className="rt-error" role="alert">{error}<button className="btn small" onClick={() => setError("")}>Dismiss</button></div>}
     {(w.persistence === "error" || w.persistence === "conflict") && <div className="rt-error" role="alert"><p>{w.storageError || "Changes are not saved. Export a backup before reloading saved data."}</p><div className="rt-actions"><button className="btn small" onClick={w.exportSnapshot}>Export backup</button>{w.persistence === "error" && <button className="btn small" disabled={busy} onClick={() => void perform(w.retrySave)}>Retry save</button>}<button className="btn small" disabled={busy} onClick={() => { if (window.confirm("Discard unsaved local changes and reload saved server data? Export a backup first if you want to keep them.")) void perform(w.reload); }}>Reload saved data</button></div></div>}
-    <div className={"rt-columns" + (settingsPanel ? " has-settings" : "")}>
+    <div className={"rt-columns" + (settingsPanel ? " has-settings" : "") + (thread.canvas?.collapsed ? " canvas-collapsed" : "")}>
       <section className="rt-conversation" aria-label="Conversation">
         <div className="rt-messages">
           {!(thread.messages || []).length && <div className="rt-empty"><h2>No messages yet</h2><p>Ask a question or start a task. DeepSeek can use your saved conversation, selected agent instructions, skills, memories and text attachments when configured.</p></div>}
@@ -261,16 +272,20 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
         </div>
         <div className="rt-composer"><Composer disabled={generating} compact navigate={navigate} notify={notify} agents={agents} initialSettings={thread.config} contextKey={thread.id} onSend={send} /></div>
       </section>
-      <section className="rt-artifacts" aria-label="Thread artifacts">
+      <section className={"rt-artifacts" + (thread.canvas?.collapsed ? " is-collapsed" : "")} aria-label="Thread artifacts">
+        {thread.canvas?.collapsed ? <button className="rt-canvas-restore" onClick={() => void perform(() => saveThread({ canvas: { ...thread.canvas!, collapsed: false } }))}><PanelRightOpen size={17} />Show canvas</button> : <>
         <div className="rt-section-heading"><h2>Artifacts <span>{linked.length}</span></h2><div className="rt-actions"><button className="btn small" disabled={busy} onClick={() => void perform(() => newArtifact("Document"))}>New document</button><button className="btn small" disabled={busy} onClick={() => void perform(() => newArtifact("Webpage"))}>New webpage</button></div></div>
         <div className="rt-artifact-filters"><input aria-label="Filter artifacts" placeholder="Filter artifacts…" value={search} onChange={e => setSearch(e.target.value)} /><select aria-label="Artifact type" value={kind} onChange={e => setKind(e.target.value)}>{["All", "Document", "Webpage", "Table", "Image", "File"].map(k => <option key={k}>{k}</option>)}</select><select aria-label="Sort artifacts" value={sort} onChange={e => setSort(e.target.value)}><option value="updated">Last updated</option><option value="created">Newest first</option><option value="title">Title A–Z</option></select></div>
-        {!linked.length ? <div className="rt-empty"><h3>No linked artifacts</h3><p>Create a document or webpage to start. This thread has no generated or sample content.</p></div> : !visible.length ? <p className="rt-empty">No artifacts match these filters.</p> : <nav className="rt-artifact-list" aria-label="Select artifact">{visible.map(a => <button key={a.id} className={a.id === selectedId ? "active" : ""} onClick={() => setSelectedId(a.id)}><span>{a.title}</span><small>{a.kind}</small></button>)}</nav>}
+        <ArtifactCanvas artifacts={visible} allArtifacts={linked} selectedId={selectedId} value={thread.canvas} disabled={busy} onSelect={selectArtifact} onChange={canvas => void perform(() => saveThread({ canvas }))}>
+        {!linked.length ? <div className="rt-empty"><h3>No linked artifacts</h3><p>Create a document or webpage to start. This thread has no generated or sample content.</p></div> : !canvasVisible.length ? <p className="rt-empty">No visible artifacts match these filters. Restore docked items below.</p> : <nav className="rt-artifact-list" aria-label="Select artifact">{canvasVisible.map(a => <button key={a.id} className={a.id === selectedId ? "active" : ""} onClick={() => selectArtifact(a.id)}><span>{a.title}</span><small>{a.kind}</small></button>)}</nav>}
         {selected ? <div className="rt-artifact-editor">
           <div className="rt-section-heading"><h3>{selected.title}</h3><button className="btn small" onClick={() => exportArtifact(preview!)}>Download</button></div>
           <div className="rt-artifact-filters"><label>Version <select aria-label="Artifact version" value={versionId} onChange={e => { setVersionId(e.target.value); setEditing(false); }}><option value="">Current version</option>{[...selected.versions].reverse().map((v, i) => <option key={v.id} value={v.id}>{dateLabel(v.createdAt)} · revision {selected.versions.length - i}</option>)}</select></label>{historical ? <button className="btn small" disabled={busy} onClick={() => void perform(async () => { w.updateArtifact(selected.id, historical.content); await w.flush(); setVersionId(""); })}>Restore this version</button> : <button className="btn small" onClick={() => setEditing(!editing)}>{editing ? "Preview" : "Edit artifact"}</button>}</div>
           {historical && <p className="rt-notice">Viewing a previous version. Restoring preserves the current content in version history.</p>}
           {editing ? <form onSubmit={e => { e.preventDefault(); void perform(saveArtifact); }} className="rt-artifact-form"><label>Artifact title<input required value={artifactTitle} onChange={e => setArtifactTitle(e.target.value)} /></label><label>{selected.kind === "Webpage" ? "HTML source" : "Content"}<textarea aria-label="Artifact content" value={content} onChange={e => setContent(e.target.value)} /></label><button className="btn primary" disabled={busy}>Save artifact</button></form> : <ArtifactView artifact={preview!} />}
         </div> : !!linked.length && <p className="rt-empty">Select an artifact to preview, edit, download, or restore a version.</p>}
+        </ArtifactCanvas>
+        </>}
       </section>
       {settingsPanel && <aside className="rt-settings" aria-label="Thread configuration"><div className="rt-section-heading"><h2>Configuration</h2><IconButton label="Close configuration" onClick={() => navigate("/thread/" + thread.id)}><X size={16} /></IconButton></div><p className="rt-notice">DeepSeek uses the selected agent prompt and saved context. Only the supported models below execute. Enable Thread Search, Documents, Webpages and Tables for local tool calls. World Bank / Weather / configured OpenAlex are read-only API tools. Selected integrations execute actual API reads; writes are confirmation-gated. Browser, generic web search, media and schedules are not connected.</p>
         <label>Project<select aria-label="Thread project" value={thread.projectId || ""} onChange={e => void perform(() => saveThread({ projectId: e.target.value || undefined, project: undefined }))}><option value="">No project</option>{w.data.projects.filter(p => !p.archived || p.id === thread.projectId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
@@ -288,6 +303,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
         <button className="btn" disabled title="Execution is not connected">Schedule execution unavailable</button>
       </aside>}
     </div>
+    {modal === "diagnostics" && <Modal title="AI provider & system status" onClose={() => setModal("")} wide><ProviderDiagnostics /></Modal>}
     {modal === "rename" && <Modal title="Rename thread" onClose={() => setModal("")}><form className="rt-dialog-form" onSubmit={e => { e.preventDefault(); if (title.trim()) void perform(async () => { await saveThread({ title: title.trim() }); setModal(""); }); }}><label>Thread title<input aria-label="Thread title" required autoFocus value={title} onChange={e => setTitle(e.target.value)} /></label>{error && <p className="rt-error" role="alert">{error}</p>}<button className="btn primary" disabled={busy || !title.trim()}>Save name</button></form></Modal>}
     {modal === "delete" && <Modal title="Delete thread?" onClose={() => setModal("")}><p>This permanently removes “{thread.title}” and its messages. Artifacts remain in the Library, unlinked from this thread. All active public snapshots of this thread will also be revoked. This cannot be undone.</p>{error && <p className="rt-error" role="alert">{error}</p>}<div className="rt-actions"><button className="btn" onClick={() => setModal("")}>Cancel</button><button className="btn danger" disabled={busy} onClick={() => void perform(async () => { await w.flush(); const result = await api<{ shares: Share[] }>("/api/shares?workspaceId=" + encodeURIComponent(w.state.active) + "&threadId=" + encodeURIComponent(thread.id)); for (const share of result.shares.filter(s => !s.revokedAt)) await api("/api/shares/" + encodeURIComponent(share.id), { method: "DELETE" }); w.set("threads", items => items.filter(t => t.id !== thread.id)); w.set("artifacts", items => items.map(a => a.threadId === thread.id ? { ...a, threadId: undefined } : a)); await w.flush(); navigate("/threads"); })}>Delete permanently</button></div></Modal>}
     {modal === "share" && <Modal title="Share thread snapshot" onClose={() => setModal("")} wide><div className="rt-share"><p>Publishing creates an immutable public snapshot of the thread title, message text and attachment filenames. Only artifacts you select below are included. Private attachment bytes, context, settings, and workspace data are never public.</p><p>Anyone with the link can read the snapshot. Review message text and artifact contents for sensitive information before publishing.</p><fieldset><legend>Artifacts to include</legend>{linked.length ? linked.map(a => <label className="rt-checkbox" key={a.id}><input type="checkbox" checked={shareIds.includes(a.id)} onChange={e => setShareIds(ids => e.target.checked ? [...ids, a.id] : ids.filter(id => id !== a.id))} />{a.title} ({a.kind})</label>) : <p>No linked artifacts.</p>}</fieldset><label className="rt-checkbox"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />I confirm the message text and selected artifact snapshots may be public.</label><button className="btn primary" disabled={busy || !confirmed} onClick={() => void perform(publish)}>Publish snapshot</button>{error && <p role="alert" className="rt-error">{error}</p>}<div className="rt-section-heading"><h3>Published snapshots</h3><button className="btn small" disabled={shareLoading} onClick={() => void loadShares()}>Refresh</button></div>{shareLoading && <p role="status">Loading snapshots…</p>}{shareError && <p role="alert" className="rt-error">{shareError}</p>}{!shareLoading && !shareError && !shares.length && <p>No published snapshots.</p>}{shares.map(share => <div className="rt-share-row" key={share.id}><div><time>{dateLabel(share.createdAt)}</time>{share.revokedAt ? <p>Revoked</p> : <a href={"/share/" + encodeURIComponent(share.token)} target="_blank" rel="noopener noreferrer">{window.location.origin}/share/{share.token}</a>}</div>{!share.revokedAt && <button className="btn small" disabled={busy} onClick={() => void perform(async () => { await api("/api/shares/" + encodeURIComponent(share.id), { method: "DELETE" }); setShares(items => items.map(s => s.id === share.id ? { ...s, revokedAt: now() } : s)); })}>Revoke</button>}</div>)}</div></Modal>}

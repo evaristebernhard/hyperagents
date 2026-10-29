@@ -1,9 +1,19 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type BrowserContext } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 const ownerPassword = "local-e2e-owner-password-not-a-secret";
 test.describe.configure({ mode: "serial" });
+let loginCookies: Awaited<ReturnType<BrowserContext["cookies"]>> | undefined;
 async function signedIn(page: Page) {
+  // Reuse a real authenticated owner session rather than exhausting the production
+  // sign-in rate limit as the browser regression suite grows.
+  if (loginCookies) {
+    await page.context().addCookies(loginCookies);
+    await page.goto("/threads/new");
+    await expect(page.getByLabel("Task prompt", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Storage status", { exact: true })).toHaveText("Saved to local server");
+    return;
+  }
   await page.goto("/threads/new");
   // Password inputs have no textbox role in all browser accessibility trees.
   const input = page.getByLabel("Password", { exact: true });
@@ -16,6 +26,7 @@ async function signedIn(page: Page) {
   } else await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByLabel("Task prompt", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Storage status", { exact: true })).toHaveText("Saved to local server");
+  loginCookies = await page.context().cookies();
 }
 async function createThread(page: Page, title: string) {
   await page.goto("/threads/new");

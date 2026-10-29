@@ -18,7 +18,9 @@ export type IntegrationApproval = { id: string; token: string; provider: string;
 export type DemoMessage = { id?: string; role: "user" | "assistant"; text: string; createdAt?: string; context?: MessageContext; toolRuns?: ToolRun[]; actionRequests?: IntegrationApproval[] };
 export type WorkspacePreferences = { defaultThreadSettings?: ThreadSettings; [key: string]: unknown };
 export const defaultThreadSettings: ThreadSettings = { model: "", reasoning: "Medium", provider: "Any", mode: "Execute", tools: ["Thread Search", "Documents", "Webpages", "Tables"] };
+export type CanvasPreferences = { layout: "focus" | "tiles" | "carousel"; hidden: string[]; order: string[]; collapsed?: boolean };
 export type DemoThread = {
+  canvas?: CanvasPreferences;
   id: string;
   title: string;
   summary: string;

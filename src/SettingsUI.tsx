@@ -38,6 +38,7 @@ import { useWorkspace } from "./workspace";
 import { uid, now } from "./local-model";
 import "./settings-ui.css";
 import ServerThreadDefaults from "./ServerThreadDefaults";
+import ProviderDiagnostics from "./ProviderDiagnostics";
 import IntegrationSettings from "./IntegrationSettings";
 const groups = [
   {
@@ -935,7 +936,7 @@ export default function SettingsUI({
       </>
     );
   else if (section === "ai-providers")
-    content = (
+    content = workspace.mode === "server" ? <ProviderDiagnostics /> : (
       <>
         <h4>Your connections</h4>
         <p className="muted">

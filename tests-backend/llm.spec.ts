@@ -42,7 +42,7 @@ test("LLM protocol UI: new task autostarts once, answer persists, followup uses 
   expect(Object.keys(requests[0]).sort()).toEqual(["threadId", "userMessageId", "workspaceId"]);
   expect(await page.evaluate(() => (window as any).untrusted)).toBeUndefined();
   await page.reload(); await expect(page.locator(".rt-message.assistant")).toHaveCount(1);
-  await expect(page.locator(".rt-status")).toContainText("DeepSeek connected");
+  await expect(page.locator(".rt-status")).toContainText("DeepSeek configured");
   expect(requests).toHaveLength(1);
   await send(page, "Follow-up question", true);
   await expect(page.locator(".rt-message.assistant")).toHaveCount(2);
@@ -166,4 +166,54 @@ test("workspace tools UI: document/table patches persist, tool history survives 
   const final = await (await page.request.get("/api/state")).json();
   const artifacts = final.state.workspaces.flatMap((w: any) => w.data.artifacts);
   expect(artifacts.find((a: any) => a.id === "artifact-tool-doc-test").versions[0].content).toBe("# First tool document");
+});
+
+test("connection diagnostics: page loads never spend provider credit; missing key is explicit", async ({ page }) => {
+  await configure(page, "Diagnostics setup answer"); await login(page); await send(page, "Connection diagnostics missing-key test");
+  await expect(page.locator(".rt-message.assistant")).toHaveCount(1);
+  let paidTests = 0;
+  await page.route("**/api/llm/test", route => { paidTests++; return route.abort(); });
+  await page.getByRole("button", { name: "Connection diagnostics", exact: true }).click();
+  const panel = page.getByRole("region", { name: "Connection diagnostics", exact: true });
+  await expect(panel.getByText("Reachable", { exact: true })).toBeVisible();
+  await expect(panel.getByText("Readable", { exact: true })).toBeVisible();
+  await expect(panel.getByText("Not configured", { exact: true })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Run small paid test", exact: true })).toBeDisabled();
+  await panel.getByRole("button", { name: "Refresh status", exact: true }).click();
+  await expect(panel.getByText("Readable", { exact: true })).toBeVisible();
+  expect(paidTests).toBe(0);
+});
+
+test("connection diagnostics: explicit model test displays dated verified result, refresh clears it", async ({ page }) => {
+  await configure(page, "Diagnostics connected answer");
+  await page.route("**/api/diagnostics", route => route.fulfill({ json: { api: { status: "ready" }, database: { status: "ready", engine: "SQLite", revision: 12 }, provider: { name: "DeepSeek", configured: true, models: ["deepseek-flash", "deepseek-v4-pro"] }, runtime: { node: "24.18.0" } } }));
+  const requests: unknown[] = [];
+  await page.route("**/api/llm/test", route => { requests.push(route.request().postDataJSON()); return route.fulfill({ json: { status: "verified", model: "deepseek-v4-pro", checkedAt: "2026-10-29T06:00:00.000Z", latencyMs: 420, cached: false } }); });
+  await login(page); await send(page, "Connection diagnostics explicit-test flow");
+  await expect(page.locator(".rt-message.assistant")).toHaveCount(1);
+  await page.getByRole("button", { name: "Connection diagnostics", exact: true }).click();
+  const panel = page.getByRole("region", { name: "Connection diagnostics", exact: true });
+  await expect(panel.getByText("Key configured", { exact: true })).toBeVisible(); expect(requests).toHaveLength(0);
+  await panel.getByLabel("Diagnostic model", { exact: true }).selectOption("deepseek-v4-pro");
+  await panel.getByRole("button", { name: "Run small paid test", exact: true }).click();
+  await expect(panel.getByRole("status")).toContainText("Provider verified · deepseek-v4-pro");
+  await expect(panel.getByRole("status")).toContainText("420 ms");
+  expect(requests).toEqual([{ model: "deepseek-v4-pro", confirmed: true }]);
+  await panel.getByRole("button", { name: "Refresh status", exact: true }).click();
+  await expect(panel.getByText("Key configured", { exact: true })).toBeVisible();
+  await expect(panel.getByRole("status")).toHaveCount(0); expect(requests).toHaveLength(1);
+});
+
+test("connection diagnostics: rejected credential is actionable, not connected", async ({ page }) => {
+  await configure(page, "Diagnostics rejected answer");
+  await page.route("**/api/diagnostics", route => route.fulfill({ json: { api: { status: "ready" }, database: { status: "ready", engine: "SQLite", revision: 1 }, provider: { name: "DeepSeek", configured: true, models: ["deepseek-flash"] }, runtime: { node: "24.18.0" } } }));
+  await page.route("**/api/llm/test", route => route.fulfill({ json: { status: "failed", code: "AUTH_REJECTED", model: "deepseek-flash", checkedAt: "2026-10-29T06:00:00.000Z", latencyMs: 120, cached: false } }));
+  await login(page); await send(page, "Connection diagnostics rejected test");
+  await expect(page.locator(".rt-message.assistant")).toHaveCount(1);
+  await page.getByRole("button", { name: "Connection diagnostics", exact: true }).click();
+  const panel = page.getByRole("region", { name: "Connection diagnostics", exact: true });
+  await panel.getByRole("button", { name: "Run small paid test", exact: true }).click();
+  await expect(panel.getByRole("status")).toContainText("DeepSeek rejected the server credential");
+  await expect(panel.getByRole("status")).not.toContainText("Provider verified");
+  await expect(page.locator(".rt-status")).toContainText("Connection not verified");
 });

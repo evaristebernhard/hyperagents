@@ -7,7 +7,7 @@ This is an independent implementation, not Hyperagent's private source or backen
 1. Rotate any key that has appeared in chat or source history.
 2. In the deployment platform's private environment settings, or in this project's untracked .env on your server, set DEEPSEEK_API_KEY. Do not send the value in chat. .env.example deliberately contains an empty value.
 3. Restart the existing Node service. npm run dev starts Vite and the API together; npm run preview serves the built frontend and API. A static-only server cannot supply generation.
-4. Sign in using the existing owner account. A thread displays DeepSeek connected when the server has a nonempty key. This checks configuration presence, not provider authorization or account balance; a first real message is required to validate those.
+4. Sign in using the existing owner account. A thread displays DeepSeek configured when the server has a nonempty key; it never labels configuration presence as a verified connection. Open Connection diagnostics from the thread header or Settings > AI providers. Local API and SQLite checks do not call DeepSeek. Choose a model and explicitly click Run small paid test to verify a real completion.
 5. Send a short question. The answer streams into the conversation and is saved through the normal revision-checked SQLite state API.
 
 Never set VITE_DEEPSEEK_API_KEY or commit the key. The browser sends saved resource IDs to the same-origin authenticated API; the server attaches the provider Authorization header. The key is removed from process.env before Vite initializes and never returned by /api/llm/config. No real credential is included in this change.
@@ -78,3 +78,47 @@ Selected independently installed Marketplace skills can bind the fixed read-only
 ## Selected account integration tools
 
 Configured integrations explicitly selected in a message now supply bounded real API reads and prepare-only write tools. Writes require owner confirmation outside the model loop, with signed current-thread/workspace scope and replay protection. See INTEGRATIONS.md for actual supported services and remaining limits. Connected Hyperagent accounts are not reused.
+
+
+## Connection diagnostics (2026-10-29)
+
+Authenticated GET /api/diagnostics returns API readiness, SQLite readability and revision,
+Node version, and provider configuration presence/model allowlist. It does not return
+paths, environment values, owner details or workspace contents. Opening or refreshing
+the diagnostics panel never calls the provider and never changes workspace revision.
+
+POST /api/llm/test requires the owner session, trusted Origin, CSRF token, an allowlisted
+model and confirmed: true. It sends one fixed small non-streaming request with thinking
+disabled and at most 16 output tokens. The server key is sent only to the fixed DeepSeek
+HTTPS endpoint; redirects are rejected. The 15-second deadline covers fetch and body
+reading, and the body is bounded to 64 KiB. Only status, safe error code, model, latency,
+check time and cache status are returned. Neither model output nor provider error bodies
+are returned. Results are reused per model for 30 seconds; simultaneous tests are refused
+and the endpoint is limited to six requests per minute. A verified result means that model
+returned a real completion at that instant, not that all tools work or availability is permanent.
+
+The diagnostics UI distinguishes rejected credentials, insufficient balance, rate limits,
+model access, timeouts and connection/service failures. It never accepts or reveals API keys.
+Normal server mode replaces the placeholder ChatGPT connection UI in Settings > AI providers;
+fixture mode retains its existing UI regression samples.
+
+For an explicit live end-to-end smoke test, run on your server:
+
+    node scripts/verify-provider.mjs --confirm
+
+This spends two small provider requests, uses an isolated temporary SQLite database and
+random temporary owner password, verifies a real SSE completion, saves/reloads the answer
+through the revision-checked API and checks persistence after a server restart. It does not
+modify the real owner database, print credentials or expose a server publicly. Automated
+unit/browser tests still use mocked provider transport; live test results must be reported
+separately, never inferred from configuration or fixture tests.
+
+
+### Live verification on the authorized WSL node — 2026-10-29
+
+The explicit smoke test completed against the real configured DeepSeek Flash provider:
+small non-streaming completion, authenticated SSE answer with expected marker,
+revision-checked answer save/reload, and persistence after restarting the temporary backend.
+The provider probe took 984 ms in that run. This was separate from mocked automated tests.
+The existing owner database and credentials were not changed. This verifies that deployment
+at that moment, not other models, integrations, public reverse-proxy streaming or all media tools.
