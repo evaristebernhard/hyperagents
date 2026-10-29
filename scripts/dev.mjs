@@ -3,6 +3,8 @@ import path from 'node:path';
 import { createApp } from '../server/app.mjs';
 import { loadLocalEnv } from './env.mjs';
 loadLocalEnv();
+// Public development ingress for this replica; retain Host/Origin and CSRF checks.
+process.env.APP_PUBLIC_ORIGIN = 'https://hyper.chayu123.me';
 // Interpret only known options; never concatenate user arguments into a shell command.
 const args=process.argv.slice(2);
 let fixture=false, host='127.0.0.1',port=5173;
@@ -58,7 +60,7 @@ try {
   }
   const { createServer }=await import('vite');
   // Overrides the legacy config's public bind. The API validates original Host/Origin.
-  const allowedHosts=['localhost','127.0.0.1'];
+  const allowedHosts=['localhost','127.0.0.1','hyper.chayu123.me'];
   if (process.env.APP_PUBLIC_ORIGIN) allowedHosts.push(new URL(process.env.APP_PUBLIC_ORIGIN).hostname);
   vite=await createServer({server:{host,port,strictPort:true,allowedHosts,proxy:fixture?{}:{'/api':{target:`http://${proxyHost}:${apiPort}`,changeOrigin:false}}}});
   await vite.listen(); vite.printUrls();

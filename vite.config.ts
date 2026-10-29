@@ -10,8 +10,11 @@ export default defineConfig({
     host: "127.0.0.1",
     fs: { strict: true, deny: privateFsDeny },
     headers: { "X-Frame-Options": "DENY", "Content-Security-Policy": "frame-ancestors 'none'" },
-    allowedHosts: ["localhost", "127.0.0.1", ...(publicHost ? [publicHost] : [])],
+    allowedHosts: ["localhost", "127.0.0.1", "lp.chayu123.me", "hyper.chayu123.me", ...(publicHost ? [publicHost] : [])],
     proxy: { "/api": { target: `http://127.0.0.1:${apiPort}`, changeOrigin: false } },
   },
-  preview: { host: "127.0.0.1", allowedHosts: ["localhost", "127.0.0.1", ...(publicHost ? [publicHost] : [])] },
+  preview: {
+    host: "127.0.0.1",
+    allowedHosts: ["localhost", "127.0.0.1", "lp.chayu123.me", "hyper.chayu123.me", ...(publicHost ? [publicHost] : [])],
+  },
 });
