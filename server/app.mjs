@@ -9,6 +9,7 @@ import { pipeline } from 'node:stream/promises';
 import { ApiError, emptyState, validateState } from './validation.mjs';
 import { prepareLegacy } from './legacy.mjs';
 import { createLlm } from './llm.mjs';
+import { createRunManager } from './agent-runs.mjs';
 import { createProviderProbe } from './provider-probe.mjs';
 import { marketplaceCapabilities, marketplaceCatalog } from './marketplace.mjs';
 import { createIntegrationRegistry } from './integrations.mjs';
@@ -84,7 +85,7 @@ export async function createApp(options = {}) {
   const approvalBroker=createApprovalBroker({load,registry:integrationRegistry});
   // Only authenticated chat execution can read saved, workspace-owned UTF-8 text.
   const probeProvider=createProviderProbe({apiKey:options.deepseekApiKey,fetchImpl:options.llmProbeFetch});
-  const llm=createLlm({apiKey:options.deepseekApiKey,integrationRegistry,approvalBroker,fetchImpl:options.llmFetch,publicFetch:options.publicFetch,openAlexApiKey:options.openAlexApiKey,publicUserAgent:options.publicUserAgent,load,readAttachment:async(f,workspaceId)=> {
+  const readAttachment=async(f,workspaceId)=> {
     if (!/^file-[a-f0-9-]{36}$/.test(f.id)) return null;
     const stored=findFile(f.id,workspaceId);
     if (!stored || ['name','size','mimeType','createdAt','workspaceId'].some(k=>stored[k]!==f[k]) || stored.size>16384) return null;
@@ -99,7 +100,8 @@ export async function createApp(options = {}) {
       const text=new TextDecoder('utf-8',{fatal:true}).decode(buffer.subarray(0,bytesRead));
       return text.includes('\u0000')?null:text;
     } catch {return null;} finally {if(handle)await handle.close().catch(()=>{});}
-  }});
+  };
+  const llm=createLlm({apiKey:options.deepseekApiKey,integrationRegistry,approvalBroker,fetchImpl:options.llmFetch,publicFetch:options.publicFetch,openAlexApiKey:options.openAlexApiKey,publicUserAgent:options.publicUserAgent,load,readAttachment});
   const workspace = id => { const w=load().state.workspaces.find(w=>w.id===id); if (!w) err(422,'Invalid workspace.'); return w; };
   const commit = (state, revision) => {
     if (!Number.isSafeInteger(revision) || revision<0) err(400,'A valid revision is required.');
@@ -108,6 +110,35 @@ export async function createApp(options = {}) {
     if (!result.changes) err(409,'Workspace changed. Reload before saving.','CONFLICT');
     return revision+1;
   };
+  const runs=createRunManager({dataDir,llm,load,readAttachment,validateAdmission:(state,request)=>{try{integrationRegistry.bind(state,request,approvalBroker);}catch(e){throw new ApiError(422,e.message,'INTEGRATION_SETUP');}},shellRoot:options.shellRoot ?? process.cwd(),maxConcurrent:options.runConcurrency ?? 2,timeoutMs:options.runTimeoutMs ?? 20*60*1000,persist:run=> {
+    const current=load(),w=current.state.workspaces.find(w=>w.id===run.request.workspaceId),thread=w?.data.threads.find(t=>t.id===run.request.threadId && !t.archived);
+    const index=thread?.messages?.findIndex(m=>m.id===run.request.userMessageId) ?? -1;
+    if(!thread || index<0 || hash(thread.messages[index].text)!==run.sourceHash)throw Error('Run source changed.');
+    const answerId='run-answer-'+run.id;
+    if(thread.messages.some(m=>m.id===answerId))return true;
+    // Use a fresh workspace revision; never overwrite unrelated edits from the run snapshot.
+    for(const patch of run.patches) {
+      const a=patch.artifact;
+      if(a.threadId!==thread.id || !['Document','Webpage','Table'].includes(a.kind))throw Error('Invalid artifact scope.');
+      const at=w.data.artifacts.findIndex(x=>x.id===a.id),old=w.data.artifacts[at];
+      if(patch.base) {
+        if(!old || old.archived || old.threadId!==thread.id || ['content','title','updatedAt'].some(k=>old[k]!==patch.base[k]))throw Error('Artifact conflict.');
+        w.data.artifacts[at]=a;
+      } else {if(at>=0)throw Error('Artifact ID conflict.');w.data.artifacts.push(a);}
+    }
+    let text=run.text;
+    if(!text.trim())text=run.approvals.length?'An integration action is ready for explicit review. No write has been performed.':run.patches.length?'Created '+run.patches.length+' artifact(s).':run.error || 'The run completed without answer text.';
+    if(run.status!=='succeeded')text+='\n\n['+(run.status==='cancelled'?'Stopped — partial answer':run.status==='interrupted'?'Server stopped — partial answer':'Interrupted — partial answer')+']';
+    const source=thread.messages[index],format=(source.context?.settings?.outputFormat || thread.config?.outputFormat || '').toLowerCase();
+    if(run.status==='succeeded' && !run.patches.length && ['doc','document','webpage'].includes(format)) {
+      let content=text,kind='Document';
+      if(format==='webpage') {kind='Webpage';content=/```(?:html)?\s*\n([\s\S]*?)```/i.exec(text)?.[1]?.trim() || text.trim();if(!/^<(?:!doctype\s+html|html|main|section|article|div)\b/i.test(content))content=null;}
+      if(content)w.data.artifacts.push({id:'artifact-'+randomUUID(),title:thread.title+' · '+kind,kind,content,threadId:thread.id,...(thread.projectId?{projectId:thread.projectId}:{}),versions:[],createdAt:now(),updatedAt:now()});
+    }
+    const tools=run.toolRuns.slice(-30).map(e=>({id:e.id,name:e.name,status:e.status==='running'?'error':e.status,summary:e.summary}));
+    thread.messages.splice(index+1,0,{id:answerId,role:'assistant',text,createdAt:now(),...(tools.length?{toolRuns:tools}:{}),...(run.approvals.length?{actionRequests:run.approvals.slice(0,12)}:{})});thread.updatedAt=now();
+    validateState(current.state,findFile);commit(current.state,current.revision);return true;
+  }});
   const limits = new Map();
   const rateWindow = 15*60*1000;
   function rate(key,max) {
@@ -232,6 +263,19 @@ export async function createApp(options = {}) {
       }
       if (route==='/api/llm/config' && method==='GET') return send(res,200,llm.config());
       if (route==='/api/llm/chat' && method==='POST') return await llm.chat(req,res,await body(req,4096));
+      if(route==='/api/runtime' && method==='GET')return send(res,200,runs.capabilities());
+      if(route==='/api/runs' && method==='POST') { const b=await body(req,4096);return send(res,202,{run:await runs.create(b)}); }
+      if(route==='/api/runs' && method==='GET')return send(res,200,{runs:runs.list({workspaceId:url.searchParams.get('workspaceId'),threadId:url.searchParams.get('threadId')})});
+      const runMatch=route.match(/^\/api\/runs\/([a-f0-9-]{36})(?:\/(events|cancel|approvals)(?:\/([a-f0-9-]{36}))?)?$/);
+      if(runMatch) {
+        const [,id,action,approvalId]=runMatch;
+        const scope={workspaceId:url.searchParams.get('workspaceId') ?? undefined,threadId:url.searchParams.get('threadId') ?? undefined};
+        if(method==='GET' && !action)return send(res,200,{run:runs.get(id,scope)});
+        if(method==='GET' && action==='events'){const after=url.searchParams.get('after') ?? '0';if(!/^\d{1,10}$/.test(after))err(400,'Invalid event cursor.');return send(res,200,runs.events(id,scope,Number(after)));}
+        if(method==='POST' && action==='cancel' && !approvalId){const b=await body(req,4096);exactBody(b,['workspaceId','threadId']);if(!b.workspaceId||!b.threadId)err(400,'Workspace and thread required.');return send(res,200,{run:runs.cancel(id,b)});}
+        if(method==='POST' && action==='approvals' && approvalId){const b=await body(req,4096);exactBody(b,['workspaceId','threadId','decision']);if(!b.workspaceId||!b.threadId)err(400,'Workspace and thread required.');return send(res,200,{run:runs.decide(id,approvalId,b)});}
+      }
+
       if (route==='/api/state' && method==='GET') return send(res,200,load());
       if (route==='/api/state' && method==='PUT') {
         const match=req.headers['if-match'];
@@ -324,7 +368,7 @@ export async function createApp(options = {}) {
     }
   });
   server.requestTimeout=60000; server.headersTimeout=15000; server.keepAliveTimeout=5000; server.maxRequestsPerSocket=1000;
-  return {server, async listen() { await new Promise((resolve,reject)=>{server.once('error',reject); server.listen(port,host,()=>{server.off('error',reject);resolve();});}); return server.address(); }, async close() { await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}); db.close(); }};
+  return {server, async listen() { await new Promise((resolve,reject)=>{server.once('error',reject); server.listen(port,host,()=>{server.off('error',reject);resolve();});}); return server.address(); }, async close() { await runs.close();await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}); db.close(); }};
 }
 async function serveDist(req,res,route,distDir) {
   const root=realpathSync(distDir);

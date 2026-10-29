@@ -109,3 +109,38 @@
 .rt-approval pre,.rt-approval-details { white-space:pre-wrap; overflow-wrap:anywhere; max-height:360px; overflow:auto; font:11px/1.65 ui-monospace,monospace; }
 .rt-approval .rt-actions { margin-top:12px; }
 .rt-approval.completed { border-color:#91b99d; }.rt-approval.failed { border-color:#cd9b9b; }
+
+/* Durable execution metadata is separate from transient answer previews. */
+.rt-run-loading { margin: 0; padding: 10px 24px; font-size: 12px; color: var(--muted, #666); border-bottom: 1px solid var(--line, #ddd); }
+.rt-run-panel { flex: 0 0 auto; max-height: 34vh; overflow: auto; padding: 14px 24px; border-bottom: 1px solid var(--line, #ddd); background: var(--hover, #fafafa); font-size: 12px; min-width: 0; }
+.rt-run-heading, .rt-run-heading > div:first-child { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.rt-run-heading { justify-content: space-between; }
+.rt-run-heading strong { font-size: 13px; }
+.rt-run-heading code { font: 11px/1.5 ui-monospace, monospace; color: var(--muted, #666); }
+.rt-run-stats { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 12px 0 0; }
+.rt-run-stats > div { display: flex; align-items: baseline; gap: 6px; }
+.rt-run-stats dt { color: var(--muted, #666); font-size: 11px; }
+.rt-run-stats dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.rt-run-hint { margin: 10px 0 0; color: var(--muted, #666); font-size: 11px; line-height: 1.6; }
+.rt-run-failure { color: #9e2525; overflow-wrap: anywhere; line-height: 1.6; }
+.rt-run-reconnecting { padding: 10px 12px; margin: 12px 0 0; border: 1px solid #d9b976; border-radius: 6px; color: #76520b; background: #fff9e9; line-height: 1.6; }
+.rt-run-reconnecting span { display: block; font-size: 11px; overflow-wrap: anywhere; }
+.rt-run-view-error { display: flex; flex: 0 0 auto; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 24px; background: #fff9e9; color: #76520b; border-bottom: 1px solid #d9b976; font-size: 12px; }
+.rt-run-view-error p { margin: 0; line-height: 1.6; overflow-wrap: anywhere; }
+.rt-run-view-error button { flex-shrink: 0; }
+.rt-shell-approvals { margin-top: 14px; display: grid; gap: 10px; }
+.rt-shell-warning { margin: 0; padding: 12px 14px; border: 1px solid #d7b877; border-radius: 7px; background: #fff9e9; color: #76520b; line-height: 1.7; }
+.rt-shell-warning strong { display: block; }
+.rt-shell-approval { padding: 14px; border: 1px solid var(--line, #ccc); border-radius: 8px; background: var(--bg, #fff); min-width: 0; }
+.rt-shell-approval.pending { border-color: #c29848; }
+.rt-shell-approval .rt-section-heading { margin-bottom: 10px; }
+.rt-shell-command { margin: 0; padding: 12px; background: var(--hover, #f6f6f6); border: 1px solid var(--line, #ddd); border-radius: 6px; font: 12px/1.7 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; tab-size: 4; }
+.rt-shell-approval dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 14px; line-height: 1.6; }
+.rt-shell-approval dt { color: var(--muted, #666); }
+.rt-shell-approval dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.rt-shell-approval dd code { font: 11px/1.7 ui-monospace, monospace; }
+.rt-shell-config { border: 1px solid var(--line, #ddd); border-radius: 7px; padding: 12px; font-size: 11px; line-height: 1.7; }
+.rt-shell-config p { margin: 8px 0 12px; color: var(--muted, #666); }
+@media (max-width: 900px) { .rt-run-panel { max-height: 30vh; padding: 12px 16px; } .rt-run-loading, .rt-run-view-error { padding: 10px 16px; } .rt-run-view-error { align-items: flex-start; flex-wrap: wrap; } .rt-run-stats { gap: 8px 14px; } .rt-shell-approval dl { grid-template-columns: 1fr; gap: 4px; } }
+
+.rt-run-plan{list-style:none;margin:12px 0;padding:0;display:grid;gap:7px}.rt-run-plan li{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;align-items:start;font-size:13px}.rt-run-plan li small{color:var(--muted,#64748b);font-size:11px}.rt-run-plan li.in_progress{color:var(--accent,#2563eb)}.rt-run-plan li.completed>span:first-child{color:#16803c}

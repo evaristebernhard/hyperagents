@@ -1,4 +1,4 @@
-import DOMPurify from "dompurify";
+import { buildWebpagePreview } from "./webpage-preview";
 import { useEffect, useRef, useState } from "react";
 import {
   Plus,
@@ -45,33 +45,7 @@ export function ArtifactView({ artifact }: { artifact: Artifact }) {
       title={artifact.title}
       sandbox=""
       referrerPolicy="no-referrer"
-      srcDoc={
-        "<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src 'none'; base-uri 'none'; form-action 'none'\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
-        DOMPurify.sanitize(artifact.content, {
-          FORBID_TAGS: [
-            "script",
-            "iframe",
-            "object",
-            "embed",
-            "form",
-            "meta",
-            "base",
-            "link",
-          ],
-          FORBID_ATTR: [
-            "src",
-            "href",
-            "srcset",
-            "action",
-            "formaction",
-            "poster",
-            "xlink:href",
-            "ping",
-            "background",
-            "srcdoc",
-          ],
-        })
-      }
+      srcDoc={buildWebpagePreview(artifact.content)}
     />
   ) : artifact.kind === "Document" ? (
     <article className="notes-document">

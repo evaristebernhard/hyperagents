@@ -26,7 +26,7 @@ const DEFINITIONS = [
 /** Local-only tools over an isolated snapshot. Attachment reader receives (metadata, workspaceId).
  * At most ten execute calls per runtime; patches are staged, never persisted here.
  */
-export function createWorkspaceTools({ state, workspaceId, threadId, readAttachment = async () => null, enabled = [] }) {
+export function createWorkspaceTools({ state, workspaceId, threadId, readAttachment = async () => null, enabled = [], maxCalls = 10 }) {
   const source = state?.workspaces?.filter(w => w.id === workspaceId);
   if (!source || source.length !== 1) fail('Workspace or thread not found.');
   const data = structuredClone(source[0].data);
@@ -109,7 +109,7 @@ export function createWorkspaceTools({ state, workspaceId, threadId, readAttachm
   }
 
   async function execute(name, args) {
-    if (++calls > 10) fail('Tool call limit exceeded (10).');
+    if (++calls > maxCalls) fail('Tool call limit exceeded ('+maxCalls+').');
     validate(name, args);
     if (name === 'workspace_search') {
       const query = args.query.trim().toLowerCase();

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Star, SlidersHorizontal, Share2, GitFork, Archive, Trash2, Pencil, X, Activity, PanelRightClose, PanelRightOpen } from "lucide-react";
 import type { ThreadProps } from "./Thread";
-import type { DemoMessage, MessageContext, ThreadSettings, ToolRun, IntegrationApproval } from "./types";
+import type { MessageContext, ThreadSettings, ToolRun } from "./types";
 import { defaultThreadSettings } from "./types";
 import type { Artifact } from "./local-model";
 import { now, uid } from "./local-model";
@@ -9,7 +9,8 @@ import { useWorkspace } from "./workspace";
 import { Composer, IconButton, Modal } from "./ui";
 import { ArtifactView, exportArtifact } from "./LibraryManager";
 import { api, fileDownloadUrl } from "./backend-client";
-import { streamChat, pendingKey, artifactFromAnswer, currentModels, type LlmConfig, type ArtifactPatch } from "./llm-client";
+import { pendingKey, artifactFromAnswer, currentModels, type LlmConfig } from "./llm-client";
+import { createRun, listRuns, followRun, cancelRun, decideShellApproval, isActiveRun, type RunInfo, type RunConnection, type RuntimeEvent } from "./run-client";
 import AnswerMarkdown from "./AnswerMarkdown";
 import { parseTable } from "./table-utils";
 import ArtifactCanvas from "./ArtifactCanvas";
@@ -30,7 +31,20 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
   const [draft, setDraft] = useState("");
   const [reasoning, setReasoning] = useState(false);
   const [toolRuns, setToolRuns] = useState<ToolRun[]>([]);
+  // This controller owns the VIEW, never the lifetime of server execution.
   const generation = useRef<AbortController | null>(null);
+  const [runInfo, setRunInfo] = useState<RunInfo | null>(null);
+  const runRef = useRef<RunInfo | null>(null);
+  const cursor = useRef(0);
+  const [checkingRuns, setCheckingRuns] = useState(true);
+  const [connection, setConnection] = useState<RunConnection | null>(null);
+  const [viewError, setViewError] = useState("");
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [approvalBusy, setApprovalBusy] = useState("");
+  const actionPending = useRef(false);
+  const [preparedArtifacts, setPreparedArtifacts] = useState(0);
+  const [preparedApprovals, setPreparedApprovals] = useState(0);
+  const [clock, setClock] = useState(Date.now());
   const alive = useRef(true);
   const lifecycle = useRef(0);
   const currentView = useRef({ threadId: thread.id, workspaceId: w.state.active });
@@ -86,23 +100,32 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
   useEffect(() => {
     alive.current = true;
     const epoch = ++lifecycle.current;
-    let valid = true;
+    const controller = new AbortController();
+    generation.current = controller;
     setLlm(null); setLlmError(""); setDraft(""); setToolRuns([]); setGenerating(false);
-    const loadConfig = async () => {
+    setRunInfo(null); runRef.current = null; cursor.current = 0;
+    setCheckingRuns(true); setConnection(null); setViewError("");
+    setPreparedArtifacts(0); setPreparedApprovals(0); setCancelBusy(false); setApprovalBusy("");
+    actionPending.current = false;
+    const load = async () => {
+      let result: LlmConfig | null = null;
       try {
-        const result = await api<LlmConfig>("/api/llm/config");
-        if (!valid) return;
+        result = await api<LlmConfig>("/api/llm/config");
+        if (!isCurrentView(epoch) || controller.signal.aborted) return;
         setLlm(result);
-        const key = pendingKey(w.state.active, thread.id);
-        const id = sessionStorage.getItem(key);
-        sessionStorage.removeItem(key);
-        if (result.configured && id && latest.current.messages?.at(-1)?.id === id) void generate(id, epoch);
-      } catch (e) { if (valid) setLlmError(errorText(e)); }
+      } catch (e) { if (isCurrentView(epoch) && !controller.signal.aborted) setLlmError(errorText(e)); }
+      if (isCurrentView(epoch) && !controller.signal.aborted) await discoverRuns(epoch, controller, !!result?.configured);
     };
-    void loadConfig();
-    return () => { valid = false; alive.current = false; lifecycle.current++; generation.current?.abort(); generation.current = null; };
+    void load();
+    return () => { alive.current = false; lifecycle.current++; controller.abort(); generation.current?.abort(); generation.current = null; };
   }, [thread.id, w.state.active]);
   useEffect(() => { if (generating) bottom.current?.scrollIntoView({ block: "nearest" }); }, [draft, generating]);
+  useEffect(() => {
+    if (!runInfo || !isActiveRun(runInfo)) return;
+    setClock(Date.now());
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [runInfo?.id, runInfo?.status]);
 
   async function answerArtifact(text: string, artifactKind: "Document" | "Webpage", epoch = lifecycle.current) {
     if (!isCurrentView(epoch)) return;
@@ -114,69 +137,137 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     await w.flush();
   }
 
+  function showRun(run: RunInfo) {
+    runRef.current = run; setRunInfo(run); setGenerating(isActiveRun(run));
+  }
+  function receiveEvent(event: RuntimeEvent) {
+    if (event.type === "delta") { setDraft(text => text + event.text); setReasoning(false); }
+    else if (event.type === "reasoning") setReasoning(true);
+    else if (event.type === "tool") setToolRuns(items => {
+      const run: ToolRun = { id: event.id, name: event.name, status: event.status, summary: event.summary };
+      return items.some(item => item.id === run.id) ? items.map(item => item.id === run.id ? run : item) : [...items, run];
+    });
+    else if (event.type === "plan" && runRef.current) showRun({ ...runRef.current, plan: event.steps });
+    else if (event.type === "artifact") setPreparedArtifacts(count => count + 1);
+    else if (event.type === "approval") setPreparedApprovals(count => count + 1);
+    else if (event.type === "shell_approval" && runRef.current) {
+      const run = runRef.current;
+      if (!run.approvals.some(item => item.id === event.actionId)) showRun({ ...run, approvals: [...run.approvals, { id: event.actionId, status: "pending", command: event.command, cwd: event.cwd, timeoutSeconds: event.timeoutSeconds }] });
+    } else if (event.type === "run_status" && runRef.current) showRun({ ...runRef.current, status: event.status });
+    else if (event.type === "done" && runRef.current) showRun({ ...runRef.current, model: event.model });
+    else if (event.type === "error") setError(event.message);
+  }
+  async function watchRun(run: RunInfo, epoch: number, controller: AbortController, replay = true) {
+    if (!isCurrentView(epoch) || controller.signal.aborted) return;
+    generation.current = controller; showRun(run); setCheckingRuns(false); setViewError(""); setConnection(null);
+    if (replay) {
+      cursor.current = 0; setDraft(""); setReasoning(false); setToolRuns([]); setPreparedArtifacts(0); setPreparedApprovals(0);
+    }
+    const viewing = () => isCurrentView(epoch) && generation.current === controller && !controller.signal.aborted;
+    try {
+      await followRun({
+        id: run.id, scope: { workspaceId: run.workspaceId, threadId: run.threadId }, signal: controller.signal, after: cursor.current,
+        onEvent: event => { if (viewing()) receiveEvent(event); },
+        onRun: value => { if (viewing()) showRun(value); },
+        onCursor: value => { if (viewing()) cursor.current = value; },
+        onConnection: value => { if (viewing()) setConnection(value); },
+      });
+      if (!viewing()) return;
+      // Server owns final assistant messages and versioned artifacts. Never re-save them here.
+      await w.reload();
+      if (viewing()) { setDraft(""); setReasoning(false); setToolRuns([]); setPreparedArtifacts(0); setPreparedApprovals(0); }
+    } catch (e) {
+      if (viewing()) setViewError(errorText(e) + " Retry viewing reconnects to this run; it does not execute again.");
+    } finally {
+      if (viewing()) { generation.current = null; setCheckingRuns(false); setConnection(null); setGenerating(!!runRef.current && isActiveRun(runRef.current)); }
+    }
+  }
+  async function discoverRuns(epoch: number, controller: AbortController, allowPending = false) {
+    const viewing = () => isCurrentView(epoch) && generation.current === controller && !controller.signal.aborted;
+    setCheckingRuns(true); setViewError("");
+    try {
+      const runs = await listRuns({ workspaceId: w.state.active, threadId: thread.id }, controller.signal);
+      if (!viewing()) return;
+      const key = pendingKey(w.state.active, thread.id), pendingId = sessionStorage.getItem(key);
+      const active = runs.find(isActiveRun);
+      if (active) {
+        if (active.userMessageId === pendingId) sessionStorage.removeItem(key);
+        void watchRun(active, epoch, controller);
+        return;
+      }
+      const recent = runs[0];
+      if (recent) showRun(recent);
+      const pendingRun = pendingId ? runs.find(run => run.userMessageId === pendingId) : undefined;
+      if (pendingRun) sessionStorage.removeItem(key);
+      if (recent) {
+        await w.reload();
+        if (!viewing()) return;
+      }
+      generation.current = null; setCheckingRuns(false); setConnection(null);
+      if (allowPending && !pendingRun && pendingId && latest.current.messages?.at(-1)?.id === pendingId && latest.current.messages?.at(-1)?.role === "user") void generate(pendingId, epoch);
+    } catch (e) {
+      if (viewing()) { generation.current = null; setCheckingRuns(false); setViewError("Could not check saved runs. " + errorText(e) + " Retry viewing before sending or generating again."); }
+    }
+  }
   async function generate(userMessageId: string, epoch = lifecycle.current) {
-    if (!isCurrentView(epoch) || generation.current || thread.archived) return;
+    if (!isCurrentView(epoch) || generation.current || (runRef.current && isActiveRun(runRef.current)) || thread.archived) return;
     const controller = new AbortController();
-    generation.current = controller; setGenerating(true); setDraft(""); setError(""); setReasoning(false); setToolRuns([]);
-    const originalId = thread.id;
-    let text = "", failure = "", stopped = false;
-    const runs: ToolRun[] = [], patches: ArtifactPatch[] = [], approvals: IntegrationApproval[] = [];
-    let artifactFailure = "";
+    generation.current = controller; setGenerating(true); setDraft(""); setError(""); setViewError(""); setReasoning(false); setToolRuns([]);
+    // A failed POST is ambiguous: discover the new run, never reconnect to an older terminal run.
+    runRef.current = null; setRunInfo(null); cursor.current = 0; setConnection(null); setPreparedArtifacts(0); setPreparedApprovals(0);
+    const key = pendingKey(w.state.active, thread.id);
     try {
       await w.flush();
-      if (!isCurrentView(epoch) || generation.current !== controller) return;
-      await streamChat({ workspaceId: w.state.active, threadId: originalId, userMessageId }, controller.signal, event => {
-        if (!isCurrentView(epoch) || latest.current.id !== originalId) return;
-        if (event.type === "delta") { text += event.text; setDraft(text); setReasoning(false); }
-        if (event.type === "reasoning") setReasoning(true);
-        if (event.type === "tool") { const run: ToolRun = { id: event.id, name: event.name, status: event.status, summary: event.summary }; const at = runs.findIndex(t => t.id === run.id); if (at < 0) runs.push(run); else runs[at] = run; setToolRuns([...runs]); }
-        if (event.type === "artifact") patches.push(event.patch);
-        if (event.type === "approval") approvals.push(event.approval);
-      });
-      if (!text.trim() && approvals.length) text = "An integration action is ready for your explicit review. No write has been performed.";
-      if (!text.trim() && patches.length) text = "Prepared " + patches.length + " artifact(s) using local workspace tools.";
-      if (!text.trim()) throw new Error("The model returned no answer text. Try again.");
+      if (!isCurrentView(epoch) || generation.current !== controller || controller.signal.aborted) return;
+      sessionStorage.setItem(key, userMessageId);
+      const run = await createRun({ workspaceId: w.state.active, threadId: thread.id, userMessageId }, controller.signal);
+      if (!isCurrentView(epoch) || generation.current !== controller || controller.signal.aborted) return;
+      sessionStorage.removeItem(key);
+      // Release onSend after the durable POST, not after a long-running execution.
+      void watchRun(run, epoch, controller);
     } catch (e) {
-      stopped = controller.signal.aborted;
-      failure = stopped ? "Generation stopped." : errorText(e);
-    }
-    if (!isCurrentView(epoch) || latest.current.id !== originalId || generation.current !== controller) return;
-    try {
-      if (text) {
-        if (!failure && patches.length) {
-          try { w.set("artifacts", current => {
-            const next = [...current];
-            for (const patch of patches) {
-              const a = patch.artifact;
-              if (a.threadId !== originalId || !["Document", "Webpage", "Table"].includes(a.kind)) throw Error("The tool returned an invalid artifact scope.");
-              const index = next.findIndex(item => item.id === a.id), old = next[index];
-              if (patch.base) {
-                if (!old || old.archived || old.threadId !== originalId || ["content", "title", "updatedAt"].some(key => old[key as keyof Artifact] !== patch.base![key as keyof typeof patch.base])) throw Error("An artifact changed while the model was working. No tool changes were applied.");
-                next[index] = a;
-              } else { if (index >= 0) throw Error("Artifact ID already exists."); next.push(a); }
-            }
-            return next;
-          });
-          setSelectedId(patches[0].artifact.id);
-          } catch (e) { artifactFailure = errorText(e); }
-        }
-        const answer: DemoMessage = { id: crypto.randomUUID(), role: "assistant" as const, text: text + (failure ? "\n\n[" + (stopped ? "Stopped — partial answer" : "Interrupted — partial answer") + "]" : ""), createdAt: now(), ...(!failure && approvals.length ? { actionRequests: approvals } : {}), ...(runs.length ? { toolRuns: runs.map(run => ({ ...run, status: run.status === "running" ? "error" as const : run.status })) } : {}) };
-        const next = { ...latest.current, messages: [...(latest.current.messages || []), answer], updatedAt: now() };
-        latest.current = next; update(next); await w.flush();
-        if (!isCurrentView(epoch) || generation.current !== controller) return;
-        if (!failure) {
-          const source = next.messages.find(m => m.id === userMessageId);
-          const format = (source?.context?.settings?.outputFormat || next.config?.outputFormat || "").toLowerCase();
-          if (!patches.length && ["doc", "document", "webpage"].includes(format)) await answerArtifact(text, format === "webpage" ? "Webpage" : "Document", epoch);
-        }
+      if (isCurrentView(epoch) && generation.current === controller && !controller.signal.aborted) {
+        generation.current = null; setGenerating(false);
+        setViewError("Could not attach to the run. " + errorText(e) + " The server may already be executing. Retry viewing to check; do not submit the task again.");
       }
-      if (artifactFailure) setError("The answer was saved, but tool artifact changes were not applied: " + artifactFailure);
-      if (failure) setError(failure + (text ? " The partial answer was saved." : " Your message is saved; use Generate reply to retry."));
-    } catch (e) { setError("Answer received, but saving or creating its artifact failed: " + errorText(e) + " Export a backup before reloading."); }
-    finally { if (isCurrentView(epoch) && generation.current === controller) { generation.current = null; setGenerating(false); setDraft(""); setReasoning(false); setToolRuns([]); } }
+    }
+  }
+  function retryViewing() {
+    if (generation.current || checkingRuns) return;
+    const epoch = lifecycle.current, controller = new AbortController();
+    generation.current = controller;
+    if (runRef.current) void watchRun(runRef.current, epoch, controller, false);
+    else void discoverRuns(epoch, controller);
+  }
+  async function stopRun() {
+    const run = runRef.current;
+    if (!run || !isActiveRun(run) || actionPending.current) return;
+    const epoch = lifecycle.current;
+    actionPending.current = true; setCancelBusy(true); setError("");
+    try {
+      const stopped = await cancelRun(run.id, { workspaceId: run.workspaceId, threadId: run.threadId });
+      if (!isCurrentView(epoch)) return;
+      showRun(stopped);
+      if (!generation.current) { const controller = new AbortController(); void watchRun(stopped, epoch, controller, false); }
+    } catch (e) { if (isCurrentView(epoch)) setError("Cancellation was not confirmed: " + errorText(e) + " The run may still be active."); }
+    finally { if (isCurrentView(epoch)) { actionPending.current = false; setCancelBusy(false); } }
+  }
+  async function approveShell(actionId: string, decision: "approve" | "deny") {
+    const run = runRef.current;
+    if (!run || !isActiveRun(run) || actionPending.current || !run.approvals.some(item => item.id === actionId && item.status === "pending")) return;
+    const epoch = lifecycle.current;
+    actionPending.current = true; setApprovalBusy(actionId); setError("");
+    try {
+      const next = await decideShellApproval(run.id, actionId, { workspaceId: run.workspaceId, threadId: run.threadId }, decision);
+      if (isCurrentView(epoch)) {
+        showRun(next);
+        if (!generation.current) { const controller = new AbortController(); void watchRun(next, epoch, controller, false); }
+      }
+    } catch (e) { if (isCurrentView(epoch)) setError("The shell decision was not confirmed: " + errorText(e) + " Retry viewing to check its status before deciding again."); }
+    finally { if (isCurrentView(epoch)) { actionPending.current = false; setApprovalBusy(""); } }
   }
   const lastMessage = thread.messages?.at(-1);
-  const canGenerate = !!llm?.configured && lastMessage?.role === "user" && !!lastMessage.id && !thread.archived;
+  const canGenerate = !!llm?.configured && lastMessage?.role === "user" && !!lastMessage.id && !thread.archived && !checkingRuns && !viewError && (!runInfo || (!isActiveRun(runInfo) && runInfo.userMessageId !== lastMessage.id));
 
   async function perform(action: () => Promise<void>) {
     if (operationBusy.current) return;
@@ -188,7 +279,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     await w.flush();
   }
   async function send(text: string, context?: MessageContext, clientRequestId?: string) {
-    if (generation.current) throw Error("Stop the current answer before sending another message.");
+    if (generation.current || generating || checkingRuns || viewError || (runRef.current && isActiveRun(runRef.current))) throw Error("Wait for the active run or retry viewing its saved status before sending another message.");
     setError("");
     const epoch = lifecycle.current;
     const current = latest.current;
@@ -251,7 +342,19 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
       </div>
     </header>
     <div className="rt-status"><span>{llm?.configured ? "DeepSeek configured · Connection not verified" : llmError ? "Model status unavailable" : llm ? "DeepSeek not configured · Messages are still saved" : "Checking model connection…"}</span><span role="status">{busy ? "Saving…" : w.persistence === "saved" ? "Saved" : w.persistence}</span></div>
-    {llm && !llm.configured && <p className="rt-notice">To enable real replies, set DEEPSEEK_API_KEY in the server’s private .env or deployment environment and restart the service. Never commit a key or use a VITE_ secret. Local tools and selected public-data APIs are available when enabled. Selected configured integrations can read actual APIs. Writes require your per-action confirmation. Browser, generic web search, media and schedules are not executed.</p>}
+    {llm && !llm.configured && <p className="rt-notice">To enable real replies, set DEEPSEEK_API_KEY in the server’s private .env or deployment environment and restart the service. Never commit a key or use a VITE_ secret. Local tools and selected public-data APIs are available when enabled. Selected configured integrations can read actual APIs. Integration writes require your per-action confirmation. Durable runs can use real shell commands only when Shell is explicitly enabled and you approve each command. Shell is not sandboxed and can modify files or access the network. Browser automation, generic web search, media and schedules are not executed.</p>}
+    {checkingRuns && <p className="rt-run-loading" role="status">Checking saved runs before enabling execution…</p>}
+    {runInfo && <section className={"rt-run-panel " + runInfo.status} aria-label="Durable run status">
+      <div className="rt-run-heading"><div><strong>{runStatusLabel(runInfo.status)}</strong><code title={runInfo.id}>Run {runInfo.id.slice(0, 8)}</code></div><div className="rt-actions">{isActiveRun(runInfo) && <button className="btn small" disabled={cancelBusy || !!approvalBusy} onClick={() => void stopRun()}>{cancelBusy ? "Stopping…" : "Stop run"}</button>}</div></div>
+      <dl className="rt-run-stats"><div><dt>Elapsed</dt><dd>{elapsedLabel(runInfo, clock)}</dd></div><div><dt>Tools</dt><dd>{runInfo.toolCount.toLocaleString()}</dd></div>{runInfo.model && <div><dt>Model</dt><dd>{runInfo.model}</dd></div>}{runInfo.usage?.prompt_tokens !== undefined && <div><dt>Input tokens</dt><dd>{runInfo.usage.prompt_tokens.toLocaleString()}</dd></div>}{runInfo.usage?.completion_tokens !== undefined && <div><dt>Output tokens</dt><dd>{runInfo.usage.completion_tokens.toLocaleString()}</dd></div>}{runInfo.usage?.total_tokens !== undefined && <div><dt>Total tokens</dt><dd>{runInfo.usage.total_tokens.toLocaleString()}</dd></div>}</dl>
+      {!!runInfo.plan?.length && <ol className="rt-run-plan" aria-label="Agent task plan">{runInfo.plan.map(step => <li key={step.id} className={step.status}><span aria-hidden="true">{step.status === "completed" ? "✓" : step.status === "in_progress" ? "◌" : "○"}</span><span>{step.title}</span><small>{step.status.replace("_", " ")}</small></li>)}</ol>}
+      {isActiveRun(runInfo) && <p className="rt-run-hint">Execution continues on the server if you leave this page. Stop run explicitly requests cancellation.</p>}
+      {!isActiveRun(runInfo) && <p className="rt-run-hint">{runInfo.resultSaved ? "Result saved by the server." : "Run ended. Saving the result was not confirmed; inspect the preserved execution log."}{runInfo.status !== "succeeded" && " Send a new message if you want another execution; retry viewing never reruns the task."}</p>}
+      {runInfo.error && <p className="rt-run-failure" role="alert">{runInfo.error}</p>}
+      {connection?.status === "reconnecting" && <p className="rt-run-reconnecting" role="status">Reconnecting to saved events · attempt {connection.failures}/5 · retry in {Math.ceil(connection.retryInMs / 1000)}s. Execution is not restarted.<span>{connection.message}</span></p>}
+      {!!runInfo.approvals.length && <div className="rt-shell-approvals" aria-label="Shell command approvals"><p className="rt-shell-warning"><strong>Full shell authority — not a sandbox.</strong> Approved commands run on the server and may modify files, access credentials available to the process, or contact the network. Review the exact command, working directory and timeout. No command is auto-approved.</p>{runInfo.approvals.map(approval => <section className={"rt-shell-approval " + approval.status} key={approval.id} aria-label="Shell command review"><div className="rt-section-heading"><strong>Shell command</strong><span className="rt-badge">{approval.status}</span></div><pre className="rt-shell-command">{approval.command}</pre><dl><dt>Working directory</dt><dd><code>{approval.cwd}</code></dd><dt>Timeout</dt><dd>{approval.timeoutSeconds} seconds</dd></dl>{approval.status === "pending" && isActiveRun(runInfo) && <div className="rt-actions"><button className="btn primary" disabled={!!approvalBusy || cancelBusy || !!viewError} onClick={() => void approveShell(approval.id, "approve")}>{approvalBusy === approval.id ? "Submitting decision…" : "Approve command"}</button><button className="btn" disabled={!!approvalBusy || cancelBusy || !!viewError} onClick={() => void approveShell(approval.id, "deny")}>Deny command</button></div>}</section>)}</div>}
+    </section>}
+    {viewError && <div className="rt-run-view-error" role="alert"><p>{viewError}</p><button className="btn small" disabled={checkingRuns || !!generation.current} onClick={retryViewing}>Retry viewing</button></div>}
     {llmError && <p className="rt-error" role="alert">{llmError}</p>}
     {error && <div className="rt-error" role="alert">{error}<button className="btn small" onClick={() => setError("")}>Dismiss</button></div>}
     {(w.persistence === "error" || w.persistence === "conflict") && <div className="rt-error" role="alert"><p>{w.storageError || "Changes are not saved. Export a backup before reloading saved data."}</p><div className="rt-actions"><button className="btn small" onClick={w.exportSnapshot}>Export backup</button>{w.persistence === "error" && <button className="btn small" disabled={busy} onClick={() => void perform(w.retrySave)}>Retry save</button>}<button className="btn small" disabled={busy} onClick={() => { if (window.confirm("Discard unsaved local changes and reload saved server data? Export a backup first if you want to keep them.")) void perform(w.reload); }}>Reload saved data</button></div></div>}
@@ -267,11 +370,11 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
             {!!message.actionRequests?.length && message.id && <IntegrationApprovals threadId={thread.id} messageId={message.id} requests={message.actionRequests} />}
             {message.context && <details className="rt-context"><summary>Saved context</summary><dl><dt>Model preference</dt><dd>{message.context.settings?.model || "Not selected"}</dd><dt>Provider preference</dt><dd>{message.context.settings?.provider || "Not selected"}</dd><dt>Skills</dt><dd>{(message.context.skillIds || []).map(id => w.data.skills.find(s => s.id === id)?.name || id).join(", ") || "None"}</dd><dt>Memories</dt><dd>{(message.context.memoryIds || []).length}</dd><dt>Artifacts</dt><dd>{(message.context.artifactIds || []).map(id => w.data.artifacts.find(a => a.id === id)?.title || id).join(", ") || "None"}</dd><dt>Integrations</dt><dd>{(message.context.integrationIds || []).map(id => w.data.connections.find(c => c.id === id)?.label || id).join(", ") || "None"}</dd></dl></details>}
           </article>)}
-          {generating && thread.messages?.at(-1)?.role !== "assistant" && <article className="rt-message assistant" aria-label="Streaming answer"><div className="rt-message-meta"><strong>Assistant</strong><span role="status">{draft ? "Writing…" : reasoning ? "Reasoning…" : "Working…"}</span></div>{!!toolRuns.length && <ToolHistory runs={toolRuns} />}{draft && <div className="rt-answer"><AnswerMarkdown content={draft} /></div>}<button className="btn small" onClick={() => generation.current?.abort()}>Stop generation</button></article>}
+          {(generating || (!!viewError && !!draft)) && <article className="rt-message assistant" aria-label="Streaming answer"><div className="rt-message-meta"><strong>Assistant · live preview</strong><span role="status">{viewError ? "Viewing paused" : runInfo?.status === "waiting_approval" ? "Awaiting approval" : connection?.status === "reconnecting" ? "Reconnecting…" : draft ? "Writing…" : reasoning ? "Reasoning…" : "Working…"}</span></div>{!!toolRuns.length && <ToolHistory runs={toolRuns} />}{draft && <div className="rt-answer"><AnswerMarkdown content={draft} /></div>}{!!preparedArtifacts && <p className="rt-run-hint">{preparedArtifacts} artifact update(s) prepared. The server saves final artifact versions.</p>}{!!preparedApprovals && <p className="rt-run-hint">Integration review prepared. Review the saved action below the final answer when the run finishes.</p>}</article>}
           {!generating && canGenerate && <button className="btn" onClick={() => void generate(lastMessage!.id!)}>Generate reply</button>}
           <div ref={bottom} />
         </div>
-        <div className="rt-composer"><Composer disabled={generating} compact navigate={navigate} notify={notify} agents={agents} initialSettings={thread.config} contextKey={thread.id} onSend={send} /></div>
+        <div className="rt-composer"><Composer disabled={generating || checkingRuns || !!viewError || !!generation.current} compact navigate={navigate} notify={notify} agents={agents} initialSettings={thread.config} contextKey={thread.id} onSend={send} /></div>
       </section>
       <section className={"rt-artifacts" + (thread.canvas?.collapsed ? " is-collapsed" : "")} aria-label="Thread artifacts">
         {thread.canvas?.collapsed ? <button className="rt-canvas-restore" onClick={() => void perform(() => saveThread({ canvas: { ...thread.canvas!, collapsed: false } }))}><PanelRightOpen size={17} />Show canvas</button> : <>
@@ -288,7 +391,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
         </ArtifactCanvas>
         </>}
       </section>
-      {settingsPanel && <aside className="rt-settings" aria-label="Thread configuration"><div className="rt-section-heading"><h2>Configuration</h2><IconButton label="Close configuration" onClick={() => navigate("/thread/" + thread.id)}><X size={16} /></IconButton></div><p className="rt-notice">DeepSeek uses the selected agent prompt and saved context. Only the supported models below execute. Enable Thread Search, Documents, Webpages and Tables for local tool calls. World Bank / Weather / configured OpenAlex are read-only API tools. Selected integrations execute actual API reads; writes are confirmation-gated. Browser, generic web search, media and schedules are not connected.</p>
+      {settingsPanel && <aside className="rt-settings" aria-label="Thread configuration"><div className="rt-section-heading"><h2>Configuration</h2><IconButton label="Close configuration" onClick={() => navigate("/thread/" + thread.id)}><X size={16} /></IconButton></div><p className="rt-notice">DeepSeek uses the selected agent prompt and saved context. Only the supported models below execute. Enable Thread Search, Documents, Webpages and Tables for local tool calls. World Bank / Weather / configured OpenAlex are read-only API tools. Selected integrations execute actual API reads; writes are confirmation-gated. Durable server runs can use Shell only after you enable it and explicitly approve each command. Shell has full server authority, not sandbox isolation, and can modify files or contact the network. Leaving this page does not stop a run. Browser automation, generic web search, media and schedules remain unavailable.</p>
         <label>Project<select aria-label="Thread project" value={thread.projectId || ""} onChange={e => void perform(() => saveThread({ projectId: e.target.value || undefined, project: undefined }))}><option value="">No project</option>{w.data.projects.filter(p => !p.archived || p.id === thread.projectId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
         <form onSubmit={e => { e.preventDefault(); void perform(() => saveThread({ config })); }}>
           <label>Provider<select value="DeepSeek" disabled><option>DeepSeek</option></select></label>
@@ -297,6 +400,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
           <label>Mode preference<select value={config.mode} onChange={e => setConfig({ ...config, mode: e.target.value })}>{Array.from(new Set([config.mode, "Execute", "Plan", "Ask"])).map(m => <option key={m}>{m}</option>)}</select></label>
           <label>Agent preference<select value={config.agentId || ""} onChange={e => setConfig({ ...config, agentId: e.target.value || undefined, starterAgentName: undefined })}><option value="">No agent</option>{w.data.agents.filter(a => !a.archived || a.id === config.agentId).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
           <label>Tools preference (comma-separated)<input value={toolsText} onChange={e => { setToolsText(e.target.value); setConfig({ ...config, tools: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }); }} /></label>
+          <div className="rt-shell-config"><strong>Real shell execution</strong><p>Enable Shell for future runs only if you intend to grant real server shell access. Every proposed command still requires Approve or Deny. Enabling this tool does not approve any command.</p><button type="button" className="btn small" disabled={busy || config.tools.some(tool => tool.toLowerCase() === "shell")} onClick={() => void perform(async () => { const next = { ...config, tools: [...config.tools, "Shell"] }; setConfig(next); setToolsText(next.tools.join(", ")); await saveThread({ config: next }); })}>{config.tools.some(tool => tool.toLowerCase() === "shell") ? "Shell enabled in configuration" : "Enable Shell & save configuration"}</button></div>
           <label>Output format<input value={config.outputFormat || ""} onChange={e => setConfig({ ...config, outputFormat: e.target.value })} /></label>
           <label>Visual style<input value={config.visuals || ""} onChange={e => setConfig({ ...config, visuals: e.target.value })} /></label>
           <div className="rt-actions"><button className="btn primary" disabled={busy}>Save configuration</button><button type="button" className="btn" disabled={busy} onClick={() => void perform(async () => { w.setPreferences({ defaultThreadSettings: structuredClone(config) }); await w.flush(); })}>Save as default</button></div>
@@ -313,4 +417,18 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
 
 function ToolHistory({ runs }: { runs: ToolRun[] }) {
   return <div className="rt-tool-history" aria-label="Tool activity">{runs.map(run => <details key={run.id} className={"rt-tool " + run.status}><summary><span>{run.status === "running" ? "◌" : run.status === "error" ? "!" : "✓"}</span> {run.name} <small>{run.status === "running" ? "Running" : run.status === "error" ? "Failed" : "Result ready"}</small></summary><pre>{run.summary}</pre></details>)}</div>;
+}
+
+function runStatusLabel(status: RunInfo["status"]) {
+  const labels: Record<RunInfo["status"], string> = { queued: "Queued", running: "Running", waiting_approval: "Waiting for approval", succeeded: "Succeeded", failed: "Failed", cancelled: "Cancelled", interrupted: "Interrupted" };
+  return labels[status];
+}
+function elapsedLabel(run: RunInfo, clock: number) {
+  const start = Date.parse(run.startedAt || run.createdAt);
+  const end = run.finishedAt ? Date.parse(run.finishedAt) : isActiveRun(run) ? clock : NaN;
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return "—";
+  const seconds = Math.max(0, Math.floor((end - start) / 1000));
+  if (seconds < 60) return seconds + "s";
+  if (seconds < 3600) return Math.floor(seconds / 60) + "m " + seconds % 60 + "s";
+  return Math.floor(seconds / 3600) + "h " + Math.floor(seconds % 3600 / 60) + "m";
 }
