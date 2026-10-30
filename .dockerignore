@@ -8,3 +8,8 @@ playwright-report
 .env
 .env.*
 !.env.example
+
+# Independent reference checkouts: not production dependencies or build inputs.
+/OpenMausBot/
+/browser/
+/macro/

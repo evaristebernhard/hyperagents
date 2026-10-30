@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 export type Navigate = (path: string) => void;
+export type ArtifactKind = "Document" | "Webpage" | "Slides" | "Table" | "Image" | "File";
+export type Slide = { title: string; body: string; notes?: string };
+export type SlideDeck = { title: string; slides: Slide[] };
 export type ThreadSettings = {
   model: string;
   reasoning: string;

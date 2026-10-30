@@ -9,8 +9,8 @@ test('observed marketplace catalog preserves unique source identities and all ca
   assert.equal(entries.filter(e=>e.kind==='skill').length,36);assert.equal(entries.filter(e=>e.kind==='agent').length,25);assert.equal(categories.length,8);
   for(const e of entries){assert.match(e.sourceUrl,/^https:\/\/hyperagent\.com\/marketplace\/[as]\//);assert.ok(e.categories.every(id=>categories.some(c=>c.id===id)));if(e.implementation){assert.match(e.implementation.documentation,/independently written/);assert.ok(e.implementation.limitations);}}
 });
-test('capabilities disclose configuration only; secrets and unsupported services never become executable',()=>{
-  const result=marketplaceCapabilities({openAlexApiKey:'test-only-placeholder',deepseekConfigured:true});
+test('capabilities disclose configuration only; secrets and unconfigured services never become executable',()=>{
+  const result=marketplaceCapabilities({openAlexApiKey:'test-only-placeholder',deepseekConfigured:true,browserPath:'/missing/browser-for-test'});
   assert.equal(result.capabilities.OpenAlex.available,true);assert.equal(result.capabilities.Browser.available,false);assert.equal(result.capabilities.LLM.available,true);
   assert.doesNotMatch(JSON.stringify(result),/test-only-placeholder/);assert.equal(marketplaceCapabilities().capabilities.OpenAlex.available,false);
 });

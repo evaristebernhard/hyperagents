@@ -1,3 +1,4 @@
+import { SLIDES_SCRIPT_HASH } from './slides.mjs';
 import http from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, randomUUID, createHash, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
@@ -105,15 +106,15 @@ export async function createApp(options = {}) {
   const workspace = id => { const w=load().state.workspaces.find(w=>w.id===id); if (!w) err(422,'Invalid workspace.'); return w; };
   const persistVisual=async({bytes,mimeType,filename,workspaceId})=>{
     workspace(workspaceId);
-    if(!Buffer.isBuffer(bytes) || bytes.length<1 || bytes.length>maxFileBytes) throw Error('Generated visual is too large.');
+    if(!Buffer.isBuffer(bytes) || bytes.length<1 || bytes.length>maxFileBytes) throw Error('Generated file is empty or too large.');
     if(typeof filename!=='string' || !/^[A-Za-z0-9._-]{1,180}$/.test(filename)) throw Error('Invalid generated filename.');
-    if(typeof mimeType!=='string' || !/^(?:image\/png|application\/pdf)$/.test(mimeType)) throw Error('Invalid generated MIME type.');
+    if(typeof mimeType!=='string' || !/^(?:image\/png|application\/(?:pdf|json)|text\/(?:csv|plain))$/.test(mimeType)) throw Error('Invalid generated MIME type.');
     const id='file-'+randomUUID(),temp=path.join(uploadsDir,'.tmp-'+randomUUID()),target=path.join(uploadsDir,id),createdAt=now();
     let handle,moved=false;
     try { handle=await open(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600); await handle.writeFile(bytes); await handle.sync(); await handle.close(); handle=undefined; await rename(temp,target); moved=true; db.prepare('INSERT INTO files VALUES (?,?,?,?,?,?)').run(id,workspaceId,filename,bytes.length,mimeType,createdAt); return {type:'file',id,name:filename,size:bytes.length,mimeType,createdAt,workspaceId}; }
     catch(e){if(handle)await handle.close().catch(()=>{});await unlink(moved?target:temp).catch(()=>{});throw e;}
   };
-  const llm=createLlm({apiKey:options.deepseekApiKey,integrationRegistry,approvalBroker,fetchImpl:options.llmFetch,publicFetch:options.publicFetch,openAlexApiKey:options.openAlexApiKey,publicUserAgent:options.publicUserAgent,moliPath:options.moliPath,persistVisual,load,readAttachment});
+  const llm=createLlm({apiKey:options.deepseekApiKey,integrationRegistry,approvalBroker,fetchImpl:options.llmFetch,publicFetch:options.publicFetch,exaFetch:options.exaFetch,openAlexApiKey:options.openAlexApiKey,exaApiKey:options.exaApiKey,publicUserAgent:options.publicUserAgent,moliPath:options.moliPath,browserProvider:options.browserProvider,browserPath:options.browserPath,persistVisual,load,readAttachment});
   const commit = (state, revision) => {
     if (!Number.isSafeInteger(revision) || revision<0) err(400,'A valid revision is required.');
     const data=JSON.stringify(state); if (Buffer.byteLength(data)>maxStateBytes) err(413,'Workspace is too large.');
@@ -130,7 +131,7 @@ export async function createApp(options = {}) {
     // Use a fresh workspace revision; never overwrite unrelated edits from the run snapshot.
     for(const patch of run.patches) {
       const a=patch.artifact;
-      if(a.threadId!==thread.id || !['Document','Webpage','Table'].includes(a.kind))throw Error('Invalid artifact scope.');
+      if(a.threadId!==thread.id || !['Document','Webpage','Slides','Table'].includes(a.kind))throw Error('Invalid artifact scope.');
       const at=w.data.artifacts.findIndex(x=>x.id===a.id),old=w.data.artifacts[at];
       if(patch.base) {
         if(!old || old.archived || old.threadId!==thread.id || ['content','title','updatedAt'].some(k=>old[k]!==patch.base[k]))throw Error('Artifact conflict.');
@@ -258,9 +259,9 @@ export async function createApp(options = {}) {
         const b=await body(req,70000);exactBody(b,['token','confirmed','workspaceId','threadId']);if(b.confirmed!==true)err(422,'Explicit confirmation is required.','CONFIRMATION');
         rate('integration-writes',60);try{return send(res,200,await approvalBroker.execute(b.token,{workspaceId:b.workspaceId,threadId:b.threadId}));}catch(e){err(422,e.message,'INTEGRATION_ACTION');}
       }
-      if (route==='/api/capabilities' && method==='GET') return send(res,200,buildCapabilityManifest({openAlexApiKey:options.openAlexApiKey,userAgent:options.publicUserAgent,moliPath:options.moliPath}));
+      if (route==='/api/capabilities' && method==='GET') return send(res,200,buildCapabilityManifest({openAlexApiKey:options.openAlexApiKey,exaApiKey:options.exaApiKey,userAgent:options.publicUserAgent,moliPath:options.moliPath,browserProvider:options.browserProvider,browserPath:options.browserPath}));
       if (route==='/api/marketplace/capabilities' && method==='GET') {
-        const result=marketplaceCapabilities({deepseekConfigured:llm.config().configured,openAlexApiKey:options.openAlexApiKey,userAgent:options.publicUserAgent});
+        const result=marketplaceCapabilities({browserProvider:options.browserProvider,browserPath:options.browserPath,moliPath:options.moliPath,deepseekConfigured:llm.config().configured,openAlexApiKey:options.openAlexApiKey,exaApiKey:options.exaApiKey,userAgent:options.publicUserAgent});
         for(const provider of integrationRegistry.statuses().providers)result.capabilities[provider.name]={available:provider.configured,reason:provider.configured?'Server API adapter configured; select a tested workspace connection. Write operations still need per-action confirmation.':'API adapter implemented; configure '+provider.env.join(' / ')+' and test the provider access.'};
         result.capabilities.Email={available:false,reason:'Gmail supports reads and approval-gated drafts, not direct outbound email sending. See the Gmail capability.'};result.capabilities.Calendar=result.capabilities['Google Calendar'];return send(res,200,result);
       }
@@ -396,7 +397,7 @@ async function serveDist(req,res,route,distDir) {
   const real=realpathSync(candidate); if (!real.startsWith(root+path.sep)) err(404,'Not found.');
   const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.ico':'image/x-icon','.woff2':'font/woff2'};
   res.setHeader('Content-Type',types[path.extname(real)] || 'application/octet-stream');
-  res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
+  res.setHeader('Content-Security-Policy',`default-src 'self'; script-src 'self' '${SLIDES_SCRIPT_HASH}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'`);
   if (req.method==='HEAD') return res.end();
   await pipeline(createReadStream(real),res);
 }

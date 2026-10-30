@@ -1,4 +1,5 @@
 import { buildWebpagePreview } from "./webpage-preview";
+import { SlidesPreview, buildSlidesHtml, parseSlidesContent } from "./slide-preview";
 import { useEffect, useRef, useState } from "react";
 import {
   Plus,
@@ -12,6 +13,7 @@ import {
   History,
   FileText,
   Globe,
+  Presentation,
   Image as ImageIcon,
   Grid2X2,
   List,
@@ -25,6 +27,7 @@ import { IconButton, Modal } from "./ui";
 import { Markdown } from "./ContentHub";
 import { parseTable, tableCsv } from "./table-utils";
 export function ArtifactView({ artifact }: { artifact: Artifact }) {
+  if (artifact.kind === "Slides") return <SlidesPreview content={artifact.content} title={artifact.title} />;
   if (artifact.kind === "Table") {
     try { const data = parseTable(artifact.content); return <div className="rt-answer-table"><table aria-label={artifact.title}><thead><tr>{data.columns.map((c,i)=><th key={i}>{c}</th>)}</tr></thead><tbody>{data.rows.map((row,i)=><tr key={i}>{row.map((c,j)=><td key={j}>{c}</td>)}</tr>)}</tbody></table></div>; }
     catch (e) { return <p role="alert">{e instanceof Error ? e.message : "Invalid table"}</p>; }
@@ -57,6 +60,11 @@ export function ArtifactView({ artifact }: { artifact: Artifact }) {
   );
 }
 export function exportArtifact(a: Artifact) {
+  if (a.kind === "Slides") {
+    try { download(a.title.replace(/\.html?$/i, "") + ".html", buildSlidesHtml(a.content), "text/html;charset=utf-8"); }
+    catch (e) { window.alert(e instanceof Error ? e.message : "Invalid Slides content."); }
+    return;
+  }
   if (a.kind === "Table") { download(a.title.replace(/\.csv$/i, "") + ".csv", "\uFEFF" + tableCsv(a.content), "text/csv;charset=utf-8"); return; }
   if (a.kind === "Image") {
     const url = safeImage(a.content);
@@ -135,6 +143,10 @@ export default function LibraryManager({ path, navigate, notify }: PageProps) {
   const save = () => {
     if (!title.trim()) return;
     if (editKind === "Table") { try { parseTable(content); } catch (e) { notify(e instanceof Error ? e.message : "Invalid table"); return; } }
+    if (editKind === "Slides") {
+      try { parseSlidesContent(content); if (artifact && artifact.kind !== "Slides") throw Error("Create a new Slides artifact instead of converting a different type."); }
+      catch (e) { notify(e instanceof Error ? e.message : "Invalid Slides JSON"); return; }
+    }
     const time = now();
     if (artifact) {
       w.set("artifacts", (aa) =>
@@ -255,7 +267,7 @@ export default function LibraryManager({ path, navigate, notify }: PageProps) {
           value={kind}
           onChange={(e) => setKind(e.target.value)}
         >
-          {["All", "Document", "Webpage", "Table", "Image", "File"].map((s) => (
+          {["All", "Document", "Webpage", "Slides", "Table", "Image", "File"].map((s) => (
             <option key={s}>{s}</option>
           ))}
         </select>
@@ -299,14 +311,18 @@ export default function LibraryManager({ path, navigate, notify }: PageProps) {
                 <img src={safeImage(a.content)} alt="" />
               ) : (
                 <div className="rp-note-preview">
-                  {a.kind === "Webpage" ? (
+                  {a.kind === "Slides" ? (
+                    <Presentation size={30} />
+                  ) : a.kind === "Webpage" ? (
                     <Globe size={30} />
                   ) : (
                     <FileText size={30} />
                   )}
                   <h3>{a.title}</h3>
                   <p>
-                    {a.kind === "Webpage"
+                    {a.kind === "Slides"
+                      ? "Slides presentation · Offline preview"
+                      : a.kind === "Webpage"
                       ? "Webpage preview"
                       : a.content.slice(0, 150)}
                   </p>
@@ -384,10 +400,11 @@ export default function LibraryManager({ path, navigate, notify }: PageProps) {
                 onChange={(e) =>
                   setEditKind(e.target.value as Artifact["kind"])
                 }
-                disabled={artifact?.kind === "Image"}
+                disabled={artifact?.kind === "Image" || artifact?.kind === "Slides"}
               >
                 <option>Document</option>
                 <option>Webpage</option>
+                {(!artifact || artifact.kind === "Slides") && <option>Slides</option>}
                 <option>Table</option>
                 <option>File</option>
                 {artifact?.kind === "Image" && <option>Image</option>}
@@ -400,7 +417,8 @@ export default function LibraryManager({ path, navigate, notify }: PageProps) {
             </p>
           ) : (
             <label className="field">
-              Content
+              {editKind === "Slides" ? "Slides JSON · 1–40 slides, plain text only" : "Content"}
+              {editKind === "Slides" && <small>Use a title and slides array. Each slide has title, body, and optional notes. HTML/Markdown is displayed as text.</small>}
               <textarea
                 aria-label="Content"
                 className="textarea local-code"
@@ -408,7 +426,9 @@ export default function LibraryManager({ path, navigate, notify }: PageProps) {
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder={
-                  editKind === "Webpage"
+                  editKind === "Slides"
+                    ? '{"title":"My deck","slides":[{"title":"Welcome","body":"First point\\nSecond point","notes":"Optional speaker notes"}]}'
+                    : editKind === "Webpage"
                     ? "<main><h1>Your page</h1></main>"
                     : "Write your document…"
                 }
@@ -451,7 +471,7 @@ export default function LibraryManager({ path, navigate, notify }: PageProps) {
           </div>
           <p className="demo-note">
             Saved locally. Webpage previews block scripts, network access, and
-            forms.
+            forms. Slides accept structured text only and run just the trusted offline navigation script.
           </p>
         </Modal>
       )}

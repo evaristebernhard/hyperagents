@@ -32,8 +32,10 @@ const integrationCredentials=captureIntegrationCredentials(process.env);
 const ownerPassword=process.env.APP_OWNER_PASSWORD;
 const deepseekApiKey=process.env.DEEPSEEK_API_KEY;
 const openAlexApiKey=process.env.OPENALEX_API_KEY;
+const exaApiKey=process.env.EXA_API_KEY;
 const publicUserAgent=process.env.PUBLIC_API_USER_AGENT || "Hyperagents-Replica/0.1";
 delete process.env.OPENALEX_API_KEY;
+delete process.env.EXA_API_KEY;
 delete process.env.DEEPSEEK_API_KEY;
 delete process.env.APP_OWNER_PASSWORD;
 const browserHost=['0.0.0.0','::'].includes(host)?'127.0.0.1':host==='::1'?'[::1]':host;
@@ -50,7 +52,7 @@ async function shutdown(code=0) {
 for (const signal of ['SIGINT','SIGTERM']) process.on(signal,()=>void shutdown());
 try {
   if (!fixture) {
-    app=await createApp({host:apiHost,port:apiPort,dataDir:process.env.APP_DATA_DIR ?? path.resolve('.data'),devOrigin:process.env.APP_DEV_ORIGIN,publicOrigin:process.env.APP_PUBLIC_ORIGIN,maxFileBytes:process.env.APP_MAX_FILE_BYTES,ownerPassword,integrationCredentials,deepseekApiKey,openAlexApiKey,publicUserAgent});
+    app=await createApp({host:apiHost,port:apiPort,dataDir:process.env.APP_DATA_DIR ?? path.resolve('.data'),devOrigin:process.env.APP_DEV_ORIGIN,publicOrigin:process.env.APP_PUBLIC_ORIGIN,maxFileBytes:process.env.APP_MAX_FILE_BYTES,ownerPassword,integrationCredentials,deepseekApiKey,openAlexApiKey,exaApiKey,publicUserAgent,moliPath:process.env.MOLI_PATH,browserProvider:process.env.BROWSER_PROVIDER || 'moli',browserPath:process.env.BROWSER_PATH});
     await app.listen();
     if (publicBind) {
       const response=await fetch(`http://${proxyHost}:${apiPort}/api/session`);

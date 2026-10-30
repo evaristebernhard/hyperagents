@@ -1,6 +1,6 @@
 const plain = value => value!==null && typeof value==='object' && !Array.isArray(value) && [Object.prototype,null].includes(Object.getPrototypeOf(value));
 const clone = value => structuredClone(value);
-const sources = new Set(['workspace','public-api','moli','integration','shell','managed']);
+const sources = new Set(['workspace','public-api','moli','integration','shell','managed','browser']);
 const effects = new Set(['read-only','local-staged','approval-gated','mixed','orchestration']);
 const fail = message => { throw new Error(message); };
 

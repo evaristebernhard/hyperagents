@@ -1,4 +1,4 @@
-import type { DemoAgent, DemoMemory, DemoProject, DemoThread, WorkspacePreferences } from "./types";
+import type { DemoAgent, DemoMemory, DemoProject, DemoThread, WorkspacePreferences, ArtifactKind } from "./types";
 export type Skill = {
   id: string;
   name: string;
@@ -37,7 +37,7 @@ export type ArtifactVersion = {
 export type Artifact = {
   id: string;
   title: string;
-  kind: "Document" | "Webpage" | "Table" | "Image" | "File";
+  kind: ArtifactKind;
   content: string;
   threadId?: string;
   projectId?: string;

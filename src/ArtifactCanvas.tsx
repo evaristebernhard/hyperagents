@@ -1,5 +1,5 @@
 import { useState, type ReactNode, useRef } from "react";
-import { Columns3, Grid2X2, PanelRight, Maximize2, Minus, ArrowLeft, ArrowRight, GripVertical, FileText, Globe, Table2, Image as ImageIcon, Download } from "lucide-react";
+import { Columns3, Grid2X2, PanelRight, Maximize2, Minus, ArrowLeft, ArrowRight, GripVertical, FileText, Globe, Table2, Image as ImageIcon, Presentation, Download } from "lucide-react";
 import type { Artifact } from "./local-model";
 import type { CanvasPreferences } from "./types";
 import { ArtifactView, exportArtifact } from "./LibraryManager";
@@ -8,7 +8,7 @@ import { moveVisibleArtifact } from "./canvas-order";
 import "./artifact-canvas.css";
 
 type Props = { artifacts: Artifact[]; allArtifacts: Artifact[]; selectedId: string; value?: CanvasPreferences; disabled?: boolean; onChange: (value: CanvasPreferences) => void; onSelect: (id: string) => boolean; children: ReactNode };
-const icon = (kind: string) => kind === "Webpage" ? <Globe size={14} /> : kind === "Table" ? <Table2 size={14} /> : kind === "Image" ? <ImageIcon size={14} /> : <FileText size={14} />;
+const icon = (kind: string) => kind === "Slides" ? <Presentation size={14} /> : kind === "Webpage" ? <Globe size={14} /> : kind === "Table" ? <Table2 size={14} /> : kind === "Image" ? <ImageIcon size={14} /> : <FileText size={14} />;
 export default function ArtifactCanvas({ artifacts, allArtifacts, selectedId, value, disabled, onChange, onSelect, children }: Props) {
   const preferences: CanvasPreferences = value || { layout: "focus", hidden: [], order: [], collapsed: false };
   const { layout, hidden, order } = preferences;

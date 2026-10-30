@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Artifact } from "./local-model";
 import { ArtifactView, exportArtifact } from "./LibraryManager";
+import { parseSlidesContent } from "./slide-preview";
 import "./real-thread.css";
 
 type PublicMessage = { role: "user" | "assistant"; text: string; createdAt?: string; attachments?: (string | { name: string })[]; attachmentNames?: string[] };
@@ -25,7 +26,8 @@ function parseSnapshot(value: unknown): PublicSnapshot {
   const artifacts = raw.artifacts.map((item: unknown, i: number) => {
     if (!item || typeof item !== "object") throw Error("This shared snapshot is invalid.");
     const a = item as Record<string, unknown>;
-    if (typeof a.title !== "string" || typeof a.content !== "string" || !["Document", "Webpage", "Table", "Image", "File"].includes(String(a.kind))) throw Error("This shared snapshot is invalid.");
+    if (typeof a.title !== "string" || typeof a.content !== "string" || !["Document", "Webpage", "Slides", "Table", "Image", "File"].includes(String(a.kind))) throw Error("This shared snapshot is invalid.");
+    if (a.kind === "Slides") parseSlidesContent(a.content);
     // Deliberately use only the snapshot content, not historical versions or private IDs.
     return { id: "public-artifact-" + i, title: a.title, kind: a.kind, content: a.content, versions: [], createdAt: typeof a.createdAt === "string" ? a.createdAt : "", updatedAt: typeof a.updatedAt === "string" ? a.updatedAt : "" } as Artifact;
   });

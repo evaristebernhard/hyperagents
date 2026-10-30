@@ -1,3 +1,4 @@
+import { parseSlidesContent } from './slides.mjs';
 export class ApiError extends Error {
   constructor(status, message, code) { super(message); this.status = status; this.code = code; }
 }
@@ -86,7 +87,13 @@ export function validateState(state, findFile = () => undefined) {
             let table;try {table=JSON.parse(item.content);}catch {fail('Invalid table JSON.');}
             if(!obj(table) || Object.keys(table).some(k=>!['columns','rows'].includes(k)) || !Array.isArray(table.columns) || !table.columns.length || table.columns.length>30 || !table.columns.every(str) || !Array.isArray(table.rows) || table.rows.length>500 || !table.rows.every(row=>Array.isArray(row) && row.length===table.columns.length && row.every(str))) fail('Invalid table data.');
           }
-          if (!['Document','Webpage','Table','Image','File'].includes(item.kind) || !list(item.versions,v=> { keys(v,['id','content','createdAt']); return id(v.id) && str(v.content) && str(v.createdAt); })) fail();
+          if (!['Document','Webpage','Slides','Table','Image','File'].includes(item.kind) || !list(item.versions,v=> { keys(v,['id','content','createdAt']); return id(v.id) && str(v.content) && str(v.createdAt); })) fail();
+          if (item.kind === 'Slides') {
+            try {
+              parseSlidesContent(item.content);
+              for (const version of item.versions) parseSlidesContent(version.content);
+            } catch (error) { fail(error.message || 'Invalid Slides JSON.'); }
+          }
         }
         if (key === 'threads') {
           if (item.config !== undefined) settings(item.config);

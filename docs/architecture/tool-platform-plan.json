@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "kind": "implementation-plan-only",
+  "runtimeAuthority": false,
+  "decision": "AGENT-TOOL-PLATFORM-2026-10-30.md",
+  "kernel": [
+    "server/agent-runs.mjs",
+    "server/llm.mjs",
+    "server/tool-registry.mjs"
+  ],
+  "references": [
+    {
+      "id": "openmausbot",
+      "path": "OpenMausBot",
+      "role": "design-reference",
+      "head": "10af83e74dd7b5f7895fa498e0009c6ccc12a813",
+      "licenseFiles": [
+        "LICENSE",
+        "LICENSING.md"
+      ],
+      "licenseReview": "Apache-2.0 core; enterprise separately licensed; audit file-level and third-party notices before reuse",
+      "productionImport": false
+    },
+    {
+      "id": "lightpanda",
+      "path": "browser",
+      "role": "candidate-browser-provider",
+      "head": "1ebb2762da9a1df4ca5591c06d186ffd23fcce2d",
+      "licenseFiles": [
+        "LICENSE",
+        "LICENSING.md"
+      ],
+      "licenseReview": "AGPL-3.0-only default; independent process is not a blanket license exemption",
+      "productionImport": false
+    },
+    {
+      "id": "macro",
+      "path": "macro",
+      "role": "design-reference",
+      "head": "c3413c371fe19a9344c2af91574aa46db939ce0b",
+      "licenseFiles": [
+        "LICENSE.txt"
+      ],
+      "licenseReview": "Root GNU AGPL v3 text; inspect package and file-level declarations before reuse",
+      "productionImport": false
+    }
+  ],
+  "families": [
+    {
+      "id": "browser",
+      "owner": "browser-service",
+      "next": "Lightpanda MCP allowlisted DOM/session slice; not yet bound"
+    },
+    {
+      "id": "research",
+      "owner": "research-service",
+      "next": "Separate search providers from fetch and browser"
+    },
+    {
+      "id": "artifacts",
+      "owner": "artifact-service",
+      "next": "Keep resource identity, versions and managed persistence"
+    },
+    {
+      "id": "execution",
+      "owner": "execution-service",
+      "next": "Join shell and skill task lifecycle without widening approval"
+    },
+    {
+      "id": "integrations",
+      "owner": "integration-service",
+      "next": "Keep account/resource scopes and per-operation write approval"
+    },
+    {
+      "id": "delegation",
+      "owner": "agent-runs",
+      "next": "Extend child runs with identity, permission intersection and budgets"
+    },
+    {
+      "id": "triggers",
+      "owner": "run-admission",
+      "next": "Schedules/webhooks/IM create runs, never bypass dispatcher"
+    },
+    {
+      "id": "media-maps",
+      "owner": "provider-jobs",
+      "next": "Review existing uncommitted adapters before wiring"
+    },
+    {
+      "id": "knowledge",
+      "owner": "knowledge-service",
+      "next": "Versioned scoped suggestions, not automatic authorization"
+    }
+  ],
+  "browser": {
+    "stage": "partial-cdp-bound",
+    "preferredTransport": "cdp-existing-runtime",
+    "scopeKeys": [
+      "owner",
+      "workspace",
+      "thread",
+      "run"
+    ],
+    "sessionScheduling": "serial",
+    "automaticProviderFallback": false,
+    "initialOperations": {
+      "session": [
+        "initialize",
+        "session_new",
+        "session_close"
+      ],
+      "navigate": [
+        "goto",
+        "getUrl"
+      ],
+      "observe": [
+        "tree",
+        "interactiveElements",
+        "findElement",
+        "nodeDetails"
+      ],
+      "content": [
+        "markdown",
+        "html",
+        "structuredData"
+      ]
+    },
+    "deferredOperations": [
+      "click",
+      "fill",
+      "press",
+      "selectOption",
+      "setChecked",
+      "hover",
+      "scroll",
+      "screenshot",
+      "evaluate",
+      "upload",
+      "handoff",
+      "recording",
+      "stored-logins"
+    ],
+    "blockedNativePassthrough": [
+      "login",
+      "getCookies",
+      "getEnv",
+      "save",
+      "download",
+      "callPageTool",
+      "evaluate",
+      "search",
+      "classify",
+      "session_list"
+    ],
+    "acceptance": [
+      "Real provider create/navigate/observe/content/close round trip",
+      "Cross-owner and cross-workspace handles rejected",
+      "Private targets blocked across redirects and subresources",
+      "Abort, timeout and expiry release resources",
+      "Durable run events reflect actual operations",
+      "No credentials or unbounded binary payload in model results"
+    ],
+    "implementation": {
+      "module": "server/browser-runtime.mjs",
+      "provider": "moli",
+      "lightpandaCheckout": "source-only-not-runtime-verified",
+      "limitations": [
+        "run-scoped ephemeral sessions",
+        "no click/type/evaluate",
+        "no persistent logins/handoff/recording"
+      ],
+      "boundOperations": [
+        "browser_session",
+        "browser_navigate",
+        "browser_observe",
+        "browser_get_content",
+        "browser_extract",
+        "browser_back",
+        "browser_forward",
+        "browser_scroll",
+        "browser_screenshot"
+      ]
+    }
+  }
+}

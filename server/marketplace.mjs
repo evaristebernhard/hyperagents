@@ -2,8 +2,8 @@ import { buildCapabilityManifest } from './capability-authority.mjs';
 import catalog from '../shared/marketplace-catalog.json' with { type: 'json' };
 import { createPublicTools } from './public-tools.mjs';
 export const marketplaceCatalog = catalog;
-export function marketplaceCapabilities({deepseekConfigured=false,openAlexApiKey,userAgent}={}) {
-  const manifest=buildCapabilityManifest({deepseekConfigured,openAlexApiKey,userAgent});
+export function marketplaceCapabilities({deepseekConfigured=false,openAlexApiKey,exaApiKey,userAgent,moliPath,browserProvider,browserPath}={}) {
+  const manifest=buildCapabilityManifest({deepseekConfigured,openAlexApiKey,exaApiKey,userAgent,moliPath,browserProvider,browserPath});
   const capabilities=Object.fromEntries(manifest.capabilities.map(c=>[c.label,{available:c.implemented&&c.configured,reason:c.reason || (c.executable?'Executable tool is available.':'Implemented but not authorized for this run.')} ]));
   capabilities.LLM={available:deepseekConfigured,reason:deepseekConfigured?'Server-side DeepSeek key is present; provider authorization is verified only by a real request.':'Set DEEPSEEK_API_KEY on the server before running a skill.'};
   for(const item of createPublicTools({enabled:["World Bank","Weather","OpenAlex"],openAlexApiKey,userAgent}).capabilities) capabilities[item.service]={available:item.configured,reason:item.reason + " Adapter configuration only; upstream reachability is checked on use."};

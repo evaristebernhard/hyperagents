@@ -1,3 +1,4 @@
+import { parseSlidesContent } from "./slide-preview";
 import {
   createContext,
   useContext,
@@ -209,7 +210,7 @@ export function validateSnapshot(input: unknown): WorkspaceState {
           throw Error("Invalid room");
         if (
           key === "artifacts" &&
-          (!["Document", "Webpage", "Table", "Image", "File"].includes(item.kind) ||
+          (!["Document", "Webpage", "Slides", "Table", "Image", "File"].includes(item.kind) ||
             !Array.isArray(item.versions) ||
             item.versions.some(
               (v: any) =>
@@ -220,6 +221,10 @@ export function validateSnapshot(input: unknown): WorkspaceState {
             ))
         )
           throw Error("Invalid artifact");
+        if (key === "artifacts" && item.kind === "Slides") {
+          parseSlidesContent(item.content);
+          for (const version of item.versions) parseSlidesContent(version.content);
+        }
         if (
           key === "rubrics" &&
           (!Array.isArray(item.criteria) ||
