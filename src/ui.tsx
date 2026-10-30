@@ -219,6 +219,7 @@ export function Composer({ navigate, onSend, notify, compact = false, agents = [
     } catch (e) { failed.current = true; setError(e instanceof Error ? e.message : "Could not confirm this message was saved. Check storage status before retrying."); }
     finally { busy.current = false; setSending(false); }
   };
+  const slidesRequested = String(choices.outputFormat || "").toLowerCase() === "slides" || /publish_slides|幻灯片/i.test(text);
   const toggle = (value: string) => setMenu(menu === value ? "" : value);
   const openContext = (value: PickerKind, legacyPath: string) => { if (server) setMenu(value); else { navigate(legacyPath); setMenu(""); } };
   const pickerKinds: PickerKind[] = ["skills", "memories", "assets", "integrations", "projects"];
@@ -250,6 +251,7 @@ export function Composer({ navigate, onSend, notify, compact = false, agents = [
       <IconButton label="Safety and permissions" onClick={() => server ? toggle("safety") : notify("No external actions or tool execution are enabled.")}><LockKeyhole size={17} /></IconButton>
       <button className="send-btn" aria-label="Send message" disabled={sending || uploading || disabled || (!text.trim() && !files.length)} onClick={() => void send()}><ArrowUp size={19} /></button>
     </div></div>
+    {server && slidesRequested && !choices.tools.includes("Slides") && <div className="rt-notice" role="status"><strong>Slides 工具未开启。</strong> 文字中提到 publish_slides 不会自动授予工具权限。<button type="button" className="btn small" disabled={sending || disabled} onClick={() => setChoices(current => ({ ...current, outputFormat: "Slides", tools: [...new Set([...current.tools, "Slides"])] }))}>启用 Slides（下一次发送生效）</button></div>}
     {!server && <button className="integration-strip" onClick={() => navigate(location.pathname + "?settings=integrations")}><span className="integration-logos"><b>◈</b><b>M</b><b>✣</b></span>Connect your integrations →</button>}
     <input ref={upload} type="file" multiple hidden aria-label="Attach files" disabled={sending || uploading} onChange={async e => {
       const selected = Array.from(e.target.files || []); e.target.value = ""; setMenu(""); setError(""); setUploading(true);
