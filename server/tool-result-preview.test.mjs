@@ -1,0 +1,7 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {summarizeToolResult} from './tool-result-preview.mjs';
+test('small tool results retain existing JSON contract',()=>{const a={status:'prepared',id:'x'};assert.equal(summarizeToolResult(a),JSON.stringify(a));});
+test('large search outputs remain valid bounded JSON with source projections',()=>{const a={status:'ok',query:'hello world',results:Array.from({length:20},()=>({title:'A'.repeat(300),url:'https://example.org/a',excerpt:'B'.repeat(2000),privateExtra:'never project'}))};const s=summarizeToolResult(a);assert.ok(s.length<=1200);const r=JSON.parse(s);assert.equal(r.truncated,true);assert.equal(r.query,'hello world');assert.ok(r.results.length>0);assert.equal(r.returnedCount,20);assert.ok(!s.includes('never project'));});
+test('large previews never render credentialed or unsafe result links',()=>{const r=JSON.parse(summarizeToolResult({status:'ok',results:[{title:'x',url:'https://user:password@example.org/',excerpt:'x'.repeat(2000)},{title:'y',url:'javascript:alert(1)'}]}));assert.ok(r.results.every(x=>!x.url));});
+test('large non-search results do not emit contents or raw execution arguments',()=>{const r=JSON.parse(summarizeToolResult({status:'prepared',content:'PRIVATE'.repeat(1000),title:'Document'}));assert.equal(r.status,'prepared');assert.equal(r.title,'Document');assert.equal('content' in r,false);});

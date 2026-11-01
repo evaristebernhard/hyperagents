@@ -38,6 +38,7 @@ async function createThread(page: Page, title: string) {
   return new URL(page.url()).pathname.split("/")[2];
 }
 async function document(page: Page, title: string, text: string) {
+  if (!(await page.getByRole("button", { name: "New document", exact: true }).isVisible())) await page.getByRole("button", { name: "Show canvas", exact: true }).click();
   await page.getByRole("button", { name: "New document", exact: true }).click();
   await page.getByRole("button", { name: "Edit artifact", exact: true }).click();
   await page.getByLabel("Artifact title", { exact: true }).fill(title);
@@ -88,7 +89,7 @@ test("fresh database has no demo threads; configuration, actual upload bytes and
 
 test("rename, follow-up, artifact editing, real history restore and fork persist", async ({ page }) => {
   await createThread(page, "Artifact lifecycle");
-  await page.getByRole("button", { name: "Rename thread", exact: true }).click();
+  await openThreadActions(page); await page.getByRole("button", { name: "Rename thread", exact: true }).click();
   await page.getByLabel("Thread title", { exact: true }).fill("Renamed conversation");
   await page.getByRole("button", { name: "Save name", exact: true }).click();
   await page.getByLabel("Follow-up message", { exact: true }).fill("A real second user message");
@@ -104,7 +105,7 @@ test("rename, follow-up, artifact editing, real history restore and fork persist
   await versions.selectOption(prior!);
   await page.getByRole("button", { name: "Restore this version", exact: true }).click();
   await expect(page.locator(".rt-artifact-editor")).toContainText("First durable content");
-  await page.getByRole("button", { name: "Fork thread", exact: true }).click();
+  await openThreadActions(page); await page.getByRole("button", { name: "Fork thread", exact: true }).click();
   await expect(page.locator(".rt-title h1")).toHaveText("Renamed conversation (fork)");
   await expect(page.locator(".rt-message.user")).toHaveCount(2);
   await page.reload();
@@ -114,7 +115,7 @@ test("rename, follow-up, artifact editing, real history restore and fork persist
 test("share is an immutable read-only snapshot and revocation removes anonymous access", async ({ page, browser }) => {
   await createThread(page, "Snapshot publication");
   await document(page, "Public notes", "Public artifact version one");
-  await page.getByRole("button", { name: "Share", exact: true }).click();
+  await openThreadActions(page); await page.getByRole("button", { name: "Share", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Share thread snapshot", exact: true });
   await dialog.getByRole("checkbox", { name: /Public notes/ }).check();
   await dialog.getByRole("checkbox", { name: /I confirm/ }).check();
@@ -146,7 +147,7 @@ test("a stale revision cannot silently overwrite another writer", async ({ page 
   workspace.data.threads.find((t: any) => t.id === id).title = "Other writer saved this";
   const written = await page.request.put("/api/state", { headers: { Origin: "http://127.0.0.1:5174", "X-CSRF-Token": session.csrfToken, "If-Match": String(current.revision) }, data: { state: current.state } });
   expect(written.status()).toBe(200);
-  await page.getByRole("button", { name: "Rename thread", exact: true }).click();
+  await openThreadActions(page); await page.getByRole("button", { name: "Rename thread", exact: true }).click();
   await page.getByLabel("Thread title", { exact: true }).fill("This must not overwrite silently");
   await page.getByRole("button", { name: "Save name", exact: true }).click();
   await expect(page.getByLabel("Storage status", { exact: true })).toContainText("Conflicting changes");
@@ -252,3 +253,5 @@ test("migration waits for delayed saves, locks editing and cannot discard a conc
     expect(after.state.workspaces.some((w: any) => w.name === "Race browser (imported)")).toBe(true);
   } finally { releaseWrite(); releaseImport(); }
 });
+
+async function openThreadActions(page: import("@playwright/test").Page) { const menu=page.locator("details.rt-thread-actions"); if (!(await menu.getAttribute("open") !== null)) await menu.locator(":scope > summary").click(); }

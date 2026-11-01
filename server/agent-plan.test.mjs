@@ -11,7 +11,7 @@ test('managed plan steps and aggregate model usage are durable, with no shell ex
   const steps=[{id:'inspect',title:'Inspect the input',status:'completed'},{id:'answer',title:'Write a short answer',status:'in_progress'}];
   const app=await createApp({dataDir:dir,shellRoot:dir,port:0,deepseekApiKey:'synthetic-test-key',llmFetch:async(_url,init)=>{
     const request=JSON.parse(init.body);turns++;
-    assert.deepEqual(request.tools.map(t=>t.function.name),['update_plan']);
+    assert.deepEqual(request.tools.map(t=>t.function.name).sort(),['suggest_follow_ups','update_plan']);
     const data=turns===1?{choices:[{delta:{tool_calls:[{index:0,id:'plan1',type:'function',function:{name:'update_plan',arguments:JSON.stringify({steps})}}]},finish_reason:'tool_calls'}]}:{choices:[{delta:{content:'Planned answer'}}]};
     return new Response(frame(data)+frame({choices:[],usage:{prompt_tokens:10,completion_tokens:3,total_tokens:13}})+frame('[DONE]'),{headers:{'Content-Type':'text/event-stream'}});
   }});

@@ -9,6 +9,11 @@ const obj = x => x !== null && typeof x === 'object' && !Array.isArray(x);
 const str = x => typeof x === 'string';
 const id = x => str(x) && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(x);
 const list = (x, test) => Array.isArray(x) && x.length <= 10000 && x.every(test);
+// Public message metadata contains no raw reasoning or executable instructions.
+export const validFollowUps = value => Array.isArray(value) && value.length>=2 && value.length<=3 && value.every(v=>typeof v==='string' && v===v.trim() && v.length>0 && v.length<=160 && !/[\r\n\x00-\x1f\x7f]/.test(v)) && new Set(value.map(v=>v.toLowerCase())).size===value.length;
+export const validReasoningMs = value => Number.isSafeInteger(value) && value>=0 && value<=86400000;
+export const validKnowledgeHints = value => obj(value) && Object.keys(value).length===2 && ['skillIds','memoryIds'].every(k=>Array.isArray(value[k]) && value[k].length<=10000 && value[k].every(id) && new Set(value[k]).size===value[k].length);
+
 function keys(x, allowed) { if (!obj(x) || Object.keys(x).some(k=>!allowed.includes(k))) fail(); }
 function json(x, depth = 0) {
   if (depth > 20) fail('Metadata nesting is too deep.');
@@ -103,7 +108,10 @@ export function validateState(state, findFile = () => undefined) {
             for (const field of ['hidden','order']) if (!list(c[field],id) || new Set(c[field]).size!==c[field].length) fail('Invalid canvas artifact IDs.');
           }
           if (item.messages !== undefined && !list(item.messages,m=> {
-            keys(m,['id','role','text','createdAt','context','toolRuns','actionRequests']);
+            keys(m,['id','role','text','createdAt','context','toolRuns','actionRequests','followUps','reasoningMs','knowledgeHints']);
+            if (m.followUps!==undefined && (m.role!=='assistant' || !validFollowUps(m.followUps))) fail('Invalid follow-up suggestions.');
+            if (m.reasoningMs!==undefined && (m.role!=='assistant' || !validReasoningMs(m.reasoningMs))) fail('Invalid reasoning timing.');
+            if (m.knowledgeHints!==undefined && (m.role!=='assistant' || !validKnowledgeHints(m.knowledgeHints))) fail('Invalid knowledge hints.');
             if(m.actionRequests!==undefined && (!Array.isArray(m.actionRequests)||m.actionRequests.length>12||!m.actionRequests.every(a=>{keys(a,['id','token','provider','operation','summary','args','status','result']);return id(a.id)&&str(a.token)&&a.token.length<=66000&&str(a.provider)&&str(a.operation)&&str(a.summary)&&obj(a.args)&&['pending','completed','failed','dismissed'].includes(a.status)&&(a.result===undefined||str(a.result));}))) fail('Invalid action request.');
             if(m.toolRuns!==undefined && (!Array.isArray(m.toolRuns) || m.toolRuns.length>30 || !m.toolRuns.every(t=>{keys(t,['id','name','status','summary']);return id(t.id) && str(t.name) && ['running','success','error'].includes(t.status) && str(t.summary) && t.summary.length<=1600;}))) fail('Invalid tool history.');
             if (m.id !== undefined && !id(m.id)) fail();

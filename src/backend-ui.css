@@ -43,3 +43,14 @@
 .backend-replacement-overlay { position: fixed; inset: 0; z-index: 1900; background: var(--bg); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; text-align: center; }
 .backend-replacement-overlay h2 { margin-bottom: 12px; }
 .backend-replacement-overlay p { max-width: 520px; }
+
+/* Compact does not mean unlabeled: keep model and execution choices legible. */
+.composer.compact .composer-bar { padding: 8px 12px 10px; gap: 8px; }
+.composer.compact .composer-bar-left, .composer.compact .composer-bar-right { min-width: 0; gap: 7px; }
+.composer.compact .compact-model { display: inline-flex; width: auto; max-width: 260px; gap: 6px; padding: 5px 7px; }
+.composer.compact .compact-model .model-chip-label { display: inline; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.composer.compact .execution { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; white-space: nowrap; }
+.composer.server-composer .integration-strip { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; color: var(--muted, #777); background: var(--hover, #fafafa); border: 0; border-top: 1px solid var(--line, #eee); font-size: 11px; padding: 9px 12px; border-radius: 0 0 14px 14px; }
+.composer.server-composer .integration-strip:hover { color: var(--ink, #222); }
+@media (max-width: 520px) { .composer.compact .compact-model { max-width: 150px; } .composer.compact .compact-model .model-chip-label { max-width: 105px; } .composer.compact .composer-bar-left, .composer.compact .composer-bar-right { gap: 3px; } }
+@media (max-width: 380px) { .composer.compact .compact-model .model-chip-label { max-width: 65px; } .composer.compact .execution-label { display: none; } .rt-header-model { display: none; } }

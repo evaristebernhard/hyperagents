@@ -22,10 +22,12 @@ test("reasoning and tool preview choices update without invoking a model", async
   await expect(menu.locator('[data-submenu="effort"]')).toContainText("High");
   await menu.locator('[data-submenu="tools"]').hover();
   const browser = page.getByRole("menuitemcheckbox", { name: "Browser", exact: true });
+  const count = menu.locator('[data-submenu="tools"] .menu-current');
+  const before = Number(await count.textContent());
   await expect(browser).toHaveAttribute("aria-checked", "true");
   await browser.click();
   await expect(browser).toHaveAttribute("aria-checked", "false");
-  await expect(menu.locator('[data-submenu="tools"]')).toContainText("15");
+  await expect(count).toHaveText(String(before - 1));
   await page.keyboard.press("Escape");
   await expect(menu).toBeVisible();
   await page.keyboard.press("Escape");

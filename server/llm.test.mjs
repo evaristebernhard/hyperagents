@@ -62,10 +62,13 @@ test('streams split UTF-8, reasoning and usage; fixed endpoint, server context, 
   await h.setup();await h.save();const before=await (await h.call('/api/state')).json();
   const response=await h.chat({...request,model:'deepseek-v4-pro'});
   assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/text\/event-stream/);
-  assert.deepEqual(events(await response.text()),[{type:'reasoning',text:'Thinking'},{type:'delta',text:'Hello 🌍'},{type:'done',model:'deepseek-v4-pro',usage:{prompt_tokens:10,completion_tokens:5,total_tokens:15}}]);
+  const received = events(await response.text());
+  assert.deepEqual(received.filter(e=>!['knowledge_hints','reasoning_timing'].includes(e.type)),[{type:'reasoning',text:'Thinking'},{type:'delta',text:'Hello 🌍'},{type:'done',model:'deepseek-v4-pro',usage:{prompt_tokens:10,completion_tokens:5,total_tokens:15}}]);
+  assert.deepEqual(received.find(e=>e.type==='knowledge_hints').knowledgeHints,{skillIds:[],memoryIds:[]});
+  assert.ok(received.filter(e=>e.type==='reasoning_timing').every(e=>Number.isSafeInteger(e.reasoningMs)&&e.reasoningMs>=0));
   assert.equal(payload.model,'deepseek-v4-pro');assert.equal(payload.max_tokens,8192);assert.equal(payload.stream,true);
   assert.equal(payload.messages.at(-1).content,'Saved question');assert.match(payload.messages[0].content,/no browser control, generic network browsing/);
-  assert.equal(payload.tools,undefined);assert.doesNotMatch(JSON.stringify(payload),/test-only-placeholder/);
+  assert.deepEqual(payload.tools.map(t=>t.function.name),['suggest_follow_ups']);assert.doesNotMatch(JSON.stringify(payload),/test-only-placeholder/);
   assert.deepEqual(await (await h.call('/api/state')).json(),before);
   assert.equal((await h.chat()).status,409);
 });

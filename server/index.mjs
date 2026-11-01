@@ -1,3 +1,4 @@
+import { loadManagedSkillCatalog } from './skill-config.mjs';
 import {captureIntegrationCredentials} from './integrations.mjs';
 import { createApp } from './app.mjs';
 import path from 'node:path';
@@ -10,6 +11,8 @@ const deepseekApiKey=process.env.DEEPSEEK_API_KEY;
 const openAlexApiKey=process.env.OPENALEX_API_KEY;
 const exaApiKey=process.env.EXA_API_KEY;
 const publicUserAgent=process.env.PUBLIC_API_USER_AGENT || "Hyperagents-Replica/0.1";
+const skillRoot=path.resolve(process.env.APP_SKILL_ROOT || '.');
+const skillCatalog=loadManagedSkillCatalog(process.env.APP_SKILL_CATALOG,skillRoot);
 delete process.env.OPENALEX_API_KEY;
 delete process.env.EXA_API_KEY;
 delete process.env.DEEPSEEK_API_KEY;
@@ -23,7 +26,7 @@ try {
     publicOrigin:process.env.APP_PUBLIC_ORIGIN,
     maxFileBytes:process.env.APP_MAX_FILE_BYTES,
     ownerPassword,integrationCredentials,
-    deepseekApiKey,openAlexApiKey,exaApiKey,publicUserAgent,
+    deepseekApiKey,openAlexApiKey,exaApiKey,publicUserAgent,skillRoot,skillCatalog,
     moliPath:process.env.MOLI_PATH, browserProvider:process.env.BROWSER_PROVIDER || 'moli', browserPath:process.env.BROWSER_PATH,
     distDir:process.env.APP_SERVE_DIST==='1' && existsSync('dist/index.html') ? path.resolve('dist') : undefined,
   });

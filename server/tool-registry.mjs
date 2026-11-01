@@ -1,6 +1,6 @@
 const plain = value => value!==null && typeof value==='object' && !Array.isArray(value) && [Object.prototype,null].includes(Object.getPrototypeOf(value));
 const clone = value => structuredClone(value);
-const sources = new Set(['workspace','public-api','moli','integration','shell','managed','browser']);
+const sources = new Set(['workspace','public-api','moli','integration','shell','managed','browser','skill','file']);
 const effects = new Set(['read-only','local-staged','approval-gated','mixed','orchestration']);
 const fail = message => { throw new Error(message); };
 
@@ -42,7 +42,7 @@ export function argumentShape(args) {
   return Object.entries(args).slice(0,40).map(([key,value])=>({field:key.slice(0,80),type:value===null?'null':Array.isArray(value)?'array':typeof value,...(typeof value==='string'?{characters:value.length}:Array.isArray(value)?{items:value.length}:{})}));
 }
 export function toolResultOutcome(result) {
-  if(result?.isError===true || result?.error || result?.timedOut===true || result?.cancelled===true || (typeof result?.exitCode==='number' && result.exitCode!==0) || ['error','failed','timed_out','cancelled','denied'].includes(result?.status))return 'error';
+  if(result?.isError===true || result?.error || result?.timedOut===true || result?.cancelled===true || (typeof result?.exitCode==='number' && result.exitCode!==0) || ['error','failed','timed_out','cancelled','denied','output_limit'].includes(result?.status))return 'error';
   if(result?.status==='approval_required')return 'awaiting_approval';
   if(result?.status==='prepared')return 'prepared';
   return 'completed';

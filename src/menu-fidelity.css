@@ -123,3 +123,25 @@
   .search-result-shortcuts { display: none; }
   .search-scope { max-width: 110px; }
 }
+
+
+/* Tool picker: grouped capability chips. */
+.popover.fidelity-model-menu .tool-picker { padding: 10px 9px; width: 320px; }
+.tool-picker-group + .tool-picker-group { margin-top: 9px; }
+.tool-picker-heading { margin: 0 2px 5px; color: var(--muted); font-size: 11px; line-height: 15px; font-weight: 500; letter-spacing: .025em; text-transform: uppercase; }
+.tool-picker-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.popover.fidelity-model-menu .tool-picker .tool-chip { display: inline-flex; align-items: center; justify-content: flex-start; flex: 0 0 auto; width: auto; min-height: 26px; padding: 3px 9px; gap: 5px; border: 1px solid var(--line); border-radius: 999px; background: var(--soft); color: var(--muted); font-size: 12px; line-height: 18px; white-space: nowrap; }
+.popover.fidelity-model-menu .tool-picker .tool-chip > span { flex: none; }
+.popover.fidelity-model-menu .tool-picker .tool-chip:hover:not(:disabled) { filter: brightness(.96); }
+.popover.fidelity-model-menu .tool-picker .tool-chip:focus-visible { outline: 2px solid #3978c9; outline-offset: 2px; }
+.popover.fidelity-model-menu .tool-picker .tool-chip.selected.tool-chip-research { background: #d6e7ff; border-color: #d6e7ff; color: #173f79; }
+.popover.fidelity-model-menu .tool-picker .tool-chip.selected.tool-chip-browser { background: #b7f1d7; border-color: #b7f1d7; color: #17583e; }
+.popover.fidelity-model-menu .tool-picker .tool-chip.selected.tool-chip-data { background: #b6efdc; border-color: #b6efdc; color: #155846; }
+.popover.fidelity-model-menu .tool-picker .tool-chip.selected.tool-chip-interactive { background: #d3d5ff; border-color: #d3d5ff; color: #373b7b; }
+.popover.fidelity-model-menu .tool-picker .tool-chip.selected.tool-chip-media { background: #f8d6ed; border-color: #f8d6ed; color: #762b56; }
+.popover.fidelity-model-menu .tool-picker .tool-chip.selected.tool-chip-workspace { background: #ffe5ad; border-color: #ffe5ad; color: #68490d; }
+.popover.fidelity-model-menu .tool-picker .tool-chip.unavailable { border-style: dashed; opacity: .57; }
+.popover.fidelity-model-menu .tool-picker .tool-chip:disabled { cursor: not-allowed; }
+.tool-picker-note { margin: 0 2px 10px; color: var(--muted); font-size: 11px; line-height: 15px; }
+.tool-picker-footnote { margin: 10px 2px 0; }
+@media (max-width: 1100px) { .popover.fidelity-model-menu .tool-picker { width: 100%; } }

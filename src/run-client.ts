@@ -5,6 +5,7 @@ export type RunStatus = "queued" | "running" | "waiting_approval" | "succeeded" 
 export type ShellApproval = {
   id: string;
   status: "pending" | "approved" | "denied" | "executing" | "completed" | "failed" | "cancelled" | "expired";
+  kind?: "shell" | "skill" | "file";
   command: string;
   cwd: string;
   timeoutSeconds: number;
@@ -20,6 +21,10 @@ export type RunInfo = {
   finishedAt?: string;
   model?: string;
   error?: string;
+  parentRunId?: string;
+  rootRunId?: string;
+  depth?: number;
+  childCount?: number;
   toolCount: number;
   usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
   approvals: ShellApproval[];
@@ -27,7 +32,7 @@ export type RunInfo = {
   plan?: { id: string; title: string; status: "pending" | "in_progress" | "completed" }[];
 };
 export type RuntimeEvent = ChatEvent
-  | { type: "shell_approval"; actionId: string; command: string; cwd: string; timeoutSeconds: number }
+  | { type: "shell_approval"; actionId: string; kind?: "shell" | "skill" | "file"; command: string; cwd: string; timeoutSeconds: number }
   | { type: "run_status"; status: RunStatus }
   | { type: "plan"; steps: NonNullable<RunInfo["plan"]> }
   | { type: "shell_result"; actionId: string; result: unknown };

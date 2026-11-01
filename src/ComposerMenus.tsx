@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
   Brain, Gauge, GitBranch, Blocks, Plug, ArrowUpRight, ChevronRight,
-  Check, Search, PencilLine, Sparkles, Bot, Zap,
+  Check, Search, PencilLine, Sparkles, Bot, Zap, Link, BookOpen, Grid3X3, History, Monitor, Table, FileText, Globe, Presentation, Image, Video, Volume2, Mic, User, MapPin, Folder, Users, Code, CloudSun, Landmark, GraduationCap, Camera,
 } from "lucide-react";
 import type { Navigate, ThreadSettings } from "./types";
 import { currentModels } from "./llm-client";
@@ -9,9 +9,26 @@ import { api } from "./backend-client";
 
 const toolNames = [
   "Search", "Find Similar", "Exa Research", "Exa Websets", "Thread Search",
-  "Browser", "Web Fetch", "Web Semantic Tree", "Web Eval", "Visual Output", "Webpages", "Slides", "Tables", "Documents", "Images", "Video",
+  "Files", "Skills", "Delegation", "Browser", "Web Fetch", "Web Semantic Tree", "Web Eval", "Visual Output", "Webpages", "Slides", "Tables", "Documents", "Images", "Video",
   "Audio", "Transcribe", "Avatar", "Maps",
 ];
+type Capability = { label: string; executable: boolean; reason?: string; surfaces?: { composer?: boolean } };
+const toolGroups = [
+  { label: "Research", names: ["Search", "Find Similar", "Exa Research", "Exa Websets", "Thread Search", "World Bank", "Weather", "OpenAlex"] },
+  { label: "Browser", names: ["Browser", "Web Fetch", "Web Semantic Tree", "Web Eval", "Visual Output"] },
+  { label: "Data", names: ["Tables", "Documents"] },
+  { label: "Interactive", names: ["Webpages", "Slides"] },
+  { label: "Media", names: ["Images", "Video", "Audio", "Transcribe", "Avatar", "Maps"] },
+  { label: "Workspace", names: ["Files", "Skills", "Delegation"] },
+] as const;
+const toolIcons: Record<string, typeof Search> = {
+  "Search": Search, "Find Similar": Link, "Exa Research": BookOpen, "Exa Websets": Grid3X3,
+  "Thread Search": History, "World Bank": Landmark, "Weather": CloudSun, "OpenAlex": GraduationCap,
+  "Browser": Monitor, "Web Fetch": Globe, "Web Semantic Tree": GitBranch, "Web Eval": Code, "Visual Output": Camera,
+  "Tables": Table, "Documents": FileText, "Webpages": Globe, "Slides": Presentation,
+  "Images": Image, "Video": Video, "Audio": Volume2, "Transcribe": Mic, "Avatar": User, "Maps": MapPin,
+  "Files": Folder, "Skills": Sparkles, "Delegation": Users,
+};
 export const starterAgents = [
   ["Daily Briefing", "Structured morning briefing delivered to your inbox", "📋", "briefing"],
   ["Context Builder", "Auto-learn your projects, teammates, and tools from connected integrations", "🧠", "context"],
@@ -45,12 +62,15 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
   const [localEffort, setLocalEffort] = useState("Medium");
   const [localProvider, setLocalProvider] = useState("Any");
   const [localTools, setLocalTools] = useState<string[]>(toolNames);
-  const [capabilityTools, setCapabilityTools] = useState<string[] | null>(null);
-  useEffect(() => { let alive = true; void api<{ capabilities?: { label: string; executable: boolean; surfaces?: { composer?: boolean } }[] }>("/api/capabilities").then(result => { if (alive) setCapabilityTools((result.capabilities || []).filter(c => c.executable && c.surfaces?.composer !== false).map(c => c.label)); }).catch(() => {}); return () => { alive = false; }; }, []);
+  const [capabilities, setCapabilities] = useState<Capability[] | null>(null);
+  const [capabilitiesFailed, setCapabilitiesFailed] = useState(false);
+  useEffect(() => { let alive = true; void api<{ capabilities?: Capability[] }>("/api/capabilities").then(result => { if (alive) setCapabilities(result.capabilities || []); }).catch(() => { if (alive) setCapabilitiesFailed(true); }); return () => { alive = false; }; }, []);
   const effort = controlled?.reasoning ?? localEffort;
   const provider = controlled?.provider ?? localProvider;
   const tools = controlled?.tools ?? localTools;
-  const availableToolNames = capabilityTools?.length ? capabilityTools : toolNames;
+  const capabilityByName = new Map((capabilities || []).map(item => [item.label, item]));
+  const canSelectTool = (name: string) => !dataOnly || capabilityByName.get(name)?.executable === true;
+  const allToolNames = [...new Set([...toolNames, "World Bank", "Weather", "OpenAlex", ...(capabilities || []).filter(item => item.surfaces?.composer !== false).map(item => item.label)])];
   const setEffort = (value: string) => controlled ? onSettingsChange?.({ ...controlled, reasoning: value }) : setLocalEffort(value);
   const setProvider = (value: string) => controlled ? onSettingsChange?.({ ...controlled, provider: value }) : setLocalProvider(value);
   const setTools = (value: string[]) => controlled ? onSettingsChange?.({ ...controlled, tools: value }) : setLocalTools(value);
@@ -81,7 +101,7 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
       const panel = el.querySelector<HTMLElement>(".composer-submenu");
       if (panel) {
         panel.style.transform = "none";
-        panel.style.maxHeight = `${Math.max(80, Math.min(400, innerHeight - 16))}px`;
+        panel.style.maxHeight = `${Math.max(80, Math.min(sub === "tools" ? 560 : 400, innerHeight - 16))}px`;
         const bounds = panel.getBoundingClientRect();
         const x = Math.max(8 - bounds.left, Math.min(0, innerWidth - 8 - bounds.right));
         const y = Math.max(8 - bounds.top, Math.min(0, innerHeight - 8 - bounds.bottom));
@@ -104,8 +124,8 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
     setSub(key);
     if (enter) requestAnimationFrame(() => {
       const panel = root.current?.querySelector<HTMLElement>(".composer-submenu");
-      (panel?.querySelector<HTMLElement>('[role^="menuitem"][aria-checked="true"]')
-        || panel?.querySelector<HTMLElement>('[role^="menuitem"]'))?.focus();
+      (panel?.querySelector<HTMLElement>('[role^="menuitem"][aria-checked="true"]:not(:disabled)')
+        || panel?.querySelector<HTMLElement>('[role^="menuitem"]:not(:disabled)'))?.focus();
     });
   };
   const closeMenu = () => {
@@ -137,7 +157,7 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
     if ((e.target as HTMLElement).tagName === "INPUT" && ["Home", "End"].includes(e.key)) return;
     const region = (document.activeElement as HTMLElement)?.closest(".composer-submenu") || root.current;
     const visible = [...(region?.querySelectorAll<HTMLElement>('[role^="menuitem"]') || [])]
-      .filter(el => el.getClientRects().length && (region?.classList.contains("composer-submenu") || !el.closest(".composer-submenu")));
+      .filter(el => !el.hasAttribute("disabled") && el.getClientRects().length && (region?.classList.contains("composer-submenu") || !el.closest(".composer-submenu")));
     if (!visible.length) return;
     e.preventDefault();
     const current = visible.indexOf(document.activeElement as HTMLElement);
@@ -162,7 +182,7 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
       <button type="button" role="menuitem" onMouseEnter={() => setSub("")} onClick={() => {
         go(location.pathname + (location.pathname.startsWith("/thread/") ? "?panel=settings" : "?settings=thread-defaults"));
       }}><ArrowUpRight size={16} />Open full settings</button>
-      {sub && <div className="popover composer-submenu" role="menu" aria-label={sub + " options"}>
+      {sub && <div className={"popover composer-submenu" + (sub === "tools" ? " tool-picker" : "")} role="menu" aria-label={sub + " options"}>
         {sub === "model" && dataOnly && <><small className="menu-local-note">DeepSeek · requires a server-side API key</small>{["", ...currentModels].map(value => <button type="button" role="menuitemradio" aria-checked={(controlled?.model || "") === value} key={value} onClick={() => { if (controlled) onSettingsChange?.({ ...controlled, model: value, provider: "DeepSeek" }); closeSub("model"); }}><span>{value || "Default · DeepSeek Flash"}</span>{(controlled?.model || "") === value && <Check size={14} />}</button>)}</>}
         {sub === "model" && !dataOnly && <button type="button" role="menuitem" className="model-unlock" onClick={() => settings("billing")}>
           <span className="unlock-icon"><Sparkles size={18} /></span>
@@ -178,10 +198,28 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
           </button>)}
         </>}
         {sub === "tools" && <>
-          <small className="menu-local-note">Local tools plus Moli Web Fetch, World Bank / Weather public data. OpenAlex needs server configuration. Other providers are not connected.</small>
-          {(dataOnly ? [...availableToolNames, "World Bank", "Weather", "OpenAlex"] : availableToolNames).filter((value, index, list) => list.indexOf(value) === index).map(value => <button type="button" role="menuitemcheckbox" aria-checked={tools.includes(value)} key={value} onClick={() => setTools(tools.includes(value) ? tools.filter(t => t !== value) : [...tools, value])}>
-            <span>{value}</span>{tools.includes(value) && <Check size={14} />}
-          </button>)}
+          {dataOnly && <p className="tool-picker-note">{capabilitiesFailed ? "Availability could not be checked; unavailable tools cannot be enabled." : capabilities ? "Only configured tools can be enabled. Selection alone does not grant approval." : "Checking tool availability…"}</p>}
+          {toolGroups.map(group => {
+            const names = group.names.filter(name => allToolNames.includes(name));
+            if (!names.length) return null;
+            return <section className="tool-picker-group" role="group" aria-label={group.label} key={group.label}>
+              <div className="tool-picker-heading">{group.label}</div><div className="tool-picker-chips">{names.map(name => {
+                const Icon = toolIcons[name] || Blocks, selected = tools.includes(name), available = canSelectTool(name);
+                const reason = capabilityByName.get(name)?.reason || (capabilitiesFailed ? "Could not check availability" : capabilities ? "Not configured or not implemented" : "Checking availability");
+                return <button type="button" role="menuitemcheckbox" aria-checked={selected} aria-label={name} key={name}
+                  className={"tool-chip tool-chip-" + group.label.toLowerCase() + (selected && available ? " selected" : "") + (!available ? " unavailable" : "")}
+                  disabled={!available && !selected} title={!available ? reason + (selected ? "; select to remove" : "") : selected ? "Selected" : "Not selected"}
+                  onClick={() => setTools(selected ? tools.filter(t => t !== name) : [...tools, name])}>
+                  <Icon size={13} aria-hidden="true" /><span>{name}</span>
+                </button>;
+              })}</div>
+            </section>;
+          })}
+          {allToolNames.filter(name => !toolGroups.some(group => (group.names as readonly string[]).includes(name))).length > 0 && <section className="tool-picker-group" role="group" aria-label="Other tools"><div className="tool-picker-heading">Other tools</div><div className="tool-picker-chips">{allToolNames.filter(name => !toolGroups.some(group => (group.names as readonly string[]).includes(name))).map(name => {
+            const selected = tools.includes(name), available = canSelectTool(name);
+            return <button type="button" role="menuitemcheckbox" aria-checked={selected} aria-label={name} className={"tool-chip tool-chip-workspace" + (selected && available ? " selected" : "") + (!available ? " unavailable" : "")} disabled={!available && !selected} title={!available ? "Not configured or not implemented" : selected ? "Selected" : "Not selected"} key={name} onClick={() => setTools(selected ? tools.filter(t => t !== name) : [...tools, name])}><Blocks size={13} aria-hidden="true"/><span>{name}</span></button>;
+          })}</div></section>}
+          {dataOnly && <p className="tool-picker-note tool-picker-footnote">Dashed, faded tools are unavailable on this server. Hover for details.</p>}
         </>}
         {sub === "integrations" && <>
           <button type="button" role="menuitem" onClick={() => settings("integrations")}><Plug size={16} />Manage integrations<ArrowUpRight size={14} /></button>

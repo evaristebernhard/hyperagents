@@ -162,7 +162,7 @@ const outputs = [
   ["Map", Map],
   ["Doc", FileText],
 ] as const;
-export function Composer({ navigate, onSend, notify, compact = false, agents = [], initialSettings, contextKey = "new", disabled = false }: {
+export function Composer({ navigate, onSend, notify, compact = false, agents = [], initialSettings, contextKey = "new", disabled = false, prefill }: {
   navigate: Navigate;
   onSend: (text: string, context?: MessageContext, clientRequestId?: string) => void | Promise<void>;
   notify: (message: string) => void;
@@ -171,6 +171,7 @@ export function Composer({ navigate, onSend, notify, compact = false, agents = [
   initialSettings?: ThreadSettings;
   contextKey?: string;
   disabled?: boolean;
+  prefill?: { id: string; text: string };
 }) {
   const w = useWorkspace();
   const server = w.mode === "server";
@@ -193,6 +194,16 @@ export function Composer({ navigate, onSend, notify, compact = false, agents = [
   const failed = useRef(false);
   const box = useRef<HTMLDivElement>(null);
   const upload = useRef<HTMLInputElement>(null);
+  const consumedPrefill = useRef("");
+  useEffect(() => {
+    if (!prefill || consumedPrefill.current === prefill.id) return;
+    consumedPrefill.current = prefill.id;
+    // A suggestion only edits the draft. Never submit or silently replace unsent work.
+    setText(current => current.trim() ? current + "\n\n" + prefill.text : prefill.text);
+    requestId.current = crypto.randomUUID(); failed.current = false;
+    setError("");
+    box.current?.querySelector("textarea")?.focus();
+  }, [prefill]);
   const signature = JSON.stringify(baseline);
   useEffect(() => { setChoices(structuredClone(baseline)); }, [contextKey, signature]);
   useEffect(() => {
@@ -232,7 +243,7 @@ export function Composer({ navigate, onSend, notify, compact = false, agents = [
     ...(projectId ? [{ key: "project:" + projectId, label: "Project: " + (w.data.projects.find(p => p.id === projectId)?.name || "Unavailable"), remove: () => setProjectId(undefined) }] : []),
   ];
   return <div className={"composer " + (server ? "server-composer " : "") + (compact ? "compact" : "")} ref={box}>
-    <textarea aria-label={compact ? "Follow-up message" : "Task prompt"} placeholder={compact ? "Add a message…" : "Ask anything or start a task…"} value={text} disabled={sending || disabled}
+    <textarea aria-label={compact ? "Follow-up message" : "Task prompt"} placeholder={compact ? "Add a follow-up…" : "Ask anything or start a task…"} value={text} disabled={sending || disabled}
       onChange={e => { if (failed.current) { requestId.current = crypto.randomUUID(); failed.current = false; } setText(e.target.value); setError(""); }}
       onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
     {(files.length > 0 || contextChips.length > 0) && <div className="composer-context-chips">
@@ -244,15 +255,15 @@ export function Composer({ navigate, onSend, notify, compact = false, agents = [
     <div className="composer-bar"><div className="composer-bar-left">
       <IconButton label="Add files or context" onClick={() => toggle("add")}><Plus size={18} /></IconButton>
       {!!choices.outputFormat && <button className="pill" aria-label={choices.outputFormat + " output settings"} onClick={() => toggle("format-settings")}>{choices.outputFormat}</button>}
-      <button className={"pill " + (compact ? "compact-model" : "")} aria-label="Model settings" aria-haspopup="menu" aria-expanded={menu === "model"} onClick={() => toggle("model")}><SlidersHorizontal size={14} />{!compact && <span className="model-chip-label">{choices.model || "Choose your model"}</span>}{!compact && <ChevronDown className="model-chip-chevron" size={12} />}</button>
+      <button className={"pill " + (compact ? "compact-model" : "")} aria-label="Model settings" aria-haspopup="menu" aria-expanded={menu === "model"} onClick={() => toggle("model")}><SlidersHorizontal size={14} /><span className="model-chip-label">{choices.model || "Choose your model"}</span><ChevronDown className="model-chip-chevron" size={12} /></button>
       {!compact && <button className="pill" aria-label="Use an agent" aria-haspopup="menu" aria-expanded={menu === "agents"} onClick={() => toggle("agents")}><Bot size={14} />{choices.agentId ? w.data.agents.find(a => a.id === choices.agentId)?.name || "Unavailable agent" : choices.starterAgentName || agent}<ChevronDown size={12} /></button>}
     </div><div className="composer-bar-right">
-      <button className="plain execution" aria-label="Execution mode" aria-haspopup="menu" aria-expanded={menu === "mode"} onClick={() => toggle("mode")}><Zap size={15} />{!compact && choices.mode}{!compact && <ChevronDown size={11} />}</button>
+      <button className="plain execution" aria-label="Execution mode" aria-haspopup="menu" aria-expanded={menu === "mode"} onClick={() => toggle("mode")}><Zap size={15} /><span className="execution-label">{choices.mode || "Execute"}</span><ChevronDown size={11} /></button>
       <IconButton label="Safety and permissions" onClick={() => server ? toggle("safety") : notify("No external actions or tool execution are enabled.")}><LockKeyhole size={17} /></IconButton>
       <button className="send-btn" aria-label="Send message" disabled={sending || uploading || disabled || (!text.trim() && !files.length)} onClick={() => void send()}><ArrowUp size={19} /></button>
     </div></div>
     {server && slidesRequested && !choices.tools.includes("Slides") && <div className="rt-notice" role="status"><strong>Slides 工具未开启。</strong> 文字中提到 publish_slides 不会自动授予工具权限。<button type="button" className="btn small" disabled={sending || disabled} onClick={() => setChoices(current => ({ ...current, outputFormat: "Slides", tools: [...new Set([...current.tools, "Slides"])] }))}>启用 Slides（下一次发送生效）</button></div>}
-    {!server && <button className="integration-strip" onClick={() => navigate(location.pathname + "?settings=integrations")}><span className="integration-logos"><b>◈</b><b>M</b><b>✣</b></span>Connect your integrations →</button>}
+    <button className="integration-strip" onClick={() => navigate(location.pathname + "?settings=integrations")}>{server ? <Plug size={14} aria-hidden="true" /> : <span className="integration-logos"><b>◈</b><b>M</b><b>✣</b></span>}{server && w.data.connections.some(connection => connection.enabled) ? "Manage integrations · " + w.data.connections.filter(connection => connection.enabled).length + " enabled" : "Connect your integrations"} →</button>
     <input ref={upload} type="file" multiple hidden aria-label="Attach files" disabled={sending || uploading} onChange={async e => {
       const selected = Array.from(e.target.files || []); e.target.value = ""; setMenu(""); setError(""); setUploading(true);
       try {

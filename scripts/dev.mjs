@@ -1,3 +1,4 @@
+import { loadManagedSkillCatalog } from '../server/skill-config.mjs';
 import {captureIntegrationCredentials} from '../server/integrations.mjs';
 import path from 'node:path';
 import { createApp } from '../server/app.mjs';
@@ -34,6 +35,8 @@ const deepseekApiKey=process.env.DEEPSEEK_API_KEY;
 const openAlexApiKey=process.env.OPENALEX_API_KEY;
 const exaApiKey=process.env.EXA_API_KEY;
 const publicUserAgent=process.env.PUBLIC_API_USER_AGENT || "Hyperagents-Replica/0.1";
+const skillRoot=path.resolve(process.env.APP_SKILL_ROOT || '.');
+const skillCatalog=loadManagedSkillCatalog(process.env.APP_SKILL_CATALOG,skillRoot);
 delete process.env.OPENALEX_API_KEY;
 delete process.env.EXA_API_KEY;
 delete process.env.DEEPSEEK_API_KEY;
@@ -52,7 +55,7 @@ async function shutdown(code=0) {
 for (const signal of ['SIGINT','SIGTERM']) process.on(signal,()=>void shutdown());
 try {
   if (!fixture) {
-    app=await createApp({host:apiHost,port:apiPort,dataDir:process.env.APP_DATA_DIR ?? path.resolve('.data'),devOrigin:process.env.APP_DEV_ORIGIN,publicOrigin:process.env.APP_PUBLIC_ORIGIN,maxFileBytes:process.env.APP_MAX_FILE_BYTES,ownerPassword,integrationCredentials,deepseekApiKey,openAlexApiKey,exaApiKey,publicUserAgent,moliPath:process.env.MOLI_PATH,browserProvider:process.env.BROWSER_PROVIDER || 'moli',browserPath:process.env.BROWSER_PATH});
+    app=await createApp({host:apiHost,port:apiPort,dataDir:process.env.APP_DATA_DIR ?? path.resolve('.data'),devOrigin:process.env.APP_DEV_ORIGIN,publicOrigin:process.env.APP_PUBLIC_ORIGIN,maxFileBytes:process.env.APP_MAX_FILE_BYTES,ownerPassword,integrationCredentials,deepseekApiKey,openAlexApiKey,exaApiKey,publicUserAgent,skillRoot,skillCatalog,moliPath:process.env.MOLI_PATH,browserProvider:process.env.BROWSER_PROVIDER || 'moli',browserPath:process.env.BROWSER_PATH});
     await app.listen();
     if (publicBind) {
       const response=await fetch(`http://${proxyHost}:${apiPort}/api/session`);

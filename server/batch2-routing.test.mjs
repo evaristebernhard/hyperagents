@@ -37,5 +37,6 @@ test('Exa config, binding, authenticated transport and source results remain sep
   });
   assert.equal(requests, 1); assert.ok(events.some(e => e.type === 'done')); assert.ok(!JSON.stringify(events).includes(secret));
   const manifest = buildCapabilityManifest({ enabled: ['Search'], moliPath: '/missing/browser', exaApiKey: undefined });
-  assert.equal(manifest.capabilities.find(c => c.label === 'Search').executable, false);
+  assert.equal(manifest.capabilities.find(c => c.label === 'Search').executable, true);
+  assert.equal(manifest.capabilities.find(c => c.label === 'Search').executor.name, 'web_search');
 });

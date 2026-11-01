@@ -1,10 +1,10 @@
 import type { Artifact } from "./local-model";
-import type { IntegrationApproval, ToolRun } from "./types";
+import type { FileMeta, IntegrationApproval, ToolRun, KnowledgeHints } from "./types";
 import { ApiError, authenticatedStream } from "./backend-client";
 
 export type LlmConfig = { configured: boolean; models: string[] };
 export type ArtifactPatch = { artifact: Artifact; base?: { content: string; title: string; updatedAt: string } };
-export type ChatEvent = { type: "approval"; approval: IntegrationApproval } | ({ type: "tool" } & ToolRun) | { type: "artifact"; patch: ArtifactPatch } | { type: "delta" | "reasoning"; text: string } | { type: "done"; model: string } | { type: "error"; message: string };
+export type ChatEvent = { type: "tool_trace"; id: string; name: string; phase: "started" | "finished"; startedAt: string; finishedAt?: string; durationMs?: number; source?: string; effect?: string; outcome?: string; argumentFields?: { field: string; type: string; characters?: number; items?: number }[] } | { type: "suggestions"; followUps: string[] } | { type: "reasoning_timing"; reasoningMs: number } | { type: "knowledge_hints"; knowledgeHints: KnowledgeHints } | { type: "generated_file"; file: FileMeta } | { type: "approval"; approval: IntegrationApproval } | ({ type: "tool" } & ToolRun) | { type: "artifact"; patch: ArtifactPatch } | { type: "delta" | "reasoning"; text: string } | { type: "done"; model: string } | { type: "error"; message: string };
 export const currentModels = ["deepseek-flash", "deepseek-v4-pro"];
 export const pendingKey = (workspaceId: string, threadId: string) => "llm-pending:" + workspaceId + ":" + threadId;
 
@@ -21,8 +21,13 @@ export async function consumeChat(response: Response, onEvent: (event: ChatEvent
     if (event.type === "error") throw new Error(typeof event.message === "string" ? event.message : "Generation failed.");
     if ((event.type === "delta" || event.type === "reasoning") && typeof event.text === "string") onEvent(event);
     else if (event.type === "tool" && typeof event.id === "string" && typeof event.summary === "string") onEvent(event);
+    else if (event.type === "tool_trace" && typeof event.id === "string" && typeof event.name === "string" && ["started", "finished"].includes(event.phase)) onEvent(event);
+    else if (event.type === "generated_file" && typeof event.file?.id === "string") onEvent(event);
     else if (event.type === "approval" && typeof event.approval?.token === "string") onEvent(event);
     else if (event.type === "artifact" && event.patch?.artifact && typeof event.patch.artifact.id === "string") onEvent(event);
+    else if (event.type === "suggestions" && Array.isArray(event.followUps) && event.followUps.length >= 2 && event.followUps.length <= 3 && event.followUps.every(s => typeof s === "string" && s === s.trim() && s.length > 0 && s.length <= 160 && !/[\r\n\x00-\x1f\x7f]/.test(s)) && new Set(event.followUps.map(s => s.toLowerCase())).size === event.followUps.length) onEvent(event);
+    else if (event.type === "reasoning_timing" && Number.isSafeInteger(event.reasoningMs) && event.reasoningMs >= 0 && event.reasoningMs <= 86400000) onEvent(event);
+    else if (event.type === "knowledge_hints" && event.knowledgeHints && [event.knowledgeHints.skillIds, event.knowledgeHints.memoryIds].every(ids => Array.isArray(ids) && ids.length <= 10000 && ids.every(id => typeof id === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(id)) && new Set(ids).size === ids.length)) onEvent(event);
     else if (event.type === "done" && typeof event.model === "string") { complete = true; onEvent(event); }
     else throw new Error("Invalid model stream event.");
   };

@@ -1,0 +1,20 @@
+[
+  {
+    "id": "inspect-json",
+    "version": "1.0.0",
+    "entrypoints": {
+      "summarize": {
+        "interpreter": "/usr/bin/node",
+        "script": "examples/skills/inspect-json.mjs",
+        "args": [],
+        "inputArgs": {
+          "minItems": 1,
+          "maxItems": 1,
+          "maxLength": 4096
+        },
+        "credentials": [],
+        "timeoutSeconds": 5
+      }
+    }
+  }
+]

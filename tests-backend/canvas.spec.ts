@@ -54,7 +54,7 @@ test("canvas: real previews, persistent layouts, dock, restore and collapse neve
   await canvas(page).getByRole("button", { name: "Restore: Canvas document", exact: true }).click(); await saved(page);
   await expect(canvas(page).locator(".ac-card")).toHaveCount(3);
   await page.getByRole("button", { name: "Hide canvas", exact: true }).click(); await saved(page); await page.reload();
-  await expect(canvas(page).getByRole("button", { name: "Show canvas", exact: true })).toBeVisible();
+  await expect(canvas(page)).toBeHidden(); await expect(page.getByRole("button", { name: "Show canvas", exact: true })).toBeVisible();
   await page.locator(".rt-actions").first().getByRole("button", { name: "Show canvas", exact: true }).click(); await saved(page);
   await expect(canvas(page).locator(".ac-card")).toHaveCount(3);
   await canvas(page).getByRole("button", { name: "Carousel layout", exact: true }).click(); await saved(page);
@@ -89,7 +89,7 @@ test("canvas: filtering is view-only and fork remaps layout IDs to copied artifa
   await page.getByLabel("Artifact type", { exact: true }).selectOption("Table");
   await expect(canvas(page).locator(".ac-card")).toHaveCount(1);
   await expect(canvas(page).getByRole("button", { name: "Restore: Canvas document", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Fork thread", exact: true }).click(); await saved(page);
+  await openThreadActions(page); await page.getByRole("button", { name: "Fork thread", exact: true }).click(); await saved(page);
   await expect(page).not.toHaveURL(new RegExp(seeded.threadId));
   await expect(canvas(page).getByRole("button", { name: "Restore: Canvas document", exact: true })).toBeVisible();
   const data = await page.evaluate(async () => {
@@ -131,3 +131,5 @@ test("canvas: first reorder follows title sort and keeps docked slots stable", a
   await expect(titles).toHaveText(["Canvas webpage", "Canvas document", "Canvas table"]);
   await page.reload(); await expect(titles).toHaveText(["Canvas webpage", "Canvas document", "Canvas table"]);
 });
+
+async function openThreadActions(page: import("@playwright/test").Page) { const menu=page.locator("details.rt-thread-actions"); if (!(await menu.getAttribute("open") !== null)) await menu.locator(":scope > summary").click(); }

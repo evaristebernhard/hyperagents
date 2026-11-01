@@ -36,6 +36,6 @@ test('integration dispatcher preserves pending approval and does not execute a w
 test('Plan mode catalog cannot expose workspace or shell executors',async()=>{
   const state={workspaces:[{id:'w',data:data()}]};state.workspaces[0].data.threads[0].messages[0].context.settings.mode='Plan';
   let called=false;
-  const events=await run(async(_u,opts)=>{assert.equal(JSON.parse(opts.body).tools,undefined);return answer();},{shell:{definitions:[{type:'function',function:{name:'shell_execute',description:'shell',parameters:{type:'object'}}}],execute:async()=>called=true}},state);
+  const events=await run(async(_u,opts)=>{assert.deepEqual(JSON.parse(opts.body).tools.map(t=>t.function.name),['suggest_follow_ups']);return answer();},{shell:{definitions:[{type:'function',function:{name:'shell_execute',description:'shell',parameters:{type:'object'}}}],execute:async()=>called=true}},state);
   assert.equal(called,false);assert.ok(events.some(e=>e.type==='done'));
 });

@@ -1096,6 +1096,9 @@ export default function SettingsUI({
               </p>
               {[
                 "Search",
+                "Files",
+                "Skills",
+                "Delegation",
                 "Browser",
                 "Webpages",
                 "Slides",

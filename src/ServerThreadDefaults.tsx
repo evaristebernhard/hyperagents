@@ -22,7 +22,7 @@ export default function ServerThreadDefaults() {
     <label className="field">Tools preference<input className="input" aria-label="Default tools preference" value={tools} placeholder="Comma-separated tool names" onChange={e => setTools(e.target.value)} /></label>
     <label className="field">Output format<input className="input" aria-label="Default output format" value={value.outputFormat || ""} onChange={e => setValue({ ...value, outputFormat: e.target.value })} /></label>
     <button className="btn primary" disabled={busy}>Save default thread settings</button>
-    <p className="demo-note">Models, agent delegation, safety approvals and run time limits require an execution service, which is intentionally not connected.</p>
+    <p className="demo-note">Saved preferences never grant execution by themselves. Files/Skills require per-action approval; Delegation only exposes read-only child runs, and every capability is checked by the server.</p>
     {status && <p role="status">{status}</p>}{error && <p role="alert">{error}</p>}
   </form>;
 }

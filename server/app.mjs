@@ -9,7 +9,7 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { ApiError, emptyState, validateState } from './validation.mjs';
 import { prepareLegacy } from './legacy.mjs';
-import { createLlm } from './llm.mjs';
+import { createLlm, MODELS } from './llm.mjs';
 import { createRunManager } from './agent-runs.mjs';
 import { createProviderProbe } from './provider-probe.mjs';
 import { marketplaceCapabilities, marketplaceCatalog } from './marketplace.mjs';
@@ -122,7 +122,26 @@ export async function createApp(options = {}) {
     if (!result.changes) err(409,'Workspace changed. Reload before saving.','CONFLICT');
     return revision+1;
   };
-  const runs=createRunManager({dataDir,llm,load,readAttachment,validateAdmission:(state,request)=>{try{integrationRegistry.bind(state,request,approvalBroker);}catch(e){throw new ApiError(422,e.message,'INTEGRATION_SETUP');}},shellRoot:options.shellRoot ?? process.cwd(),maxConcurrent:options.runConcurrency ?? 2,timeoutMs:options.runTimeoutMs ?? 20*60*1000,persist:run=> {
+  const createDelegatedThread=async({workspaceId,parentThreadId,parentRunId,agentId,task,tools})=>{
+    const current=load(),w=current.state.workspaces.find(w=>w.id===workspaceId);
+    const parent=w?.data.threads.find(t=>t.id===parentThreadId&&!t.archived);
+    const agent=w?.data.agents.find(a=>a.id===agentId&&!a.archived);
+    if(!parent||!agent)throw Error('Delegation resources are unavailable.');
+    const key=hash(JSON.stringify([parentRunId,agentId,task]));
+    const threadId='thread-delegated-'+key,userMessageId='message-delegated-'+key;
+    const existing=w.data.threads.find(t=>t.id===threadId);
+    if(existing){
+      const first=existing.messages?.[0],settings=first?.context?.settings||existing.config;
+      if(existing.archived||existing.messages?.length!==1||first.id!==userMessageId||first.text!==task||settings?.agentId!==agentId||JSON.stringify(settings.tools)!==JSON.stringify(tools))throw Error('Delegated thread conflicts with existing data.');
+      return {workspaceId,threadId,userMessageId};
+    }
+    const settings={model:MODELS.includes(agent.model)?agent.model:'deepseek-flash',reasoning:agent.reasoning||'Medium',provider:'DeepSeek',mode:'Execute',agentId,tools:[...tools]};
+    const timestamp=now();
+    w.data.threads.push({id:threadId,title:(agent.name+' · Delegated task').slice(0,512),summary:'Read-only delegated work',time:'Now',createdAt:timestamp,updatedAt:timestamp,config:settings,messages:[{id:userMessageId,role:'user',text:task,createdAt:timestamp,context:{settings}}]});
+    validateState(current.state,findFile);commit(current.state,current.revision);
+    return {workspaceId,threadId,userMessageId};
+  };
+  const runs=createRunManager({dataDir,llm,load,readAttachment,createDelegatedThread,skillCatalog:options.skillCatalog||[],skillRoot:options.skillRoot||options.shellRoot||process.cwd(),skillCredentialProvider:options.skillCredentialProvider,persistGeneratedFile:persistVisual,validateAdmission:(state,request)=>{try{integrationRegistry.bind(state,request,approvalBroker);}catch(e){throw new ApiError(422,e.message,'INTEGRATION_SETUP');}},shellRoot:options.shellRoot ?? process.cwd(),maxConcurrent:options.runConcurrency ?? 2,timeoutMs:options.runTimeoutMs ?? 20*60*1000,persist:run=> {
     const current=load(),w=current.state.workspaces.find(w=>w.id===run.request.workspaceId),thread=w?.data.threads.find(t=>t.id===run.request.threadId && !t.archived);
     const index=thread?.messages?.findIndex(m=>m.id===run.request.userMessageId) ?? -1;
     if(!thread || index<0 || hash(thread.messages[index].text)!==run.sourceHash)throw Error('Run source changed.');
@@ -147,8 +166,14 @@ export async function createApp(options = {}) {
       if(format==='webpage') {kind='Webpage';content=/```(?:html)?\s*\n([\s\S]*?)```/i.exec(text)?.[1]?.trim() || text.trim();if(!/^<(?:!doctype\s+html|html|main|section|article|div)\b/i.test(content))content=null;}
       if(content)w.data.artifacts.push({id:'artifact-'+randomUUID(),title:thread.title+' · '+kind,kind,content,threadId:thread.id,...(thread.projectId?{projectId:thread.projectId}:{}),versions:[],createdAt:now(),updatedAt:now()});
     }
+    const generatedFiles=(run.generatedFiles||[]).slice(0,8).map(f=>{
+      const stored=findFile(f.id,w.id);
+      if(!stored||['name','size','mimeType','createdAt','workspaceId'].some(k=>stored[k]!==f[k]))throw Error('Generated file is outside the workspace or metadata changed.');
+      return stored;
+    });
+    const generatedContext=generatedFiles.length?{settings:source.context?.settings||thread.config||{model:'',reasoning:'Medium',provider:'Any',mode:'Execute',tools:[]},skillIds:[],memoryIds:[],artifactIds:[],integrationIds:[],attachments:generatedFiles}:null;
     const tools=run.toolRuns.slice(-30).map(e=>({id:e.id,name:e.name,status:e.status==='running'?'error':e.status,summary:e.summary}));
-    thread.messages.splice(index+1,0,{id:answerId,role:'assistant',text,createdAt:now(),...(tools.length?{toolRuns:tools}:{}),...(run.approvals.length?{actionRequests:run.approvals.slice(0,12)}:{})});thread.updatedAt=now();
+    thread.messages.splice(index+1,0,{id:answerId,role:'assistant',text,createdAt:now(),...(generatedContext?{context:generatedContext}:{}),...(run.status==='succeeded'?{...(run.followUps?{followUps:run.followUps}:{}),...(run.reasoningMs!==undefined?{reasoningMs:run.reasoningMs}:{}),...(run.knowledgeHints?{knowledgeHints:run.knowledgeHints}:{})}:{}),...(tools.length?{toolRuns:tools}:{}),...(run.approvals.length?{actionRequests:run.approvals.slice(0,12)}:{})});thread.updatedAt=now();
     validateState(current.state,findFile);commit(current.state,current.revision);return true;
   }});
   const limits = new Map();
@@ -259,9 +284,9 @@ export async function createApp(options = {}) {
         const b=await body(req,70000);exactBody(b,['token','confirmed','workspaceId','threadId']);if(b.confirmed!==true)err(422,'Explicit confirmation is required.','CONFIRMATION');
         rate('integration-writes',60);try{return send(res,200,await approvalBroker.execute(b.token,{workspaceId:b.workspaceId,threadId:b.threadId}));}catch(e){err(422,e.message,'INTEGRATION_ACTION');}
       }
-      if (route==='/api/capabilities' && method==='GET') return send(res,200,buildCapabilityManifest({openAlexApiKey:options.openAlexApiKey,exaApiKey:options.exaApiKey,userAgent:options.publicUserAgent,moliPath:options.moliPath,browserProvider:options.browserProvider,browserPath:options.browserPath}));
+      if (route==='/api/capabilities' && method==='GET') return send(res,200,buildCapabilityManifest({openAlexApiKey:options.openAlexApiKey,exaApiKey:options.exaApiKey,userAgent:options.publicUserAgent,moliPath:options.moliPath,browserProvider:options.browserProvider,browserPath:options.browserPath,skillsConfigured:Array.isArray(options.skillCatalog)&&options.skillCatalog.length>0}));
       if (route==='/api/marketplace/capabilities' && method==='GET') {
-        const result=marketplaceCapabilities({browserProvider:options.browserProvider,browserPath:options.browserPath,moliPath:options.moliPath,deepseekConfigured:llm.config().configured,openAlexApiKey:options.openAlexApiKey,exaApiKey:options.exaApiKey,userAgent:options.publicUserAgent});
+        const result=marketplaceCapabilities({browserProvider:options.browserProvider,browserPath:options.browserPath,moliPath:options.moliPath,skillsConfigured:Array.isArray(options.skillCatalog)&&options.skillCatalog.length>0,deepseekConfigured:llm.config().configured,openAlexApiKey:options.openAlexApiKey,exaApiKey:options.exaApiKey,userAgent:options.publicUserAgent});
         for(const provider of integrationRegistry.statuses().providers)result.capabilities[provider.name]={available:provider.configured,reason:provider.configured?'Server API adapter configured; select a tested workspace connection. Write operations still need per-action confirmation.':'API adapter implemented; configure '+provider.env.join(' / ')+' and test the provider access.'};
         result.capabilities.Email={available:false,reason:'Gmail supports reads and approval-gated drafts, not direct outbound email sending. See the Gmail capability.'};result.capabilities.Calendar=result.capabilities['Google Calendar'];return send(res,200,result);
       }

@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {stripTypeScriptTypes} from 'node:module';
+const code=stripTypeScriptTypes(readFileSync(new URL('../src/tool-activity-model.ts',import.meta.url),'utf8'));
+const {formatToolActivity,safeExternalUrl}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const run=summary=>({id:'x',name:'exa_search',status:'success',summary});
+test('tool UI gives human labels and real result domains',()=>{const m=formatToolActivity(run(JSON.stringify({status:'ok',results:[{title:'Hello',url:'https://example.org/a',excerpt:'Some source'}]})));assert.equal(m.label,'Searching the web');assert.equal(m.results[0].domain,'example.org');assert.equal(m.results[0].title,'Hello');});
+test('tool UI rejects dangerous and credentialed links',()=>{for(const u of ['javascript:alert(1)','data:text/html,x','https://u:password@example.org','/relative'])assert.equal(safeExternalUrl(u),undefined);});
+test('tool UI handles clipped JSON and never invents results',()=>{const m=formatToolActivity(run('{"results":[{"title":"cut'));assert.equal(m.results.length,0);assert.ok(m.text.includes('cut'));});
+test('tool UI does not label prepared or approval as completed',()=>{assert.equal(formatToolActivity(run('{"status":"prepared"}')).statusText,'Prepared');assert.equal(formatToolActivity(run('{"status":"approval_required"}')).statusText,'Awaiting approval');});
+test('tool UI bounds lists and long titles; unknown tools remain readable',()=>{const m=formatToolActivity({...run(JSON.stringify({results:Array.from({length:20},()=>({title:'a'.repeat(400),url:'https://example.org'}))})),name:'unknown_tool'});assert.equal(m.results.length,8);assert.ok(m.results[0].title.length<=180);assert.equal(m.label,'Unknown tool');});

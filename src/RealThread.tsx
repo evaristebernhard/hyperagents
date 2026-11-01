@@ -1,8 +1,8 @@
 import { parseSlidesContent } from "./slide-preview";
 import { useEffect, useRef, useState } from "react";
-import { Star, SlidersHorizontal, Share2, GitFork, Archive, Trash2, Pencil, X, Activity, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Star, SlidersHorizontal, Share2, GitFork, Archive, Trash2, Pencil, X, Activity, ChevronDown, Copy, PanelRightClose, PanelRightOpen } from "lucide-react";
 import type { ThreadProps } from "./Thread";
-import type { MessageContext, ThreadSettings, ToolRun } from "./types";
+import type { MessageContext, ThreadSettings, ToolRun, KnowledgeHints } from "./types";
 import { defaultThreadSettings } from "./types";
 import type { Artifact } from "./local-model";
 import { now, uid } from "./local-model";
@@ -18,6 +18,7 @@ import ArtifactCanvas from "./ArtifactCanvas";
 import ProviderDiagnostics from "./ProviderDiagnostics";
 import IntegrationApprovals from "./IntegrationApprovals";
 import "./real-thread.css";
+import ToolActivity from "./ToolActivity";
 
 type Share = { id: string; token: string; createdAt: string; revokedAt?: string };
 const errorText = (error: unknown) => error instanceof Error ? error.message : "The operation could not be completed.";
@@ -31,6 +32,11 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
   const [generating, setGenerating] = useState(false);
   const [draft, setDraft] = useState("");
   const [reasoning, setReasoning] = useState(false);
+  const [reasoningMs, setReasoningMs] = useState<number | undefined>();
+  const [followUps, setFollowUps] = useState<string[]>([]);
+  const [liveHints, setLiveHints] = useState<KnowledgeHints>();
+  const [prefill, setPrefill] = useState<{ id: string; text: string }>();
+  const requestPrefill = (text: string) => setPrefill({ id: uid("prefill"), text });
   const [toolRuns, setToolRuns] = useState<ToolRun[]>([]);
   // This controller owns the VIEW, never the lifetime of server execution.
   const generation = useRef<AbortController | null>(null);
@@ -42,6 +48,8 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
   const [viewError, setViewError] = useState("");
   const [cancelBusy, setCancelBusy] = useState(false);
   const [approvalBusy, setApprovalBusy] = useState("");
+  const [delegatedRuns, setDelegatedRuns] = useState<RunInfo[]>([]);
+  const [delegatedError, setDelegatedError] = useState("");
   const actionPending = useRef(false);
   const [preparedArtifacts, setPreparedArtifacts] = useState(0);
   const [preparedApprovals, setPreparedApprovals] = useState(0);
@@ -52,6 +60,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
   currentView.current = { threadId: thread.id, workspaceId: w.state.active };
   const isCurrentView = (epoch: number) => alive.current && lifecycle.current === epoch && currentView.current.threadId === thread.id && currentView.current.workspaceId === w.state.active;
   const bottom = useRef<HTMLDivElement>(null);
+  const threadActions = useRef<HTMLDetailsElement>(null);
   const [busy, setBusy] = useState(false);
   const [modal, setModal] = useState("");
   const [title, setTitle] = useState(thread.title);
@@ -60,6 +69,9 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
   const [selectedId, setSelectedId] = useState("");
   const [kind, setKind] = useState("All");
   const [sort, setSort] = useState("updated");
+  // Canvas visibility is a view preference; opening an empty canvas must not save data.
+  const [canvasOverride, setCanvasOverride] = useState<{ threadId: string; preference: boolean | undefined; collapsed: boolean } | null>(null);
+  const [runDetails, setRunDetails] = useState<{ id: string; status: RunInfo["status"]; open: boolean } | null>(null);
   const [search, setSearch] = useState("");
   const [artifactTitle, setArtifactTitle] = useState("");
   const [content, setContent] = useState("");
@@ -74,6 +86,18 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
   const latest = useRef(thread);
   latest.current = thread;
   const linked = w.data.artifacts.filter(a => a.threadId === thread.id && !a.archived);
+  const canvasCollapsed = canvasOverride?.threadId === thread.id && canvasOverride.preference === thread.canvas?.collapsed
+    ? canvasOverride.collapsed
+    : (thread.canvas?.collapsed ?? linked.length === 0);
+  const toggleCanvas = () => {
+    // Preserve existing explicit canvas preferences for threads with artifacts.
+    if (linked.length || thread.canvas?.collapsed !== undefined) {
+      void perform(() => saveThread({ canvas: { layout: "focus", hidden: [], order: [], ...thread.canvas, collapsed: !canvasCollapsed } }));
+      setCanvasOverride(null);
+    } else setCanvasOverride({ threadId: thread.id, preference: thread.canvas?.collapsed, collapsed: !canvasCollapsed });
+  };
+  const pendingApproval = !!runInfo && (runInfo.status === "waiting_approval" || runInfo.approvals.some(approval => approval.status === "pending"));
+  const runDetailsOpen = pendingApproval || (runDetails && runDetails.id === runInfo?.id && runDetails.status === runInfo?.status && runDetails.open);
   const sortedArtifacts = [...linked].sort((a, b) => sort === "title" ? a.title.localeCompare(b.title) : (sort === "created" ? b.createdAt.localeCompare(a.createdAt) : b.updatedAt.localeCompare(a.updatedAt)));
   const visible = sortedArtifacts.filter(a => (kind === "All" || a.kind === kind) && a.title.toLowerCase().includes(search.toLowerCase()));
   const canvasOrder = new Map((thread.canvas?.order || []).map((id, i) => [id, i]));
@@ -104,6 +128,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     const controller = new AbortController();
     generation.current = controller;
     setLlm(null); setLlmError(""); setDraft(""); setToolRuns([]); setGenerating(false);
+    setReasoningMs(undefined); setFollowUps([]); setLiveHints(undefined); setPrefill(undefined);
     setRunInfo(null); runRef.current = null; cursor.current = 0;
     setCheckingRuns(true); setConnection(null); setViewError("");
     setPreparedArtifacts(0); setPreparedApprovals(0); setCancelBusy(false); setApprovalBusy("");
@@ -142,6 +167,10 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     runRef.current = run; setRunInfo(run); setGenerating(isActiveRun(run));
   }
   function receiveEvent(event: RuntimeEvent) {
+    // Optional metadata uses the runtime contract; never infer time or expose reasoning text.
+    if (event.type === "reasoning_timing") setReasoningMs(event.reasoningMs);
+    if (event.type === "suggestions") setFollowUps(event.followUps);
+    if (event.type === "knowledge_hints") setLiveHints(event.knowledgeHints);
     if (event.type === "delta") { setDraft(text => text + event.text); setReasoning(false); }
     else if (event.type === "reasoning") setReasoning(true);
     else if (event.type === "tool") setToolRuns(items => {
@@ -153,7 +182,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     else if (event.type === "approval") setPreparedApprovals(count => count + 1);
     else if (event.type === "shell_approval" && runRef.current) {
       const run = runRef.current;
-      if (!run.approvals.some(item => item.id === event.actionId)) showRun({ ...run, approvals: [...run.approvals, { id: event.actionId, status: "pending", command: event.command, cwd: event.cwd, timeoutSeconds: event.timeoutSeconds }] });
+      if (!run.approvals.some(item => item.id === event.actionId)) showRun({ ...run, approvals: [...run.approvals, { id: event.actionId, status: "pending", kind: event.kind, command: event.command, cwd: event.cwd, timeoutSeconds: event.timeoutSeconds }] });
     } else if (event.type === "run_status" && runRef.current) showRun({ ...runRef.current, status: event.status });
     else if (event.type === "done" && runRef.current) showRun({ ...runRef.current, model: event.model });
     else if (event.type === "error") setError(event.message);
@@ -162,7 +191,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     if (!isCurrentView(epoch) || controller.signal.aborted) return;
     generation.current = controller; showRun(run); setCheckingRuns(false); setViewError(""); setConnection(null);
     if (replay) {
-      cursor.current = 0; setDraft(""); setReasoning(false); setToolRuns([]); setPreparedArtifacts(0); setPreparedApprovals(0);
+      cursor.current = 0; setDraft(""); setReasoning(false); setReasoningMs(undefined); setFollowUps([]); setLiveHints(undefined); setToolRuns([]); setPreparedArtifacts(0); setPreparedApprovals(0);
     }
     const viewing = () => isCurrentView(epoch) && generation.current === controller && !controller.signal.aborted;
     try {
@@ -176,7 +205,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
       if (!viewing()) return;
       // Server owns final assistant messages and versioned artifacts. Never re-save them here.
       await w.reload();
-      if (viewing()) { setDraft(""); setReasoning(false); setToolRuns([]); setPreparedArtifacts(0); setPreparedApprovals(0); }
+      if (viewing()) { setDraft(""); setReasoning(false); setReasoningMs(undefined); setFollowUps([]); setLiveHints(undefined); setToolRuns([]); setPreparedArtifacts(0); setPreparedApprovals(0); }
     } catch (e) {
       if (viewing()) setViewError(errorText(e) + " Retry viewing reconnects to this run; it does not execute again.");
     } finally {
@@ -213,7 +242,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
   async function generate(userMessageId: string, epoch = lifecycle.current) {
     if (!isCurrentView(epoch) || generation.current || (runRef.current && isActiveRun(runRef.current)) || thread.archived) return;
     const controller = new AbortController();
-    generation.current = controller; setGenerating(true); setDraft(""); setError(""); setViewError(""); setReasoning(false); setToolRuns([]);
+    generation.current = controller; setGenerating(true); setDraft(""); setError(""); setViewError(""); setReasoning(false); setReasoningMs(undefined); setFollowUps([]); setLiveHints(undefined); setToolRuns([]);
     // A failed POST is ambiguous: discover the new run, never reconnect to an older terminal run.
     runRef.current = null; setRunInfo(null); cursor.current = 0; setConnection(null); setPreparedArtifacts(0); setPreparedApprovals(0);
     const key = pendingKey(w.state.active, thread.id);
@@ -253,6 +282,20 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     } catch (e) { if (isCurrentView(epoch)) setError("Cancellation was not confirmed: " + errorText(e) + " The run may still be active."); }
     finally { if (isCurrentView(epoch)) { actionPending.current = false; setCancelBusy(false); } }
   }
+  async function refreshDelegatedRuns() {
+    const run = runRef.current;
+    if (!run) return;
+    try {
+      const query = new URLSearchParams({ workspaceId: run.workspaceId, threadId: run.threadId });
+      const result = await api<{ runs: RunInfo[] }>("/api/runs/" + encodeURIComponent(run.id) + "/tree?" + query);
+      if (runRef.current?.id !== run.id) return;
+      setDelegatedRuns(result.runs.filter(child => child.parentRunId === run.id)); setDelegatedError("");
+    } catch { setDelegatedError("Unable to load delegated runs. Refresh to retry; this does not execute them again."); }
+  }
+  useEffect(() => {
+    setDelegatedRuns([]); setDelegatedError("");
+    if (runInfo?.childCount) void refreshDelegatedRuns();
+  }, [runInfo?.id, runInfo?.childCount, runInfo?.status]);
   async function approveShell(actionId: string, decision: "approve" | "deny") {
     const run = runRef.current;
     if (!run || !isActiveRun(run) || actionPending.current || !run.approvals.some(item => item.id === actionId && item.status === "pending")) return;
@@ -264,7 +307,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
         showRun(next);
         if (!generation.current) { const controller = new AbortController(); void watchRun(next, epoch, controller, false); }
       }
-    } catch (e) { if (isCurrentView(epoch)) setError("The shell decision was not confirmed: " + errorText(e) + " Retry viewing to check its status before deciding again."); }
+    } catch (e) { if (isCurrentView(epoch)) setError("The action decision was not confirmed: " + errorText(e) + " Retry viewing to check its status before deciding again."); }
     finally { if (isCurrentView(epoch)) { actionPending.current = false; setApprovalBusy(""); } }
   }
   const lastMessage = thread.messages?.at(-1);
@@ -328,59 +371,76 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     setShares(items => [share, ...items]); setConfirmed(false);
   }
 
+  const hintsFor = (index: number) => {
+    const message = thread.messages?.[index], next = thread.messages?.[index + 1];
+    return next?.role === "assistant" && next.knowledgeHints ? next.knowledgeHints : message?.id === runInfo?.userMessageId ? liveHints : undefined;
+  };
+  const hintCount = (hints?: KnowledgeHints) => hints ? hints.skillIds.length + hints.memoryIds.length : 0;
   return <main className="real-thread">
     <header className="rt-header">
-      <div className="rt-title"><h1>{thread.title}</h1>{thread.archived && <span className="rt-badge">Archived</span>}</div>
+      <div className="rt-title"><button className="rt-title-trigger" aria-label="Open thread menu" onClick={() => { if (threadActions.current) threadActions.current.open = !threadActions.current.open; }}><h1>{thread.title}</h1><ChevronDown size={13} aria-hidden="true" /></button><IconButton label={thread.starred ? "Unstar thread" : "Star thread"} onClick={() => void perform(() => saveThread({ starred: !thread.starred }))}><Star size={15} fill={thread.starred ? "currentColor" : "none"} /></IconButton>{thread.archived && <span className="rt-badge">Archived</span>}</div>
       <div className="rt-actions">
-        <IconButton label={thread.canvas?.collapsed ? "Show canvas" : "Hide canvas"} onClick={() => void perform(() => saveThread({ canvas: { layout: "focus", hidden: [], order: [], ...thread.canvas, collapsed: !thread.canvas?.collapsed } }))}>{thread.canvas?.collapsed ? <PanelRightOpen size={17} /> : <PanelRightClose size={17} />}</IconButton>
+        <IconButton label={canvasCollapsed ? "Show canvas" : "Hide canvas"} onClick={toggleCanvas}>{canvasCollapsed ? <PanelRightOpen size={17} /> : <PanelRightClose size={17} />}</IconButton>
+        <button className="rt-header-model" onClick={() => navigate("/thread/" + thread.id + (settingsPanel ? "" : "?panel=settings"))} aria-label="Selected model settings">{config.model || "Choose your model"}<ChevronDown size={12} /></button>
+        <IconButton label="Thread configuration" onClick={() => navigate("/thread/" + thread.id + (settingsPanel ? "" : "?panel=settings"))}><SlidersHorizontal size={17} /></IconButton>
+        <details ref={threadActions} className="rt-thread-actions"><summary>Thread actions</summary><div className="rt-thread-actions-menu">
         <IconButton label="Connection diagnostics" onClick={() => setModal("diagnostics")}><Activity size={17} /></IconButton>
-        <IconButton label={thread.starred ? "Unstar thread" : "Star thread"} onClick={() => void perform(() => saveThread({ starred: !thread.starred }))}><Star size={17} fill={thread.starred ? "currentColor" : "none"} /></IconButton>
         <IconButton label="Rename thread" onClick={() => { setTitle(thread.title); setModal("rename"); }}><Pencil size={17} /></IconButton>
         <IconButton label="Fork thread" onClick={() => void perform(fork)}><GitFork size={17} /></IconButton>
         <IconButton label={thread.archived ? "Unarchive thread" : "Archive thread"} onClick={() => void perform(() => saveThread({ archived: !thread.archived }))}><Archive size={17} /></IconButton>
         <IconButton label="Delete thread" onClick={() => setModal("delete")}><Trash2 size={17} /></IconButton>
         <button className="btn small" onClick={openShare}><Share2 size={15} />Share</button>
-        <IconButton label="Thread configuration" onClick={() => navigate("/thread/" + thread.id + (settingsPanel ? "" : "?panel=settings"))}><SlidersHorizontal size={17} /></IconButton>
+        </div></details>
       </div>
     </header>
-    <div className="rt-status"><span>{llm?.configured ? "DeepSeek configured · Connection not verified" : llmError ? "Model status unavailable" : llm ? "DeepSeek not configured · Messages are still saved" : "Checking model connection…"}</span><span role="status">{busy ? "Saving…" : w.persistence === "saved" ? "Saved" : w.persistence}</span></div>
-    {llm && !llm.configured && <p className="rt-notice">To enable real replies, set DEEPSEEK_API_KEY in the server’s private .env or deployment environment and restart the service. Never commit a key or use a VITE_ secret. Local tools and selected public-data APIs are available when enabled. Selected configured integrations can read actual APIs. Integration writes require your per-action confirmation. Durable runs can use real shell commands only when Shell is explicitly enabled and you approve each command. Shell is not sandboxed and can modify files or access the network. Browser offers ephemeral public-HTTPS navigation, DOM observation/extraction and PNG capture when its backend is configured. Slides uses a dedicated navigable artifact. Search/Find Similar require a configured Exa service. Click/type, persistent logins, handoff, media and schedules remain unavailable.</p>}
+    <details className="rt-status"><summary>Connection & storage</summary><span>{llm?.configured ? "DeepSeek configured · Connection not verified" : llmError ? "Model status unavailable" : llm ? "DeepSeek not configured · Messages are still saved" : "Checking model connection…"}</span><span role="status">{busy ? "Saving…" : w.persistence === "saved" ? "Saved" : w.persistence}</span></details>
+    {llm && !llm.configured && <p className="rt-notice">To enable real replies, set DEEPSEEK_API_KEY in the server’s private .env or deployment environment and restart the service. Never commit a key or use a VITE_ secret. Local tools and selected public-data APIs are available when enabled. Selected configured integrations can read actual APIs. Integration writes require your per-action confirmation. Durable runs can use real shell commands only when Shell is explicitly enabled and you approve each command. Shell is not sandboxed and can modify files or access the network. Browser offers ephemeral public-HTTPS navigation, DOM observation/extraction and PNG capture when its backend is configured. Files and Skills require explicit per-action approval. Delegation runs a selected workspace agent with a read-only capability intersection. Slides uses a dedicated navigable artifact. Search has a keyless public RSS path; Find Similar requires configured Exa. Click/type, persistent logins, handoff, media and schedules remain unavailable.</p>}
     {!config.tools.includes("Slides") && (String(config.outputFormat || "").toLowerCase() === "slides" || /publish_slides|幻灯片/i.test([...(thread.messages || [])].reverse().find(m => m.role === "user")?.text || "")) && <div className="rt-notice" role="status"><strong>这条线程尚未开启 Slides。</strong> 上一轮没有调用 publish_slides；Webpage 不是 Slides 产物。<button type="button" className="btn small" disabled={busy || generating || checkingRuns} onClick={() => void perform(async () => { const next = { ...config, outputFormat: "Slides", tools: [...new Set([...config.tools, "Slides"])] }; await saveThread({ config: next }); setConfig(next); setToolsText(next.tools.join(", ")); notify("Slides 已启用，请重新发送一条消息；历史运行不会重试。"); })}>启用 Slides 并保存线程配置</button></div>}
     {checkingRuns && <p className="rt-run-loading" role="status">Checking saved runs before enabling execution…</p>}
     {runInfo && <section className={"rt-run-panel " + runInfo.status} aria-label="Durable run status">
       <div className="rt-run-heading"><div><strong>{runStatusLabel(runInfo.status)}</strong><code title={runInfo.id}>Run {runInfo.id.slice(0, 8)}</code></div><div className="rt-actions">{isActiveRun(runInfo) && <button className="btn small" disabled={cancelBusy || !!approvalBusy} onClick={() => void stopRun()}>{cancelBusy ? "Stopping…" : "Stop run"}</button>}</div></div>
+      {runInfo.error && <p className="rt-run-failure" role="alert">{runInfo.error}</p>}
+      {connection?.status === "reconnecting" && <p className="rt-run-reconnecting" role="status">Reconnecting to saved events · attempt {connection.failures}/5 · retry in {Math.ceil(connection.retryInMs / 1000)}s. Execution is not restarted.<span>{connection.message}</span></p>}
+      <details className="rt-run-details" open={!!runDetailsOpen} onToggle={event => {
+        // Pending reviews must stay visible, even when the summary is activated.
+        if (pendingApproval) { event.currentTarget.open = true; return; }
+        setRunDetails({ id: runInfo.id, status: runInfo.status, open: event.currentTarget.open });
+      }}><summary onClick={event => { if (pendingApproval) event.preventDefault(); }}>Execution details{pendingApproval ? " · Review required" : ""}</summary>
       <dl className="rt-run-stats"><div><dt>Elapsed</dt><dd>{elapsedLabel(runInfo, clock)}</dd></div><div><dt>Tools</dt><dd>{runInfo.toolCount.toLocaleString()}</dd></div>{runInfo.model && <div><dt>Model</dt><dd>{runInfo.model}</dd></div>}{runInfo.usage?.prompt_tokens !== undefined && <div><dt>Input tokens</dt><dd>{runInfo.usage.prompt_tokens.toLocaleString()}</dd></div>}{runInfo.usage?.completion_tokens !== undefined && <div><dt>Output tokens</dt><dd>{runInfo.usage.completion_tokens.toLocaleString()}</dd></div>}{runInfo.usage?.total_tokens !== undefined && <div><dt>Total tokens</dt><dd>{runInfo.usage.total_tokens.toLocaleString()}</dd></div>}</dl>
+      {!!runInfo.childCount && <section aria-label="Delegated runs"><div className="rt-section-heading"><strong>Read-only delegated runs ({runInfo.childCount})</strong><button className="btn small" onClick={() => void refreshDelegatedRuns()}>Refresh child status</button></div>{delegatedError && <p role="alert">{delegatedError}</p>}{delegatedRuns.map(child => <div key={child.id} className="rt-run-hint"><button className="btn small" onClick={() => navigate("/thread/" + child.threadId)}>Open child thread · {child.id.slice(0,8)}</button> {runStatusLabel(child.status)}</div>)}</section>}
       {!!runInfo.plan?.length && <ol className="rt-run-plan" aria-label="Agent task plan">{runInfo.plan.map(step => <li key={step.id} className={step.status}><span aria-hidden="true">{step.status === "completed" ? "✓" : step.status === "in_progress" ? "◌" : "○"}</span><span>{step.title}</span><small>{step.status.replace("_", " ")}</small></li>)}</ol>}
       {isActiveRun(runInfo) && <p className="rt-run-hint">Execution continues on the server if you leave this page. Stop run explicitly requests cancellation.</p>}
       {!isActiveRun(runInfo) && <p className="rt-run-hint">{runInfo.resultSaved ? "Result saved by the server." : "Run ended. Saving the result was not confirmed; inspect the preserved execution log."}{runInfo.status !== "succeeded" && " Send a new message if you want another execution; retry viewing never reruns the task."}</p>}
-      {runInfo.error && <p className="rt-run-failure" role="alert">{runInfo.error}</p>}
-      {connection?.status === "reconnecting" && <p className="rt-run-reconnecting" role="status">Reconnecting to saved events · attempt {connection.failures}/5 · retry in {Math.ceil(connection.retryInMs / 1000)}s. Execution is not restarted.<span>{connection.message}</span></p>}
-      {!!runInfo.approvals.length && <div className="rt-shell-approvals" aria-label="Shell command approvals"><p className="rt-shell-warning"><strong>Full shell authority — not a sandbox.</strong> Approved commands run on the server and may modify files, access credentials available to the process, or contact the network. Review the exact command, working directory and timeout. No command is auto-approved.</p>{runInfo.approvals.map(approval => <section className={"rt-shell-approval " + approval.status} key={approval.id} aria-label="Shell command review"><div className="rt-section-heading"><strong>Shell command</strong><span className="rt-badge">{approval.status}</span></div><pre className="rt-shell-command">{approval.command}</pre><dl><dt>Working directory</dt><dd><code>{approval.cwd}</code></dd><dt>Timeout</dt><dd>{approval.timeoutSeconds} seconds</dd></dl>{approval.status === "pending" && isActiveRun(runInfo) && <div className="rt-actions"><button className="btn primary" disabled={!!approvalBusy || cancelBusy || !!viewError} onClick={() => void approveShell(approval.id, "approve")}>{approvalBusy === approval.id ? "Submitting decision…" : "Approve command"}</button><button className="btn" disabled={!!approvalBusy || cancelBusy || !!viewError} onClick={() => void approveShell(approval.id, "deny")}>Deny command</button></div>}</section>)}</div>}
+      {!!runInfo.approvals.length && <div className="rt-shell-approvals" aria-label="Execution approvals"><p className="rt-shell-warning"><strong>Review each action before execution.</strong> File changes are limited to this workspace storage. Shell and installed skill scripts run with the server user authority, not a security sandbox. Review the exact content or command, directory and timeout. No action is auto-approved.</p>{runInfo.approvals.map(approval => <section className={"rt-shell-approval " + approval.status} key={approval.id} aria-label={approval.kind === "file" ? "Workspace file review" : approval.kind === "skill" ? "Skill script review" : "Shell command review"}><div className="rt-section-heading"><strong>{approval.kind === "file" ? "Workspace file change" : approval.kind === "skill" ? "Installed skill script" : "Shell command"}</strong><span className="rt-badge">{approval.status}</span></div><pre className="rt-shell-command">{approval.command}</pre><dl><dt>Working directory</dt><dd><code>{approval.cwd}</code></dd><dt>Timeout</dt><dd>{approval.timeoutSeconds} seconds</dd></dl>{approval.status === "pending" && isActiveRun(runInfo) && <div className="rt-actions"><button className="btn primary" disabled={!!approvalBusy || cancelBusy || !!viewError} onClick={() => void approveShell(approval.id, "approve")}>{approvalBusy === approval.id ? "Submitting decision…" : approval.kind && approval.kind !== "shell" ? "Approve action" : "Approve command"}</button><button className="btn" disabled={!!approvalBusy || cancelBusy || !!viewError} onClick={() => void approveShell(approval.id, "deny")}>{approval.kind && approval.kind !== "shell" ? "Deny action" : "Deny command"}</button></div>}</section>)}</div>}
+      </details>
     </section>}
     {viewError && <div className="rt-run-view-error" role="alert"><p>{viewError}</p><button className="btn small" disabled={checkingRuns || !!generation.current} onClick={retryViewing}>Retry viewing</button></div>}
     {llmError && <p className="rt-error" role="alert">{llmError}</p>}
     {error && <div className="rt-error" role="alert">{error}<button className="btn small" onClick={() => setError("")}>Dismiss</button></div>}
     {(w.persistence === "error" || w.persistence === "conflict") && <div className="rt-error" role="alert"><p>{w.storageError || "Changes are not saved. Export a backup before reloading saved data."}</p><div className="rt-actions"><button className="btn small" onClick={w.exportSnapshot}>Export backup</button>{w.persistence === "error" && <button className="btn small" disabled={busy} onClick={() => void perform(w.retrySave)}>Retry save</button>}<button className="btn small" disabled={busy} onClick={() => { if (window.confirm("Discard unsaved local changes and reload saved server data? Export a backup first if you want to keep them.")) void perform(w.reload); }}>Reload saved data</button></div></div>}
-    <div className={"rt-columns" + (settingsPanel ? " has-settings" : "") + (thread.canvas?.collapsed ? " canvas-collapsed" : "")}>
+    <div className={"rt-columns" + (settingsPanel ? " has-settings" : "") + (canvasCollapsed ? " canvas-collapsed" : "")}>
       <section className="rt-conversation" aria-label="Conversation">
         <div className="rt-messages">
           {!(thread.messages || []).length && <div className="rt-empty"><h2>No messages yet</h2><p>Ask a question or start a task. DeepSeek can use your saved conversation, selected agent instructions, skills, memories and text attachments when configured.</p></div>}
           {(thread.messages || []).map((message, i) => <article className={"rt-message " + message.role} key={message.id || i}>
-            <div className="rt-message-meta"><strong>{message.role === "user" ? "You" : "Assistant"}</strong><time dateTime={message.createdAt}>{dateLabel(message.createdAt)}</time></div>
-            {message.role === "assistant" ? <div className="rt-answer"><AnswerMarkdown content={message.text} /><div className="rt-answer-actions"><button className="btn small" onClick={() => void navigator.clipboard.writeText(message.text).then(() => notify("Answer copied")).catch(() => setError("Clipboard access failed. Select and copy the answer text instead."))}>Copy answer</button><button className="btn small" disabled={busy || generating} onClick={() => void perform(() => answerArtifact(message.text, "Document"))}>Save as document</button><button className="btn small" disabled={busy || generating} onClick={() => void perform(() => answerArtifact(message.text, "Webpage"))}>Save as webpage</button></div></div> : <p>{message.text}</p>}
-            {!!message.context?.attachments?.length && <ul className="rt-attachments">{message.context.attachments.map(file => <li key={file.id}><a href={fileDownloadUrl(file)} download={file.name}>{file.name}</a><span> · {file.size.toLocaleString()} bytes</span></li>)}</ul>}
+            {message.role === "assistant" && typeof message.reasoningMs === "number" && Number.isFinite(message.reasoningMs) && message.reasoningMs >= 0 && <div className="rt-reasoning-duration" title="Observed reasoning-stream interval on the server, excluding tool execution. No private reasoning text is shown.">Thought for {durationLabel(message.reasoningMs)}</div>}
             {!!message.toolRuns?.length && <ToolHistory runs={message.toolRuns} />}
+            {message.role === "assistant" ? <div className="rt-answer"><AnswerMarkdown content={message.text} /><div className="rt-answer-actions"><button className="btn small" onClick={() => void navigator.clipboard.writeText(message.text).then(() => notify("Answer copied")).catch(() => setError("Clipboard access failed. Select and copy the answer text instead."))}><Copy size={13} aria-hidden="true" />Copy answer</button><button className="btn small" disabled={busy || generating} onClick={() => void perform(() => answerArtifact(message.text, "Document"))}>Save as document</button><button className="btn small" disabled={busy || generating} onClick={() => void perform(() => answerArtifact(message.text, "Webpage"))}>Save as webpage</button></div></div> : <p>{message.text}</p>}
+            {!!message.context?.attachments?.length && <ul className="rt-attachments">{message.context.attachments.map(file => <li key={file.id}><a href={fileDownloadUrl(file)} download={file.name}>{file.name}</a><span> · {file.size.toLocaleString()} bytes</span></li>)}</ul>}
+            {message.createdAt && <time className={"rt-message-time " + message.role} dateTime={message.createdAt}>{dateLabel(message.createdAt)}</time>}
+            {message.role === "user" && hintCount(hintsFor(i)) > 0 && <span className="rt-resolved-hints" title="Skill and memory records resolved into this run context; not proof that the model relied on them.">{hintCount(hintsFor(i))} knowledge hints</span>}
+            {message.role === "assistant" && !!message.followUps?.length && <div className="rt-followups" aria-label="Suggested follow-ups"><small>Suggested follow-ups</small>{message.followUps.filter(text => typeof text === "string" && text.trim()).map((text, index) => <button type="button" key={index} disabled={generating} onClick={() => requestPrefill(text)}>{text}<span aria-hidden="true">↗</span></button>)}</div>}
             {!!message.actionRequests?.length && message.id && <IntegrationApprovals threadId={thread.id} messageId={message.id} requests={message.actionRequests} />}
             {message.context && <details className="rt-context"><summary>Saved context</summary><dl><dt>Model preference</dt><dd>{message.context.settings?.model || "Not selected"}</dd><dt>Provider preference</dt><dd>{message.context.settings?.provider || "Not selected"}</dd><dt>Skills</dt><dd>{(message.context.skillIds || []).map(id => w.data.skills.find(s => s.id === id)?.name || id).join(", ") || "None"}</dd><dt>Memories</dt><dd>{(message.context.memoryIds || []).length}</dd><dt>Artifacts</dt><dd>{(message.context.artifactIds || []).map(id => w.data.artifacts.find(a => a.id === id)?.title || id).join(", ") || "None"}</dd><dt>Integrations</dt><dd>{(message.context.integrationIds || []).map(id => w.data.connections.find(c => c.id === id)?.label || id).join(", ") || "None"}</dd></dl></details>}
           </article>)}
-          {(generating || (!!viewError && !!draft)) && <article className="rt-message assistant" aria-label="Streaming answer"><div className="rt-message-meta"><strong>Assistant · live preview</strong><span role="status">{viewError ? "Viewing paused" : runInfo?.status === "waiting_approval" ? "Awaiting approval" : connection?.status === "reconnecting" ? "Reconnecting…" : draft ? "Writing…" : reasoning ? "Reasoning…" : "Working…"}</span></div>{!!toolRuns.length && <ToolHistory runs={toolRuns} />}{draft && <div className="rt-answer"><AnswerMarkdown content={draft} /></div>}{!!preparedArtifacts && <p className="rt-run-hint">{preparedArtifacts} artifact update(s) prepared. The server saves final artifact versions.</p>}{!!preparedApprovals && <p className="rt-run-hint">Integration review prepared. Review the saved action below the final answer when the run finishes.</p>}</article>}
+          {(generating || (!!viewError && !!draft)) && <article className="rt-message assistant" aria-label="Streaming answer"><div className="rt-message-meta"><span role="status">{viewError ? "Viewing paused" : runInfo?.status === "waiting_approval" ? "Awaiting approval" : connection?.status === "reconnecting" ? "Reconnecting…" : draft ? "Writing…" : reasoning ? "Reasoning…" : "Working…"}</span></div>{typeof reasoningMs === "number" && <div className="rt-reasoning-duration" title="Observed reasoning-stream interval on the server, excluding tool execution. No private reasoning text is shown.">Thought for {durationLabel(reasoningMs)}</div>}{!!toolRuns.length && <ToolHistory runs={toolRuns} />}{draft && <div className="rt-answer"><AnswerMarkdown content={draft} /></div>}{!!preparedArtifacts && <p className="rt-run-hint">{preparedArtifacts} artifact update(s) prepared. The server saves final artifact versions.</p>}{!!preparedApprovals && <p className="rt-run-hint">Integration review prepared. Review the saved action below the final answer when the run finishes.</p>}</article>}
+          {!generating && !viewError && !!followUps.length && <div className="rt-followups" aria-label="Suggested follow-ups"><small>Suggested follow-ups</small>{followUps.map((text, index) => <button type="button" key={index} onClick={() => requestPrefill(text)}>{text}<span aria-hidden="true">↗</span></button>)}</div>}
           {!generating && canGenerate && <button className="btn" onClick={() => void generate(lastMessage!.id!)}>Generate reply</button>}
           <div ref={bottom} />
         </div>
-        <div className="rt-composer"><Composer disabled={generating || checkingRuns || !!viewError || !!generation.current} compact navigate={navigate} notify={notify} agents={agents} initialSettings={thread.config} contextKey={thread.id} onSend={send} /></div>
+        <div className="rt-composer"><Composer prefill={prefill} disabled={generating || checkingRuns || !!viewError || !!generation.current} compact navigate={navigate} notify={notify} agents={agents} initialSettings={thread.config} contextKey={thread.id} onSend={send} /></div>
       </section>
-      <section className={"rt-artifacts" + (thread.canvas?.collapsed ? " is-collapsed" : "")} aria-label="Thread artifacts">
-        {thread.canvas?.collapsed ? <button className="rt-canvas-restore" onClick={() => void perform(() => saveThread({ canvas: { ...thread.canvas!, collapsed: false } }))}><PanelRightOpen size={17} />Show canvas</button> : <>
+      {!canvasCollapsed && <section className="rt-artifacts" aria-label="Thread artifacts">
         <div className="rt-section-heading"><h2>Artifacts <span>{linked.length}</span></h2><div className="rt-actions"><button className="btn small" disabled={busy} onClick={() => void perform(() => newArtifact("Document"))}>New document</button><button className="btn small" disabled={busy} onClick={() => void perform(() => newArtifact("Webpage"))}>New webpage</button></div></div>
         <div className="rt-artifact-filters"><input aria-label="Filter artifacts" placeholder="Filter artifacts…" value={search} onChange={e => setSearch(e.target.value)} /><select aria-label="Artifact type" value={kind} onChange={e => setKind(e.target.value)}>{["All", "Document", "Webpage", "Slides", "Table", "Image", "File"].map(k => <option key={k}>{k}</option>)}</select><select aria-label="Sort artifacts" value={sort} onChange={e => setSort(e.target.value)}><option value="updated">Last updated</option><option value="created">Newest first</option><option value="title">Title A–Z</option></select></div>
         <ArtifactCanvas artifacts={visible} allArtifacts={sortedArtifacts} selectedId={selectedId} value={thread.canvas} disabled={busy} onSelect={selectArtifact} onChange={canvas => void perform(() => saveThread({ canvas }))}>
@@ -392,9 +452,8 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
           {editing ? <form onSubmit={e => { e.preventDefault(); void perform(saveArtifact); }} className="rt-artifact-form"><label>Artifact title<input required value={artifactTitle} onChange={e => setArtifactTitle(e.target.value)} /></label><label>{selected.kind === "Webpage" ? "HTML source" : selected.kind === "Slides" ? "Slides JSON" : "Content"}<textarea aria-label="Artifact content" value={content} onChange={e => setContent(e.target.value)} /></label><button className="btn primary" disabled={busy}>Save artifact</button></form> : <ArtifactView artifact={preview!} />}
         </div> : !!linked.length && <p className="rt-empty">Select an artifact to preview, edit, download, or restore a version.</p>}
         </ArtifactCanvas>
-        </>}
-      </section>
-      {settingsPanel && <aside className="rt-settings" aria-label="Thread configuration"><div className="rt-section-heading"><h2>Configuration</h2><IconButton label="Close configuration" onClick={() => navigate("/thread/" + thread.id)}><X size={16} /></IconButton></div><p className="rt-notice">DeepSeek uses the selected agent prompt and saved context. Only the supported models below execute. Enable Thread Search, Documents, Webpages and Tables for local tool calls. Enable Web Fetch for read-only public HTTPS Markdown retrieval through local Moli. World Bank / Weather / configured OpenAlex are read-only API tools. Selected integrations execute actual API reads; writes are confirmation-gated. Durable server runs can use Shell only after you enable it and explicitly approve each command. Shell has full server authority, not sandbox isolation, and can modify files or contact the network. Leaving this page does not stop a run. Browser supports ephemeral sessions, public HTTPS navigation, DOM observation/extraction and PNG capture when configured. Slides uses a dedicated navigable artifact. Search/Find Similar require a configured Exa service. Click/type, persistent logins, handoff, media and schedules remain unavailable.</p>
+      </section>}
+      {settingsPanel && <aside className="rt-settings" aria-label="Thread configuration"><div className="rt-section-heading"><h2>Configuration</h2><IconButton label="Close configuration" onClick={() => navigate("/thread/" + thread.id)}><X size={16} /></IconButton></div><p className="rt-notice">DeepSeek uses the selected agent prompt and saved context. Only the supported models below execute. Enable Thread Search, Documents, Webpages and Tables for local tool calls. Enable Web Fetch for read-only public HTTPS Markdown retrieval through local Moli. World Bank / Weather / configured OpenAlex are read-only API tools. Selected integrations execute actual API reads; writes are confirmation-gated. Durable server runs can use Shell only after you enable it and explicitly approve each command. Shell has full server authority, not sandbox isolation, and can modify files or contact the network. Leaving this page does not stop a run. Browser supports ephemeral sessions, public HTTPS navigation, DOM observation/extraction and PNG capture when configured. Files and Skills require explicit per-action approval. Delegation runs a selected workspace agent with a read-only capability intersection. Slides uses a dedicated navigable artifact. Search has a keyless public RSS path; Find Similar requires configured Exa. Click/type, persistent logins, handoff, media and schedules remain unavailable.</p>
         <label>Project<select aria-label="Thread project" value={thread.projectId || ""} onChange={e => void perform(() => saveThread({ projectId: e.target.value || undefined, project: undefined }))}><option value="">No project</option>{w.data.projects.filter(p => !p.archived || p.id === thread.projectId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
         <form onSubmit={e => { e.preventDefault(); void perform(() => saveThread({ config })); }}>
           <label>Provider<select value="DeepSeek" disabled><option>DeepSeek</option></select></label>
@@ -404,6 +463,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
           <label>Agent preference<select value={config.agentId || ""} onChange={e => setConfig({ ...config, agentId: e.target.value || undefined, starterAgentName: undefined })}><option value="">No agent</option>{w.data.agents.filter(a => !a.archived || a.id === config.agentId).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
           <label>Tools preference (comma-separated)<input value={toolsText} onChange={e => { setToolsText(e.target.value); setConfig({ ...config, tools: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }); }} /></label>
           <div className="rt-shell-config"><strong>Real shell execution</strong><p>Enable Shell for future runs only if you intend to grant real server shell access. Every proposed command still requires Approve or Deny. Enabling this tool does not approve any command.</p><button type="button" className="btn small" disabled={busy || config.tools.some(tool => tool.toLowerCase() === "shell")} onClick={() => void perform(async () => { const next = { ...config, tools: [...config.tools, "Shell"] }; setConfig(next); setToolsText(next.tools.join(", ")); await saveThread({ config: next }); })}>{config.tools.some(tool => tool.toLowerCase() === "shell") ? "Shell enabled in configuration" : "Enable Shell & save configuration"}</button></div>
+          <div className="rt-shell-config"><strong>Managed tools</strong><p>Files use private workspace storage; writes require approval. Skills only run explicitly installed server scripts and require approval. Delegation uses existing workspace agents and a read-only permission intersection; it never creates an agent for you.</p>{["Files", "Skills", "Delegation"].map(name => <button key={name} type="button" className="btn small" disabled={busy || config.tools.includes(name)} onClick={() => void perform(async () => { const next = { ...config, tools: [...new Set([...config.tools, name])] }; await saveThread({ config: next }); setConfig(next); setToolsText(next.tools.join(", ")); })}>{config.tools.includes(name) ? name + " selected" : "Enable " + name + " & save"}</button>)}<p>Skills additionally requires a server APP_SKILL_CATALOG. Selection alone does not install code or credentials.</p></div>
           <label>Output format<input value={config.outputFormat || ""} onChange={e => setConfig({ ...config, outputFormat: e.target.value })} /></label>
           <label>Visual style<input value={config.visuals || ""} onChange={e => setConfig({ ...config, visuals: e.target.value })} /></label>
           <div className="rt-actions"><button className="btn primary" disabled={busy}>Save configuration</button><button type="button" className="btn" disabled={busy} onClick={() => void perform(async () => { w.setPreferences({ defaultThreadSettings: structuredClone(config) }); await w.flush(); })}>Save as default</button></div>
@@ -419,7 +479,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
 }
 
 function ToolHistory({ runs }: { runs: ToolRun[] }) {
-  return <div className="rt-tool-history" aria-label="Tool activity">{runs.map(run => <details key={run.id} className={"rt-tool " + run.status}><summary><span>{run.status === "running" ? "◌" : run.status === "error" ? "!" : "✓"}</span> {run.name} <small>{run.status === "running" ? "Running" : run.status === "error" ? "Failed" : "Result ready"}</small></summary><pre>{run.summary}</pre></details>)}</div>;
+  return <ToolActivity runs={runs} />;
 }
 
 function runStatusLabel(status: RunInfo["status"]) {
@@ -435,3 +495,5 @@ function elapsedLabel(run: RunInfo, clock: number) {
   if (seconds < 3600) return Math.floor(seconds / 60) + "m " + seconds % 60 + "s";
   return Math.floor(seconds / 3600) + "h " + Math.floor(seconds % 3600 / 60) + "m";
 }
+
+function durationLabel(ms: number) { return ms < 1000 ? Math.round(ms) + "ms" : (ms / 1000).toFixed(ms < 10000 ? 1 : 0) + "s"; }
