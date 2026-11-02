@@ -28,3 +28,11 @@ test('search and table summary obey independently enabled capabilities',async()=
 test('search rejects empty and extra arguments and invalid pagination and modes',async()=>{
  for(const [name,args] of [['search_documents',{query:' '}],['search_tables',{query:'x',limit:21}],['search_tables',{query:'x',offset:-1}],['search_tables',{query:'x',workspaceId:'other'}],['get_table',{id:'table',mode:'unknown'}]]) await assert.rejects(setup().execute(name,args),/Invalid/);
 });
+
+test('tables reject excluded and non-searchable records',async()=>{
+ const artifacts=[art('excluded-table','Table','Hidden',table,{excluded:true}),art('nonsearchable-table','Table','Hidden',table,{isSearchable:false}),art('foreign-table','Table','Hidden',table,{workspaceId:'other'})];
+ const state={workspaces:[{id:'w',data:{threads:[{id:'t'}],artifacts}}]};
+ const r=createWorkspaceTools({state,workspaceId:'w',threadId:'t',enabled:['Tables']});
+ for(const id of ['excluded-table','nonsearchable-table','foreign-table']) await assert.rejects(r.execute('get_table',{id}),/not found/);
+ assert.deepEqual(r.patches(),[]);
+});

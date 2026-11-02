@@ -140,7 +140,7 @@ export function createWorkspaceTools({ state, workspaceId, threadId, readAttachm
 
   function readTable(id, modifying = false) {
     const artifact = resources('artifact').find(a => a.id === id);
-    if (!artifact || artifact.archived) fail('Resource not found in this workspace.');
+    if (!readableRecord(artifact)) fail('Resource not found in this workspace.');
     if (artifact.kind !== 'Table') fail('Resource is not a table.');
     if (modifying && artifact.threadId !== threadId) fail('Only artifacts owned by the current thread can be updated.');
     let table;

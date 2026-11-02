@@ -35,7 +35,7 @@ test('real isolated child executes while root waits; permission intersection, sc
   const h=await fixture(t,async({res,body,execution,data})=>{
     if(body.threadId==='root'){
       assert.ok(names(execution).includes('delegate_agent'));
-      const listed=await tool(execution,'list_agents');assert.deepEqual(listed.agents.map(a=>a.id),['reader']);
+      const listed=await tool(execution,'list_agents');assert.deepEqual(listed.agents.map(a=>a.id),['reader']);assert.deepEqual(listed.agents[0].tools,['Thread Search','Documents']);
       const args={agentId:'reader',task:'Independently answer the read-only brief'};
       const [a,b]=await Promise.all([tool(execution,'delegate_agent',args),tool(execution,'delegate_agent',args)]);
       assert.equal(a.runId,b.runId);childRun=a.runId;
@@ -44,7 +44,7 @@ test('real isolated child executes while root waits; permission intersection, sc
       assert.equal((await tool(execution,'delegate_agent',args)).runId,a.runId);
       finish(res,'Parent synthesis');rootFinished=true;
     }else{
-      assert.equal(execution.readOnly,true);assert.deepEqual(execution.allowedTools,['Thread Search']);assert.equal(execution.shell,undefined);
+      assert.equal(execution.readOnly,true);assert.deepEqual(execution.allowedTools,['Thread Search','Documents']);assert.equal(execution.shell,undefined);
       assert.ok(!names(execution).includes('delegate_agent'));assert.equal(execution.maxConcurrent,3);
       await assert.rejects(()=>tool(execution,'delegate_agent',{agentId:'reader',task:'Recurse'}),/not enabled/);
       const thread=data.threads.find(t=>t.id===body.threadId);assert.equal(thread.messages.length,1);assert.equal(thread.messages[0].text,'Independently answer the read-only brief');
@@ -53,7 +53,7 @@ test('real isolated child executes while root waits; permission intersection, sc
   });
   const root=await h.manager.create(request);await until(()=>rootFinished);await until(()=>h.manager.get(root.id).status==='succeeded');
   assert.equal(h.calls.length,2);assert.equal(h.hosts.length,1);assert.equal(h.manager.get(childRun).parentRunId,root.id);
-  assert.deepEqual(h.hosts[0].tools,['Thread Search']);assert.equal(h.saved.length,2);assert.equal(h.manager.get(root.id).childCount,1);
+  assert.deepEqual(h.hosts[0].tools,['Thread Search','Documents']);assert.equal(h.saved.length,2);assert.equal(h.manager.get(root.id).childCount,1);
 });
 
 test('only saved Delegation enables dispatch; public private-metadata and parentRunId spoofing are rejected', {timeout:5000},async t=>{
@@ -123,4 +123,22 @@ test('eight-child budget and bounded waits/results are enforced', {timeout:5000}
     await assert.rejects(()=>tool(execution,'delegate_agent',{agentId:'reader',task:'Ninth'}),/budget exhausted/);checked=true;finish(res,'Eight done');
   });
   const root=await h.manager.create(request);await until(()=>checked);await until(()=>h.manager.get(root.id).status==='succeeded');assert.equal(h.hosts.length,8);assert.equal(h.calls.length,9);
+});
+
+test('delegation tool listing reflects parent and target capability intersection', {timeout:5000},async t=>{
+  let checked=false;
+  const h=await fixture(t,async({execution,res,body})=>{
+    if(body.threadId==='root'){
+      const listed=await tool(execution,'list_agents');
+      assert.deepEqual(listed.agents[0].tools,['Documents']);
+      const child=await tool(execution,'delegate_agent',{agentId:'reader',task:'Read an allowed document'});
+      const result=await tool(execution,'wait_for_delegated_run',{runId:child.runId,timeoutSeconds:2});
+      assert.equal(result.status,'succeeded');checked=true;finish(res,'Done');
+    }else{
+      assert.equal(execution.readOnly,true);assert.deepEqual(execution.allowedTools,['Documents']);
+      finish(res,'Only document permission inherited');
+    }
+  },{tools:['Delegation','Documents','Tables']});
+  const run=await h.manager.create(request);await until(()=>checked);await until(()=>h.manager.get(run.id).status==='succeeded');
+  assert.deepEqual(h.hosts[0].tools,['Documents']);
 });

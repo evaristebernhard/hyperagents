@@ -14,7 +14,8 @@ const terminal=new Set(['succeeded','failed','cancelled','interrupted']);
 const MAX_CHILDREN=8, MAX_DEPTH=3, MAX_TREE=32, CHILD_SLOTS=2;
 // Explicit capability allowlist: no skills, files, browser sessions, artifacts,
 // integrations or generic execution. The LLM boundary must also filter definitions.
-const READ_ONLY_TOOLS=new Set(['Thread Search','Search','Find Similar']);
+const READ_ONLY_TOOLS=new Set(['Thread Search','Search','Find Similar','Documents','Tables']);
+const delegatedTools=(agent,parentTools)=>[...new Set((agent.tools||[]).filter(t=>READ_ONLY_TOOLS.has(t)&&parentTools.includes(t)))];
 const chatRequest=request=>Object.fromEntries(['workspaceId','threadId','userMessageId','model'].filter(k=>request[k]!==undefined).map(k=>[k,request[k]]));
 const managedDefinition=(name,description,properties,required=[])=>({type:'function',function:{name,description,parameters:{type:'object',additionalProperties:false,properties,required}}});
 const runIdSchema={type:'string',minLength:1,maxLength:200};
@@ -132,7 +133,7 @@ export function createRunManager({dataDir,llm,load,persist,readAttachment,valida
     const work=(async()=>{
       budget(parent);
       const parentTools=JSON.parse(parent.request)._runTools;
-      const tools=[...new Set((agent.tools||[]).filter(t=>READ_ONLY_TOOLS.has(t)&&parentTools.includes(t)))];
+      const tools=delegatedTools(agent,parentTools);
       let child;
       try{child=await createDelegatedThread({workspaceId:parent.workspace_id,parentThreadId:parent.thread_id,parentRunId:parent.id,agentId:agent.id,task:args.task,tools:[...tools]});}
       catch{fail(503,'Delegated thread could not be saved. No child run was admitted.');}
@@ -153,10 +154,10 @@ export function createRunManager({dataDir,llm,load,persist,readAttachment,valida
     try{return await work;}finally{delegating.delete(key);}
   }
   async function delegationTool(parentId,name,args,signal){
-    authorizedParent(parentId);
+    const parent=authorizedParent(parentId);
     const allowed={list_agents:[],delegate_agent:['agentId','task'],get_delegated_run:['runId'],wait_for_delegated_run:['runId','timeoutSeconds']}[name];
     if(!allowed||!args||typeof args!=='object'||Array.isArray(args)||Object.keys(args).some(k=>!allowed.includes(k)))fail(400,'Invalid delegation arguments.');
-    if(name==='list_agents')return {agents:load().state.workspaces.find(w=>w.id===raw(parentId).workspace_id).data.agents.filter(a=>!a.archived).map(a=>({id:a.id,name:a.name,description:a.description,model:a.model,tools:(a.tools||[]).filter(t=>READ_ONLY_TOOLS.has(t))}))};
+    if(name==='list_agents')return {agents:load().state.workspaces.find(w=>w.id===raw(parentId).workspace_id).data.agents.filter(a=>!a.archived).map(a=>({id:a.id,name:a.name,description:a.description,model:a.model,tools:delegatedTools(a,JSON.parse(parent.request)._runTools)}))};
     if(name==='delegate_agent'){
       if(typeof args.agentId!=='string'||args.agentId.length>200||!args.agentId||typeof args.task!=='string'||!args.task.trim()||args.task.length>16000)fail(400,'Invalid agent or self-contained task.');
       return delegate(parentId,args);

@@ -27,6 +27,7 @@ async function harness(t, tools, factory) {
   const state = emptyState(), settings = { model: 'deepseek-flash', provider: 'DeepSeek', reasoning: 'Low', mode: 'Execute', tools };
   state.workspaces[0].data.threads.push({ id: 'root', title: 'Root task', summary: '', time: '', config: settings, messages: [{ id: 'message', role: 'user', text: 'Execute a bounded task', context: { settings } }] });
   if (extra.agents) state.workspaces[0].data.agents.push(...extra.agents);
+  if (extra.artifacts) state.workspaces[0].data.artifacts.push(...extra.artifacts);
   const current = await json(await call('/api/state'));
   await json(await call('/api/state', 'PUT', { state }, { 'If-Match': String(current.revision) }));
   const run = (await json(await call('/api/runs', 'POST', { ...scope, userMessageId: 'message' }), 202)).run;
@@ -93,4 +94,42 @@ test('actual app delegation saves an isolated child thread, enforces read-only t
   const done = await h.wait('succeeded'); assert.equal(done.resultSaved, true); assert.equal(done.childCount, 1); assert.equal(childRound, 2);
   const saved = await h.json(await h.call('/api/state')), w = saved.state.workspaces[0].data;
   const child = w.threads.find(x => x.id !== 'root'); assert.ok(child); assert.deepEqual(child.config.tools, ['Thread Search']); assert.equal(child.messages[0].context.settings.agentId, 'reader'); assert.equal(child.messages[0].text, 'Return exactly: Verified child fact.'); assert.equal(child.messages.at(-1).text, 'Verified child fact.'); assert.equal(w.artifacts.length, 0);
+});
+
+test('delegated agent searches and reads resources without broad or mutating tools', async t => {
+  let rootRound = 0, childRound = 0;
+  const createdAt = '2026-01-01T00:00:00.000Z';
+  const artifacts = [
+    { id:'doc-one', kind:'Document', title:'Needle roadmap', content:'Needle document fact', threadId:'root', createdAt, updatedAt:createdAt, versions:[] },
+    { id:'table-one', kind:'Table', title:'Needle budget', content:JSON.stringify({columns:['Name'],rows:[['Needle table fact']]}), threadId:'root', createdAt, updatedAt:createdAt, versions:[] },
+  ];
+  const h = await harness(t, ['Delegation','Documents','Tables','Shell','Files'], async () => ({ artifacts,
+    agents: [{ id:'resource-reader', name:'Resource-reader agent', description:'Reads synthetic resources', prompt:'Read only permitted resources.', tools:['Documents','Tables','Shell','Files','Delegation'] }],
+    llmFetch: async (_url, init) => {
+      const body = JSON.parse(init.body), names = (body.tools || []).map(d=>d.function.name);
+      if (body.messages[0].content.includes('Resource-reader agent')) {
+        for(const name of ['search_documents','read_document','search_tables','get_table']) assert.ok(names.includes(name),name);
+        for(const name of ['workspace_search','resource_read','resource_read_page','update_document_section','create_artifact','add_table_rows','export_table','write_file','shell_execute','delegate_agent']) assert.ok(!names.includes(name),name);
+        childRound++;
+        if(childRound===1) return tool('search_documents',{query:'Needle'},'find_doc');
+        if(childRound===2){assert.equal(JSON.parse(body.messages.at(-1).content).results[0].id,'doc-one');return tool('read_document',{id:'doc-one'},'read_doc');}
+        if(childRound===3){assert.match(JSON.stringify(JSON.parse(body.messages.at(-1).content)),/Needle document fact/);return tool('search_tables',{query:'Needle'},'find_table');}
+        if(childRound===4){assert.equal(JSON.parse(body.messages.at(-1).content).results[0].id,'table-one');return tool('get_table',{id:'table-one',mode:'summary'},'read_table');}
+        if(childRound===5){const r=JSON.parse(body.messages.at(-1).content);assert.equal(r.rowCount,1);assert.equal(Object.hasOwn(r,'rows'),false);return tool('update_document_section',{id:'doc-one',section_name:'X',operation:'replace',content:'No'},'deny_write');}
+        if(childRound===6){assert.match(JSON.parse(body.messages.at(-1).content).error,/not enabled/);return tool('resource_read',{type:'file',id:'unrelated'},'deny_broad');}
+        assert.match(JSON.parse(body.messages.at(-1).content).error,/not enabled/);
+        return response({content:'Found the document and table summary.'});
+      }
+      rootRound++;
+      if(rootRound===1) return tool('list_agents',{},'list');
+      if(rootRound===2){assert.deepEqual(JSON.parse(body.messages.at(-1).content).agents[0].tools,['Documents','Tables']);return tool('delegate_agent',{agentId:'resource-reader',task:'Find the synthetic document and table.'},'delegate');}
+      if(rootRound===3) return tool('wait_for_delegated_run',{runId:JSON.parse(body.messages.at(-1).content).runId,timeoutSeconds:5},'wait');
+      const result=JSON.parse(body.messages.at(-1).content);assert.equal(result.status,'succeeded');assert.match(result.text,/document and table summary/);
+      return response({content:'Parent received the resource findings.'});
+    },
+  }));
+  const done=await h.wait('succeeded');assert.equal(done.resultSaved,true);assert.equal(done.childCount,1);assert.equal(childRound,7);
+  const saved=await h.json(await h.call('/api/state')), data=saved.state.workspaces[0].data;
+  assert.equal(data.artifacts.length,2);assert.equal(data.artifacts.find(a=>a.id==='doc-one').content,'Needle document fact');
+  assert.deepEqual(data.threads.find(t=>t.id!=='root').config.tools,['Documents','Tables']);
 });

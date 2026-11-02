@@ -11,3 +11,15 @@ test-results/
 .env
 .env.*
 !.env.example
+
+# Independent reference checkouts (not project source or submodules)
+/OpenMausBot/
+/browser/
+/macro/
+
+# Local implementation snapshots; keep on disk, exclude from commits
+/.runtime-v1-backup-*/
+/scripts/*.backup-*
+/vite.config.ts.backup-*
+/docs/PARITY-WEBPAGE-20261029-0854/LibraryManager.before-preview-fix.txt
+/docs/TOOL-FOUNDATION-20261029/*.before.txt

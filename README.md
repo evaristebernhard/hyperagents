@@ -190,3 +190,14 @@ private and contains sensitive workspace data; do not publish it.
 Restart the normal app service and sign in with the new local password. This is not
 your DeepSeek key or Hyperagent password. APP_OWNER_PASSWORD remains a first-owner
 bootstrap only; changing it does not replace an existing password.
+
+## Development documentation
+
+- [Delegation runtime](docs/DELEGATION-RUNTIME.md): managed parent/child runs and authorization boundaries.
+- [Delegated resource access](docs/DELEGATION-RESOURCE-ACCESS-2026-11-01.md): read-only document/table access and capability intersection.
+- [Resource discovery](docs/RESOURCE-DISCOVERY-2026-10-31.md): workspace document/table search and pagination.
+- [Workspace files](docs/WORKSPACE-FILES.md): managed file storage and execution boundaries.
+
+Independent reference checkouts (`OpenMausBot/`, `browser/`, `macro/`) and local
+implementation backups are intentionally ignored. They remain on disk and are not
+part of the application source or Git submodules. Never add `.env` or `.data/` to a commit.

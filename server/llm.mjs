@@ -143,7 +143,8 @@ export function createLlm({apiKey,fetchImpl=globalThis.fetch,publicFetch,openAle
       const inherited=execution.allowedTools===undefined?null:new Set(Array.isArray(execution.allowedTools)?execution.allowedTools:[]);
       const disallowedReadOnly=new Set(['Shell','Skills','Files','Delegation','Browser','Web Eval','Visual Output','Images','Video','Audio','Transcribe','Avatar','Maps','Slides','Webpages']);
       const enabled=[...new Set([...(settings.tools || []),...requiredSkillTools(snapshot,request)])].filter(name=>(!inherited||inherited.has(name))&&(!readOnly||!disallowedReadOnly.has(name)));
-      const readTools=new Set(['workspace_search','resource_read','resource_read_page','search_threads','get_thread_messages','read_document','get_table']);
+      // Delegated workers get only capability-specific readers, never broad workspace/file readers.
+      const readTools=new Set(['search_threads','get_thread_messages','search_documents','read_document','search_tables','get_table']);
       const runtime=createWorkspaceTools({state:snapshot,workspaceId:request.workspaceId,threadId:request.threadId,readAttachment,enabled,persistFile:persistVisual?input=>persistVisual({bytes:Buffer.from(input.content,'utf8'),mimeType:input.mimeType.split(';')[0],filename:input.name,workspaceId:request.workspaceId}):undefined,maxCalls:execution.maxTools ?? 10});
       const external=createPublicTools({enabled,fetchImpl:publicFetch,openAlexApiKey,userAgent:publicUserAgent});
       const exa=createExaTools({enabled,apiKey:exaApiKey,fetchImpl:exaFetch});
