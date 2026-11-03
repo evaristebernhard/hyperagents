@@ -1,3 +1,4 @@
+import { backendV1, v1, logout, type Identity, type Capabilities, type Conversation } from "./v1-client";
 import { parseSlidesContent } from "./slide-preview";
 import {
   createContext,
@@ -255,6 +256,7 @@ type Setter<K extends keyof WorkspaceData> = (
   value: WorkspaceData[K] | ((old: WorkspaceData[K]) => WorkspaceData[K]),
 ) => void;
 type Store = {
+  capabilities?: Capabilities;
   mode: "server" | "fixture";
   persistence: "loading" | "saving" | "saved" | "error" | "conflict";
   flush: () => Promise<void>;
@@ -613,8 +615,37 @@ function ServerWorkspaceProvider({ children }: { children: ReactNode }) {
     {replacing && <div className="backend-replacement-overlay" role="alertdialog" aria-modal="true" aria-label="Updating workspace snapshot" tabIndex={-1} ref={replacementStatus}><h2>Updating workspace snapshot</h2><p>Finishing pending saves, then importing or reloading. Editing is paused so no changes can be lost.</p></div>}
   </Context.Provider>;
 }
+function V1WorkspaceProvider({ children }: { children: ReactNode }) {
+  const [identity, setIdentity] = useState<Identity>();
+  const [capabilities, setCapabilities] = useState<Capabilities>();
+  const [threads, setThreads] = useState<WorkspaceData["threads"]>([]);
+  const [error, setError] = useState("");
+  const reload = async (signal?: AbortSignal) => {
+    const rows = await v1<Conversation[]>("/conversations", { signal });
+    setThreads(rows.map(c => ({ id: c.id, title: c.title, summary: "", time: new Date(c.created_at).toLocaleDateString(), createdAt: c.created_at })));
+  };
+  useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+    const handleError = (e: unknown) => { if (!signal.aborted) setError(e instanceof Error ? e.message : "Could not load workspace"); };
+    void Promise.all([v1<Identity>("/auth/session", { signal }), v1<Capabilities>("/capabilities", { signal }), reload(signal)])
+      .then(([user, caps]) => { if (!signal.aborted) { setIdentity(user); setCapabilities(caps); } }).catch(handleError);
+    const changed = () => { void reload(signal).catch(handleError); };
+    window.addEventListener("v1-conversations-changed", changed);
+    return () => { controller.abort(); window.removeEventListener("v1-conversations-changed", changed); };
+  }, []);
+  const unsupported = () => { throw Error("This feature is not available in backend v1."); };
+  if (!identity || !capabilities) return <section className="backend-loading" role="status"><h1>{error ? "Workspace unavailable" : "Loading your workspace…"}</h1>{error && <><p>{error}</p><button className="btn" onClick={() => location.reload()}>Retry</button></>}</section>;
+  const data = { ...seed(false), threads };
+  const state: WorkspaceState = { version: 1, active: identity.workspaceId, workspaces: [{ id: identity.workspaceId, name: "Personal", data }] };
+  const store: Store = { mode: "server", persistence: "saved", flush: async () => {}, reload, retrySave: async () => {}, capabilities,
+    state, data, storageError: error, activeName: "Personal", set: unsupported, setPreferences: unsupported, switchWorkspace: unsupported,
+    createWorkspace: unsupported, renameWorkspace: unsupported, importSnapshot: unsupported, exportSnapshot: unsupported, updateArtifact: unsupported, installSkill: unsupported };
+  return <Context.Provider value={store}><div className="backend-owner-root"><div className="backend-savebar"><span role="status" aria-label="Storage status">Saved to workspace</span>{error && <span role="alert">{error}</span>}<button className="backend-signout" onClick={() => void logout().catch(e => setError(e.message))}>Sign out</button></div>{children}</div></Context.Provider>;
+}
+
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  return fixtureMode() ? <FixtureWorkspaceProvider>{children}</FixtureWorkspaceProvider> : <ServerWorkspaceProvider>{children}</ServerWorkspaceProvider>;
+  return backendV1 ? <V1WorkspaceProvider>{children}</V1WorkspaceProvider> : fixtureMode() ? <FixtureWorkspaceProvider>{children}</FixtureWorkspaceProvider> : <ServerWorkspaceProvider>{children}</ServerWorkspaceProvider>;
 }
 
 export function useWorkspace() {

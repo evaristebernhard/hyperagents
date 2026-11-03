@@ -1,0 +1,25 @@
+/* The main UI owns the layout; these rules cover adapter-only states. */
+.nav-item[aria-disabled="true"],
+.example-card[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.composer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.v1-canvas-collapsed {
+  grid-template-columns: minmax(300px, 1fr);
+}
+.v1-event-list {
+  max-height: 280px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.rt-artifact-editor a.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

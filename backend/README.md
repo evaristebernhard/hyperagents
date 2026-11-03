@@ -27,7 +27,7 @@ npm run worker
 
 脚本不隐式读取旧服务的 `.env`。评测脚本只在本地明确加载 `../.env` 中已有的模型密钥，且不打印密钥。生产建议使用服务管理器的私有环境文件或 secret 注入。
 
-CLI 首次 bootstrap 仅在用户表为空时成功。`invite` 输出一次性注册令牌；API 管理员也能创建、列出和撤销邀请。邀请有效期 7 天，不提供首期邮件服务。由于前端不在此次范围，邀请中的 `/register` 链接是后续前端入口；目前通过 CLI 或 `POST /api/v1/auth/register` 使用令牌。
+CLI 首次 bootstrap 仅在用户表为空时成功。`invite` 输出一次性注册令牌；API 管理员也能创建、列出和撤销邀请。邀请有效期 7 天，不提供首期邮件服务。邀请中的 `/register` 尚未提供注册表单；目前通过 CLI 或 `POST /api/v1/auth/register` 使用令牌。
 
 ```bash
 # AGENT_EMAIL、AGENT_PASSWORD、AGENT_INVITE 由环境传入。
@@ -123,3 +123,7 @@ npm run eval
 ```
 
 `npm test` 使用 `TEST_DATABASE_URL` 指定的**空测试数据库**；未指定时启动用户态临时 PostgreSQL。测试不连接生产数据库。真实评测通过 HTTP 上传、创建任务、轮询、下载和修订，并用独立生产 Worker 执行。默认固定 12 个案例、各 3 次；缺少必要能力计为 blocked 并影响总通过率。`EVAL_CASES=id1,id2`、`EVAL_REPEATS=1` 只用于有明确范围的回归，不构成完整验收。
+
+## 原版前端接入
+
+仓库根目录运行 `npm run dev:v1`，访问 `http://localhost:5174`。入口复用 main 的侧栏、首页、对话布局和产物面板；任务进度、追加指令、取消和产物历史版本均在原对话中处理。新账号、数据库、文件目录保持独立并持久保存。完整步骤和本次验收见 [前端接入报告](../docs/verification-v1-ui/REPORT.md)。

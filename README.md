@@ -52,7 +52,7 @@ old demo cannot recover file bytes that were never uploaded.
 ## What is connected
 
 - Durable workspace/thread/message/project/Agent/skill/memory/artifact metadata.
-- A Tasks workspace with Router/Worker delegation, execution-time follow-ups,
+- A legacy task API with Router/Worker delegation, execution-time follow-ups,
   persistent waiting and recovery, pluggable tools, and editable built-in prompts.
 - Messages carry IDs, timestamps, saved preferences, context references and actual
   attachment metadata; retries use stable request IDs rather than fake replies.
@@ -72,23 +72,22 @@ research/import are not connected. Such actions are disabled or explicitly
 state that they are unavailable; they do not report fake successful execution.
 Existing fixture-only controls are not evidence that execution exists.
 
-## Tasks and pluggable agents
+## Main UI with backend v1
 
-Open **Tasks** in the sidebar to run work through the new durable Router/Worker
-runtime. The Router keeps the goal, distributes independent assignments, accepts
-follow-up instructions while work runs, and resumes when its children finish.
-The page shows real task states, child results, pending questions and exact-action
-approval cards. Closing the page does not stop the task.
+Run `npm run dev:v1` and open **http://localhost:5174** to use the original main
+sidebar, home composer, conversation and artifact panel with the isolated
+TypeScript backend. The extra Tasks page has been retired. The legacy service
+continues on its existing ports and keeps its SQLite data.
 
-Workspace reading, public search and Document creation are registered plugins.
-The kernel owns scheduling and persistence; additional capabilities use a trusted
-server plugin interface. Browser capability is outside this iteration. Existing
-Threads remain available on their current execution path.
+Build the backend first with `npm --prefix backend ci --ignore-scripts` and
+`npm --prefix backend run build`. The v1 launcher preserves the existing accounts,
+PostgreSQL database and files under `backend/.data-v1/interactive`. First-run local
+credentials are written to its private `access.json`; credentials are never committed.
+See [setup and verification](docs/verification-v1-ui/REPORT.md) for Runner/PDF
+requirements, startup, supported features and browser verification.
 
-Router and Worker prompts are editable per workspace through **Tasks > Prompts**,
-with version checks and restore-default support. Existing tasks keep their prompt
-snapshot. See [docs/TASK-RUNTIME.md](docs/TASK-RUNTIME.md) for architecture, plugin
-examples, APIs, recovery semantics and implementation limits.
+The previous `.mjs` task API remains available to existing clients; its historical
+runtime documentation is in [TASK-RUNTIME.md](docs/TASK-RUNTIME.md).
 
 ## Real account integrations
 
@@ -177,7 +176,8 @@ Docker build/runtime has not been tested in the assistant sandbox.
 ```sh
 npm run test:backend       # built-in Node tests; real temp SQLite/files/HTTP
 npm run test:tasks         # model/plugin/prompt/runtime/API tests for Tasks
-npm run test:tasks-ui      # build + Tasks browser flows against a temporary real API
+npm run test:v1-adapter    # deterministic browser adapter tests; no model or DB
+npm run test:v1-ui         # live v1 browser verification; requires dev:v1 + model + Runner
 npm run test:fixtures     # existing UI regression suite in explicit fixture mode
 npm test                  # backend + fixture UI + real backend browser tests, in sequence
 npm run test:backend-flow  # real API + browser workflows in a temporary data directory
@@ -190,7 +190,7 @@ Tests do not use the owner's `.data` directory. Fixture mode is available separa
 as `npm run dev:fixtures`; it is for UI regression samples, not normal operation.
 
 Browser suites require a Playwright Chromium installation (`npx playwright install
-chromium`). The Tasks browser suite uses controlled model/tool adapters with real
+chromium`). The legacy backend browser suite uses controlled model/tool adapters with real
 HTTP and SQLite; it does not call production DeepSeek or external services.
 
 See `docs/BACKEND-CONTRACT.md` for the existing endpoints and security boundaries,
@@ -224,7 +224,7 @@ bootstrap only; changing it does not replace an existing password.
 
 ## Development documentation
 
-- [Durable task runtime](docs/TASK-RUNTIME.md): Tasks UI, Router/Worker scheduling, plugins, prompts and crash recovery.
+- [Durable task runtime](docs/TASK-RUNTIME.md): legacy Router/Worker scheduling, plugins, prompts and crash recovery.
 - [Delegation runtime](docs/DELEGATION-RUNTIME.md): managed parent/child runs and authorization boundaries.
 - [Delegated resource access](docs/DELEGATION-RESOURCE-ACCESS-2026-11-01.md): read-only document/table access and capability intersection.
 - [Resource discovery](docs/RESOURCE-DISCOVERY-2026-10-31.md): workspace document/table search and pagination.

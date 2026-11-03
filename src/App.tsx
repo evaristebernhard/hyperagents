@@ -1,3 +1,5 @@
+import { backendV1, submitTask, logout } from "./v1-client";
+import V1Thread from "./V1Thread";
 import { useEffect, useLayoutEffect, useState, useRef, type ReactNode } from "react";
 import {
   Search,
@@ -60,7 +62,6 @@ import Rooms from "./Rooms";
 import LibraryManager from "./LibraryManager";
 import LocalWorkspace from "./LocalWorkspace";
 import Marketplace from "./Marketplace";
-import Tasks from "./Tasks";
 
 function useSaved<T>(key: string, initial: T) {
   const [v, setV] = useState<T>(() => safeRead(key, initial));
@@ -74,7 +75,6 @@ function useSaved<T>(key: string, initial: T) {
 const gotoItems = [
   ["Projects", "/projects"],
   ["Threads", "/threads"],
-  ["Tasks", "/tasks"],
   ["Inbox", "/inbox"],
   ["Rooms", "/rooms"],
   ["Agents", "/agents"],
@@ -119,7 +119,7 @@ export default function App() {
   const shellMenuRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLElement | null>(null);
   const profile = safeRead("profile", { name: "Demo User", company: "" });
-  const profileName = profile.name || "Demo User";
+  const profileName = backendV1 ? "My workspace" : profile.name || "Demo User";
   const profileInitials = profileName.split(/\s+/).slice(0, 2).map(n => n[0]).join("").toUpperCase();
   useEffect(() => {
     if (menu) shellMenuRef.current?.querySelector<HTMLElement>("button")?.focus();
@@ -219,6 +219,12 @@ export default function App() {
     setMenu(menu === m ? "" : m);
   };
   const createThread = async (text: string, project?: string, context?: MessageContext, clientRequestId?: string) => {
+    if (backendV1) {
+      const task = await submitTask(text, context, clientRequestId);
+      await workspace.reload();
+      navigate("/thread/" + task.conversationId);
+      return;
+    }
     const id = clientRequestId ? "thread-" + clientRequestId : uid("thread");
     const timestamp = now();
     const t: DemoThread = {
@@ -244,10 +250,12 @@ export default function App() {
     <a
       key={route}
       href={route}
-      className={"nav-item " + (path === route || (route === "/tasks" && path.startsWith("/tasks/")) ? "active" : "")}
-      title={collapsed ? label : undefined}
+      className={"nav-item " + (path === route ? "active" : "")}
+      aria-disabled={backendV1 && !["/threads/new", "/threads"].includes(route) && !route.startsWith("/thread/")}
+      title={backendV1 && !["/threads/new", "/threads"].includes(route) && !route.startsWith("/thread/") ? "Unavailable in backend v1" : collapsed ? label : undefined}
       onClick={(e) => {
         e.preventDefault();
+        if (backendV1 && !["/threads/new", "/threads"].includes(route) && !route.startsWith("/thread/")) return;
         navigate(route);
       }}
     >
@@ -258,7 +266,8 @@ export default function App() {
   );
   const recent = threads.filter((t) => !t.archived).slice(0, 6);
   const renderPage = () => {
-    if (path === "/tasks" || path.startsWith("/tasks/")) return <Tasks path={path} navigate={navigate} />;
+    if (backendV1 && path.startsWith("/thread/")) return <V1Thread key={path} id={decodeURIComponent(path.split("/")[2])} navigate={navigate} notify={notify} />;
+    if (backendV1 && !["/", "/home", "/threads/new", "/threads"].includes(path)) return <section className="standard-page"><h1 className="page-title">Unavailable</h1><p>This feature is not available yet.</p><button className="btn" onClick={() => navigate("/threads/new")}>New thread</button></section>;
     if (
       path.startsWith("/skills") ||
       path.startsWith("/memories") ||
@@ -286,6 +295,7 @@ export default function App() {
               agents={agents.map((a) => a.name)}
             />
             <button
+              disabled={backendV1} title={backendV1 ? "Custom agents are not available yet" : undefined}
               className="setup-agent"
               onClick={() => navigate("/agents/new")}
             >
@@ -308,12 +318,13 @@ export default function App() {
             <div className="examples-grid">
               {examples.map((x) => (
                 <a
+                  aria-disabled={backendV1} title={backendV1 ? "Example preview unavailable" : undefined}
                   className="example-card"
                   href={"/featured/" + x.slug}
                   key={x.slug}
                   onClick={(e) => {
                     e.preventDefault();
-                    navigate("/featured/" + x.slug);
+                    if (!backendV1) navigate("/featured/" + x.slug);
                   }}
                 >
                   <img src={asset(x.image)} alt={x.title} />
@@ -568,7 +579,6 @@ export default function App() {
         </button>
         <nav className="sidebar-nav" aria-label="Main navigation">
           {link("/threads/new", "New thread", MessageSquare)}
-          {link("/tasks", "Tasks", Workflow)}
           <button
             className="nav-item"
             onClick={() => {
@@ -697,7 +707,7 @@ export default function App() {
                 ? "active"
                 : "")
             }
-            title="Learning"
+            disabled={backendV1} title={backendV1 ? "Learning is not available yet" : "Learning"}
             onClick={(e) => toggle("learning", e.currentTarget)}
             aria-haspopup="menu"
             aria-expanded={menu === "learning"}
@@ -725,7 +735,7 @@ export default function App() {
             <>
               <span>
                 <strong>{profileName}</strong>
-                <small>demo@example.com</small>
+                <small>{backendV1 ? "Private workspace" : "demo@example.com"}</small>
               </span>
               <ChevronRight size={14} />
             </>
@@ -774,7 +784,7 @@ export default function App() {
                   {workspace.activeName}
                   <Check size={14} />
                 </button>
-                <button role="menuitem"
+                <button role="menuitem" disabled={backendV1}
                   onClick={() => {
                     setMenu("");
                     navigate("/workspaces");
@@ -816,15 +826,15 @@ export default function App() {
               <>
                 <div className="account-menu-heading">
                   <strong>{profileName}</strong>
-                  <small>demo@example.com</small>
+                  <small>{backendV1 ? "Private workspace" : "demo@example.com"}</small>
                 </div>
-                <button role="menuitem"
+                <button role="menuitem" disabled={backendV1}
                   onClick={() => navigate(path + "?settings=personalization")}
                 >
                   <Settings2 size={15} />
                   Account settings
                 </button>
-                <button role="menuitem" onClick={() => navigate(path + "?settings=billing")}>
+                <button role="menuitem" disabled={backendV1} onClick={() => navigate(path + "?settings=billing")}>
                   <Star size={15} />
                   Plan & billing<span className="badge">Free</span>
                 </button>
@@ -837,16 +847,16 @@ export default function App() {
                   <HelpCircle size={15} />
                   Help & support
                 </button>
-                <button role="menuitem"
+                <button role="menuitem" disabled={backendV1}
                   onClick={() => {
                     setMenu("");
-                    setDialog("account");
+                    if (!backendV1) setDialog("account");
                   }}
                 >
                   <Plus size={15} />
                   Add account
                 </button>
-                <button role="menuitem" title="Return to the local demo login; no real account session is managed." onClick={() => navigate("/login")}>
+                <button role="menuitem" onClick={() => backendV1 ? void logout().catch(e => notify(e.message)) : navigate("/login")}>
                   <LogOut size={15} />
                   Sign out
                 </button>
@@ -864,7 +874,7 @@ export default function App() {
           navigate={navigate}
         />
       )}
-      {settings && (
+      {settings && !backendV1 && (
         <Settings
           section={settings}
           navigateSection={(s) => navigate(path + "?settings=" + s)}
@@ -1107,6 +1117,7 @@ function ThreadList({
             <div className="thread-card-actions">
               <IconButton
                 label={(t.starred ? "Unstar " : "Star ") + t.title}
+                disabled={backendV1}
                 onClick={() =>
                   setThreads(
                     allThreads.map((x) =>
@@ -1118,6 +1129,7 @@ function ThreadList({
                 <Star size={15} fill={t.starred ? "currentColor" : "none"} />
               </IconButton>
               <IconButton
+                disabled={backendV1}
                 label={(t.archived ? "Restore " : "Archive ") + t.title}
                 onClick={() => {
                   setThreads(
@@ -1182,7 +1194,7 @@ function SearchDialog({
     ...workspace.data.skills.filter(s => !s.archived).map(s => ({ title: s.name, path: "/skills/" + s.id, type: "Skill", group: "Skills" })),
     ...workspace.data.rooms.filter(r => !r.archived).map(r => ({ title: r.name, path: "/rooms/" + r.id, type: "Room", group: "Rooms" })),
     ...workspace.data.artifacts.filter(a => !a.archived).map(a => ({ title: a.title, path: "/library?artifact=" + a.id, type: a.kind, group: "Library" })),
-    ...gotoItems.map(([title, path]) => ({ title, path, type: "Go to", group: "Go to" })),
+    ...gotoItems.filter(([, path]) => !backendV1 || path === "/threads").map(([title, path]) => ({ title, path, type: "Go to", group: "Go to" })),
   ];
   const results = query
     ? allResults.filter(r => r.title.toLowerCase().includes(query))

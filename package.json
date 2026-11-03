@@ -4,6 +4,7 @@
   "version": "0.3.0",
   "type": "module",
   "scripts": {
+    "dev:v1": "node scripts/dev-v1.mjs",
     "dev": "node scripts/dev.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "node scripts/preview.mjs",
@@ -16,10 +17,12 @@
     "start": "node server/index.mjs",
     "test:backend": "node --test server/*.test.mjs",
     "test:tasks": "node --test server/agent-model.test.mjs server/agent-plugins.test.mjs server/agent-prompts.test.mjs server/task-runtime.test.mjs server/task-api.test.mjs",
-    "test:tasks-ui": "npm run build && node scripts/test-tasks-ui.mjs",
     "test:backend-flow": "playwright test --config=playwright.backend.config.ts",
     "test:fixtures": "playwright test",
-    "reset-password": "node scripts/reset-owner-password.mjs"
+    "reset-password": "node scripts/reset-owner-password.mjs",
+    "build:v1": "tsc --noEmit && VITE_BACKEND_V1=true vite build",
+    "test:v1-ui": "node scripts/smoke-v1-ui.mjs",
+    "test:v1-adapter": "node scripts/test-v1-adapter.mjs"
   },
   "dependencies": {
     "dompurify": "^3.4.17",

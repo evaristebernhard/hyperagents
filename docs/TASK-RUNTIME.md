@@ -1,4 +1,9 @@
-# Tasks: a durable, pluggable agent runtime
+# Legacy Tasks runtime (historical UI documentation)
+
+The branch-only `/tasks` page and its browser test have been retired. The `.mjs`
+API described here remains for existing clients. For the current main UI connected
+to the isolated TypeScript backend, see [v1 setup and verification](verification-v1-ui/REPORT.md).
+UI instructions below describe the former interface.
 
 The **Tasks** page at `/tasks` is a new execution path for work that needs
 delegation, follow-up instructions, waiting, or recovery after a server restart.
@@ -58,7 +63,7 @@ flowchart TD
 | Plugin host | Registration, schemas, per-task binding, capability intersection and cleanup | `server/agent-plugins.mjs` |
 | Prompt assembly | Built-in files, workspace overrides, goal and selected Agent guidance | `server/agent-prompts.mjs`, `prompts/agent/` |
 | HTTP integration | Existing authentication, workspace scope and artifact persistence | `server/app.mjs` |
-| Tasks UI | Creation, progress, children, follow-ups, exact-action approvals and prompt editing | `src/Tasks.tsx`, `src/task-client.ts` |
+| Current UI | Original conversations and artifact panel connected to backend v1 | `src/V1Thread.tsx`, `src/v1-client.ts` |
 
 The kernel has no built-in browser session, shell, email sender, or filesystem
 executor. Such capabilities can be added through trusted server plugins. Browser
@@ -296,7 +301,6 @@ HTTP API:
 
 ```sh
 npm run test:tasks
-npm run test:tasks-ui
 npm run typecheck
 npm run build
 npm run test:backend
