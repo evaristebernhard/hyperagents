@@ -11,6 +11,9 @@ import { ApiError, emptyState, validateState } from './validation.mjs';
 import { prepareLegacy } from './legacy.mjs';
 import { createLlm, MODELS } from './llm.mjs';
 import { createRunManager } from './agent-runs.mjs';
+import { createTaskRuntime } from './task-runtime.mjs';
+import { createAgentModel } from './agent-model.mjs';
+import { createAgentPlugins } from './agent-plugins.mjs';
 import { createProviderProbe } from './provider-probe.mjs';
 import { marketplaceCapabilities, marketplaceCatalog } from './marketplace.mjs';
 import { buildCapabilityManifest } from './capability-authority.mjs';
@@ -176,6 +179,19 @@ export async function createApp(options = {}) {
     thread.messages.splice(index+1,0,{id:answerId,role:'assistant',text,createdAt:now(),...(generatedContext?{context:generatedContext}:{}),...(run.status==='succeeded'?{...(run.followUps?{followUps:run.followUps}:{}),...(run.reasoningMs!==undefined?{reasoningMs:run.reasoningMs}:{}),...(run.knowledgeHints?{knowledgeHints:run.knowledgeHints}:{})}:{}),...(tools.length?{toolRuns:tools}:{}),...(run.approvals.length?{actionRequests:run.approvals.slice(0,12)}:{})});thread.updatedAt=now();
     validateState(current.state,findFile);commit(current.state,current.revision);return true;
   }});
+  const taskModel = options.taskModel ?? createAgentModel({apiKey:options.deepseekApiKey,fetchImpl:options.llmFetch});
+  const taskPlugins = options.taskPlugins ?? createAgentPlugins({load,readAttachment,publicFetch:options.publicFetch,exaApiKey:options.exaApiKey,exaFetch:options.exaFetch,openAlexApiKey:options.openAlexApiKey,publicUserAgent:options.publicUserAgent,freeSearchDisabled:options.freeSearchDisabled,plugins:options.agentPlugins ?? [],persistArtifact:async({workspaceId,taskId,effectId,title,content})=>{
+    const current=load(),w=current.state.workspaces.find(w=>w.id===workspaceId);
+    if(!w)throw new ApiError(404,'Task workspace is unavailable.');
+    // A local document is materialized under the durable effect identity. If the
+    // task DB loses its acknowledgement after this commit, replay reuses it.
+    const id='artifact-task-'+hash(effectId),existing=w.data.artifacts.find(a=>a.id===id);
+    if(existing){if(existing.title!==title||existing.content!==content||existing.archived)throw new ApiError(409,'The task document changed after it was saved.');return {id,title:existing.title,kind:existing.kind,workspaceId,taskId};}
+    const createdAt=now();w.data.artifacts.push({id,title,kind:'Document',content,versions:[],createdAt,updatedAt:createdAt});
+    validateState(current.state,findFile);commit(current.state,current.revision);
+    return {id,title,kind:'Document',workspaceId,taskId};
+  }});
+  const tasks=createTaskRuntime({dataDir,model:taskModel,plugins:taskPlugins,load,concurrency:options.taskConcurrency ?? 2,stepTimeoutMs:options.taskStepTimeoutMs ?? 120000});
   const limits = new Map();
   const rateWindow = 15*60*1000;
   function rate(key,max) {
@@ -301,6 +317,19 @@ export async function createApp(options = {}) {
       }
       if (route==='/api/llm/config' && method==='GET') return send(res,200,llm.config());
       if (route==='/api/llm/chat' && method==='POST') return await llm.chat(req,res,await body(req,4096));
+      if(route==='/api/agent-runtime' && method==='GET')return send(res,200,tasks.config({workspaceId:url.searchParams.get('workspaceId')}));
+      const promptMatch=route.match(/^\/api\/agent-prompts\/(router|worker)$/);
+      if(promptMatch && method==='PUT'){const b=await body(req,80*1024);exactBody(b,['workspaceId','content','revision']);return send(res,200,{prompt:tasks.savePrompt(promptMatch[1],b)});}
+      if(route==='/api/tasks' && method==='GET')return send(res,200,{tasks:tasks.list({workspaceId:url.searchParams.get('workspaceId')})});
+      if(route==='/api/tasks' && method==='POST'){const b=await body(req,80*1024);exactBody(b,['workspaceId','text','requestId','pluginIds','model','agentId']);return send(res,202,{task:tasks.create(b)});}
+      const taskMatch=route.match(/^\/api\/tasks\/([a-f0-9-]{36})(?:\/(inputs|cancel|retry|approvals)(?:\/([^/]+))?)?$/);
+      if(taskMatch){
+        const [,id,action,encodedEffectId]=taskMatch;
+        if(method==='GET' && !action)return send(res,200,tasks.get(id,{workspaceId:url.searchParams.get('workspaceId')}));
+        if(method==='POST' && action==='inputs' && !encodedEffectId){const b=await body(req,80*1024);exactBody(b,['workspaceId','text','requestId']);return send(res,202,tasks.input(id,b));}
+        if(method==='POST' && ['cancel','retry'].includes(action) && !encodedEffectId){const b=await body(req,4096);exactBody(b,['workspaceId']);return send(res,200,{task:tasks[action](id,b)});}
+        if(method==='POST' && action==='approvals' && encodedEffectId){let effectId;try{effectId=decodeURIComponent(encodedEffectId);}catch{err(400,'Invalid action ID.');}const b=await body(req,4096);exactBody(b,['workspaceId','decision']);return send(res,200,{task:tasks.decide(id,effectId,b)});}
+      }
       if(route==='/api/runtime' && method==='GET')return send(res,200,runs.capabilities());
       if(route==='/api/runs' && method==='POST') { const b=await body(req,4096);return send(res,202,{run:await runs.create(b)}); }
       if(route==='/api/runs' && method==='GET')return send(res,200,{runs:runs.list({workspaceId:url.searchParams.get('workspaceId'),threadId:url.searchParams.get('threadId')})});
@@ -408,7 +437,7 @@ export async function createApp(options = {}) {
     }
   });
   server.requestTimeout=60000; server.headersTimeout=15000; server.keepAliveTimeout=5000; server.maxRequestsPerSocket=1000;
-  return {server, async listen() { await new Promise((resolve,reject)=>{server.once('error',reject); server.listen(port,host,()=>{server.off('error',reject);resolve();});}); return server.address(); }, async close() { await runs.close();await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}); db.close(); }};
+  return {server, async listen() { await new Promise((resolve,reject)=>{server.once('error',reject); server.listen(port,host,()=>{server.off('error',reject);resolve();});}); return server.address(); }, async close() { await tasks.close();await runs.close();await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}); db.close(); }};
 }
 async function serveDist(req,res,route,distDir) {
   const root=realpathSync(distDir);

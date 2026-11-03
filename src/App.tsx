@@ -60,6 +60,7 @@ import Rooms from "./Rooms";
 import LibraryManager from "./LibraryManager";
 import LocalWorkspace from "./LocalWorkspace";
 import Marketplace from "./Marketplace";
+import Tasks from "./Tasks";
 
 function useSaved<T>(key: string, initial: T) {
   const [v, setV] = useState<T>(() => safeRead(key, initial));
@@ -73,6 +74,7 @@ function useSaved<T>(key: string, initial: T) {
 const gotoItems = [
   ["Projects", "/projects"],
   ["Threads", "/threads"],
+  ["Tasks", "/tasks"],
   ["Inbox", "/inbox"],
   ["Rooms", "/rooms"],
   ["Agents", "/agents"],
@@ -242,7 +244,7 @@ export default function App() {
     <a
       key={route}
       href={route}
-      className={"nav-item " + (path === route ? "active" : "")}
+      className={"nav-item " + (path === route || (route === "/tasks" && path.startsWith("/tasks/")) ? "active" : "")}
       title={collapsed ? label : undefined}
       onClick={(e) => {
         e.preventDefault();
@@ -256,6 +258,7 @@ export default function App() {
   );
   const recent = threads.filter((t) => !t.archived).slice(0, 6);
   const renderPage = () => {
+    if (path === "/tasks" || path.startsWith("/tasks/")) return <Tasks path={path} navigate={navigate} />;
     if (
       path.startsWith("/skills") ||
       path.startsWith("/memories") ||
@@ -565,6 +568,7 @@ export default function App() {
         </button>
         <nav className="sidebar-nav" aria-label="Main navigation">
           {link("/threads/new", "New thread", MessageSquare)}
+          {link("/tasks", "Tasks", Workflow)}
           <button
             className="nav-item"
             onClick={() => {
