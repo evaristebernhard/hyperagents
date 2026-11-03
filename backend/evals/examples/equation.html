@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方程复习卡</title>
+<style>
+  :root {
+    --ink: #1f2933;
+    --muted: #5b6673;
+    --line: #d8dee6;
+    --accent: #2f6fb3;
+    --accent-soft: #eaf1fa;
+    --ok: #1f7a4d;
+    --ok-soft: #e8f5ee;
+    --paper: #ffffff;
+    --bg: #f3f5f8;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    padding: 24px 16px 48px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "WenQuanYi Zen Hei", sans-serif;
+    font-size: 17px;
+    line-height: 1.75;
+  }
+  .card {
+    max-width: 720px;
+    margin: 0 auto;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 28px 28px 20px;
+    box-shadow: 0 2px 10px rgba(31, 41, 51, .06);
+  }
+  h1 {
+    margin: 0 0 4px;
+    font-size: 1.9rem;
+    line-height: 1.3;
+    letter-spacing: .02em;
+  }
+  .subtitle {
+    margin: 0 0 20px;
+    color: var(--muted);
+    font-size: .95rem;
+  }
+  h2 {
+    margin: 28px 0 10px;
+    font-size: 1.15rem;
+    padding-left: 10px;
+    border-left: 4px solid var(--accent);
+    line-height: 1.4;
+  }
+  p { margin: 8px 0; }
+  .equation {
+    display: block;
+    margin: 10px 0;
+    padding: 12px 14px;
+    background: var(--accent-soft);
+    border-radius: 8px;
+    font-family: "Cambria Math", Cambria, "Times New Roman", "DejaVu Serif", "Microsoft YaHei", serif;
+    font-size: 1.25rem;
+    letter-spacing: .04em;
+    overflow-x: auto;
+  }
+  .equation .label {
+    display: inline-block;
+    min-width: 3em;
+    margin-right: 8px;
+    color: var(--muted);
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    font-size: .8rem;
+    letter-spacing: 0;
+  }
+  .equation b { color: var(--accent); }
+  ol.steps {
+    margin: 8px 0;
+    padding-left: 1.4em;
+  }
+  ol.steps li { margin: 6px 0; }
+  .why {
+    display: block;
+    color: var(--muted);
+    font-size: .9rem;
+  }
+  .check {
+    margin: 16px 0 0;
+    padding: 14px 16px;
+    background: var(--ok-soft);
+    border: 1px solid #bfe3cf;
+    border-radius: 8px;
+  }
+  .check strong { color: var(--ok); }
+  .answer {
+    margin: 18px 0 0;
+    padding: 16px 18px;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    text-align: center;
+    font-size: 1.3rem;
+  }
+  .answer .big {
+    font-family: "Cambria Math", Cambria, "Times New Roman", "DejaVu Serif", "Microsoft YaHei", serif;
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: .06em;
+  }
+  .tips {
+    margin: 8px 0 0;
+    padding-left: 1.3em;
+  }
+  .tips li { margin: 4px 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0;
+    font-size: .97rem;
+  }
+  th, td {
+    border: 1px solid var(--line);
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--accent-soft);
+    font-weight: 600;
+  }
+  footer {
+    margin-top: 26px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--line);
+    color: var(--muted);
+    font-size: .85rem;
+  }
+  @media (max-width: 520px) {
+    body { padding: 12px 10px 32px; font-size: 16px; }
+    .card { padding: 20px 16px 16px; }
+    h1 { font-size: 1.5rem; }
+    .equation { font-size: 1.1rem; }
+  }
+</style>
+</head>
+<body>
+<main class="card">
+  <h1>方程复习卡</h1>
+  <p class="subtitle">一元一次方程示例：2x + 3 = 11</p>
+
+  <h2>一、题目</h2>
+  <p>解方程：</p>
+  <span class="equation">2x + 3 = 11</span>
+  <p>其中 <b>x</b> 是未知数。目标是把 x 单独留在等号一边，得到“x = 几”的形式。</p>
+
+  <h2>二、解题过程</h2>
+  <ol class="steps">
+    <li>
+      <strong>看清左边：</strong>2x 表示“2 乘 x”，再加 3，结果是 11。
+      <span class="why">这里 x 只出现一次，且最高次数是 1，所以是一元一次方程。</span>
+    </li>
+    <li>
+      <strong>第一步：两边同时减去 3</strong>，把常数 3 消掉。
+      <span class="equation"><span class="label">原式</span>2x + 3 = 11</span>
+      <span class="equation"><span class="label">减 3</span>2x + 3 − 3 = 11 − 3</span>
+      <span class="equation"><span class="label">化简</span>2x = 8</span>
+      <span class="why">依据：等式两边同时减去同一个数，等式仍然成立。</span>
+    </li>
+    <li>
+      <strong>第二步：两边同时除以 2</strong>，把 x 前面的系数化为 1。
+      <span class="equation"><span class="label">除以 2</span>2x ÷ 2 = 8 ÷ 2</span>
+      <span class="equation"><span class="label">化简</span><b>x = 4</b></span>
+      <span class="why">依据：等式两边同时除以同一个不为 0 的数，等式仍然成立。</span>
+    </li>
+  </ol>
+
+  <div class="check">
+    <strong>三、检验（把 x = 4 代回原方程）</strong>
+    <span class="equation"><span class="label">左边</span>2 × 4 + 3 = 8 + 3 = 11</span>
+    <span class="equation"><span class="label">右边</span>11</span>
+    <p style="margin-bottom:0">左边 = 右边，所以 <b>x = 4</b> 是原方程的解。</p>
+  </div>
+
+  <div class="answer">
+    答案：<span class="big">x = 4</span>
+  </div>
+
+  <h2>四、方法小结</h2>
+  <table>
+    <thead>
+      <tr><th>步骤</th><th>要消去的部分</th><th>使用的运算</th><th>结果</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>第 1 步</td><td>左边的“+ 3”</td><td>两边同时减 3</td><td>2x = 8</td></tr>
+      <tr><td>第 2 步</td><td>x 前面的“× 2”</td><td>两边同时除以 2</td><td>x = 4</td></tr>
+      <tr><td>结尾</td><td>—</td><td>代入原方程检验</td><td>左边 = 11 = 右边</td></tr>
+    </tbody>
+  </table>
+
+  <h2>五、易错提醒</h2>
+  <ul class="tips">
+    <li>两边要<strong>同时</strong>做同样的运算，不能只改一边。</li>
+    <li>减 3 时，右边的 11 也要减 3，写成 11 − 3，而不是保持不变。</li>
+    <li>2x = 8 中，x 不是 8，因为 x 被乘了 2；要除以 2 才得 x = 4。</li>
+    <li>算完把答案代回原方程检查，可以快速发现计算错误。</li>
+  </ul>
+
+  <h2>六、同类练习（可自测）</h2>
+  <ul class="tips">
+    <li>2x + 3 = 13 → 两边减 3 得 2x = 10，再除以 2 得 x = 5。</li>
+    <li>3x − 2 = 10 → 两边加 2 得 3x = 12，再除以 3 得 x = 4。</li>
+    <li>5x + 1 = 11 → 两边减 1 得 5x = 10，再除以 5 得 x = 2。</li>
+  </ul>
+
+  <footer>
+    方程复习卡 · 仅使用本机字体与内嵌样式，可离线打开阅读。
+  </footer>
+</main>
+</body>
+</html>

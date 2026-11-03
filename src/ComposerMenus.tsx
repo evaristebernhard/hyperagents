@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import type { Navigate, ThreadSettings } from "./types";
 import { currentModels } from "./llm-client";
-import { api } from "./backend-client";
+import { api, fixtureMode } from "./backend-client";
 
 const toolNames = [
   "Search", "Find Similar", "Exa Research", "Exa Websets", "Thread Search",
@@ -64,7 +64,14 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
   const [localTools, setLocalTools] = useState<string[]>(toolNames);
   const [capabilities, setCapabilities] = useState<Capability[] | null>(null);
   const [capabilitiesFailed, setCapabilitiesFailed] = useState(false);
-  useEffect(() => { let alive = true; void api<{ capabilities?: Capability[] }>("/api/capabilities").then(result => { if (alive) setCapabilities(result.capabilities || []); }).catch(() => { if (alive) setCapabilitiesFailed(true); }); return () => { alive = false; }; }, []);
+  useEffect(() => {
+    if (fixtureMode()) return;
+    let alive = true;
+    void api<{ capabilities?: Capability[] }>("/api/capabilities")
+      .then(result => { if (alive) setCapabilities(result.capabilities || []); })
+      .catch(() => { if (alive) setCapabilitiesFailed(true); });
+    return () => { alive = false; };
+  }, []);
   const effort = controlled?.reasoning ?? localEffort;
   const provider = controlled?.provider ?? localProvider;
   const tools = controlled?.tools ?? localTools;

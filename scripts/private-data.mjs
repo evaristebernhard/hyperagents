@@ -15,7 +15,7 @@ export function isPrivateDataRequest(rawUrl,{root=process.cwd(),dataDir=process.
     for(let i=0;i<3;i++) { const decoded=decodeURIComponent(pathname); if(decoded===pathname) break; pathname=decoded; }
   } catch { return true; }
   pathname=pathname.replaceAll('\\','/');
-  if(pathname.includes('\0') || /(^|\/)\.data(?:\/|$)/i.test(pathname)) return true;
+  if(pathname.includes('\0') || /(^|\/)\.data(?:-v1)?(?:\/|$)/i.test(pathname)) return true;
   if(/\.(?:sqlite3?|db)(?:[-.][^/]*)?$/i.test(pathname)) return true;
   let candidates;
   if(pathname.startsWith('/@fs/')) {
@@ -25,7 +25,7 @@ export function isPrivateDataRequest(rawUrl,{root=process.cwd(),dataDir=process.
     const target=pathname.replace(/^\/+/, '');
     candidates=[path.resolve(root,target),path.resolve(root,'public',target)];
   }
-  const protectedRoots=[path.resolve(root,'.data'),path.resolve(dataDir)];
+  const protectedRoots=[path.resolve(root,'.data'),path.resolve(root,'.data-v1'),path.resolve(root,'backend/.data-v1'),path.resolve(dataDir)];
   return candidates.some(filename=>protectedRoots.some(dir=>inside(filename,dir)));
 }
 export default function privateDataPlugin() {
@@ -45,4 +45,4 @@ export default function privateDataPlugin() {
     },
   };
 }
-export const privateFsDeny=['.env','.env.*','*.{crt,pem}','**/.git/**','**/.data/**','**/*.sqlite*','**/*.db','**/*.db-*'];
+export const privateFsDeny=['.env','.env.*','*.{crt,pem}','**/.git/**','**/.data/**','**/.data-v1/**','**/*.sqlite*','**/*.db','**/*.db-*'];

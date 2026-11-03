@@ -1,0 +1,312 @@
+{
+  "runId": "2026-11-03T06-57-11-314Z",
+  "caseVersion": "research-delivery-1.0.0",
+  "graderVersion": "1.0.1",
+  "model": "deepseek-chat",
+  "root": "/home/ubuntu/hyperagents/backend/.data-v1/evaluations/2026-11-03T06-57-11-314Z",
+  "total": 6,
+  "passed": 6,
+  "blocked": 0,
+  "passRate": 1,
+  "gatePassed": false,
+  "capabilities": {
+    "models": [
+      {
+        "provider": "deepseek",
+        "model": "deepseek-chat",
+        "configured": true
+      }
+    ],
+    "search": {
+      "provider": "public-bing-rss",
+      "degraded": true
+    },
+    "sandbox": {
+      "available": false,
+      "reason": "RUNNER_NOT_CONFIGURED"
+    },
+    "formats": [
+      "txt",
+      "md",
+      "csv",
+      "json",
+      "html",
+      "png",
+      "pdf"
+    ],
+    "externalActions": false,
+    "limits": {
+      "taskMs": 1200000,
+      "codeMs": 120000,
+      "modelCalls": 32,
+      "toolCalls": 64,
+      "tokens": 200000,
+      "outputTokens": 32768,
+      "transferBytes": 8388608,
+      "fileBytes": 20971520,
+      "artifactBytes": 104857600,
+      "contextChars": 180000,
+      "children": 2,
+      "globalTasks": 2
+    }
+  },
+  "results": [
+    {
+      "caseId": "research-databases",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "584a769f-29aa-471c-a1d0-e0c8faf2765f",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "584a769f-29aa-471c-a1d0-e0c8faf2765f",
+          "model_calls": 9,
+          "tool_calls": 15,
+          "tokens": "84956",
+          "transfer_bytes": "1552784",
+          "artifact_bytes": "15174"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "7d93e992-79f9-4ecd-a2b6-d6d0cead296b",
+          "name": "postgresql-vs-sqlite-task-system-zh.md",
+          "format": "md",
+          "sha256": "d94e0b9bc123b255ba68ce133ab16bafadbe2cecfd3672a12cc00e10b64a4172",
+          "bytes": "15174",
+          "storage_key": "9641eb94-72a0-4489-aca7-3f0e5176447e/d94e0b9bc123b255ba68ce133ab16bafadbe2cecfd3672a12cc00e10b64a4172"
+        }
+      ],
+      "elapsedMs": 58204
+    },
+    {
+      "caseId": "research-databases",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "9aa79c88-39da-437d-a348-2743a9b2315d",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "9aa79c88-39da-437d-a348-2743a9b2315d",
+          "model_calls": 9,
+          "tool_calls": 15,
+          "tokens": "94489",
+          "transfer_bytes": "1633659",
+          "artifact_bytes": "15564"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "7cbd58ba-91d1-4589-aada-40985f48caa8",
+          "name": "PostgreSQL_vs_SQLite_单服务器多用户任务系统并发写入与事务取舍.md",
+          "format": "md",
+          "sha256": "daa9dfde1040f8d5a19d6936a3d721fa6f5cdb1ce898d05be692488d02314954",
+          "bytes": "15564",
+          "storage_key": "850013bc-934e-4b00-a210-21693da9340a/daa9dfde1040f8d5a19d6936a3d721fa6f5cdb1ce898d05be692488d02314954"
+        }
+      ],
+      "elapsedMs": 71676
+    },
+    {
+      "caseId": "research-databases",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "6c91430e-cb3d-40ce-a99b-966e659b82be",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "6c91430e-cb3d-40ce-a99b-966e659b82be",
+          "model_calls": 10,
+          "tool_calls": 14,
+          "tokens": "98111",
+          "transfer_bytes": "1769493",
+          "artifact_bytes": "18913"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "8268f86a-65d1-42d2-aefb-de8205952bd0",
+          "name": "postgresql-vs-sqlite-concurrency-zh.md",
+          "format": "md",
+          "sha256": "160f3232e731992195f97deac5e8e26613db14d950ca937483ded4e80a98bdac",
+          "bytes": "18913",
+          "storage_key": "9641eb94-72a0-4489-aca7-3f0e5176447e/160f3232e731992195f97deac5e8e26613db14d950ca937483ded4e80a98bdac"
+        }
+      ],
+      "elapsedMs": 83022
+    },
+    {
+      "caseId": "independent-research",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "fde0f0bd-c03b-4db0-928c-d953d011d790",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "fde0f0bd-c03b-4db0-928c-d953d011d790",
+          "model_calls": 9,
+          "tool_calls": 13,
+          "tokens": "102132",
+          "transfer_bytes": "2268795",
+          "artifact_bytes": "20424"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "afdd8f8f-e77a-4876-af88-3c047333f2ca",
+          "name": "python-csv-vs-pandas-read_csv.md",
+          "format": "md",
+          "sha256": "836b576e368bc66b68e8ef4186b9b4d222845e930fc5463b5f7cc2a17a87152e",
+          "bytes": "16314",
+          "storage_key": "850013bc-934e-4b00-a210-21693da9340a/836b576e368bc66b68e8ef4186b9b4d222845e930fc5463b5f7cc2a17a87152e"
+        },
+        {
+          "id": "2547f1d4-bd27-4bb1-bb96-a187e2987a94",
+          "name": "csv_vs_pandas_scenarios.csv",
+          "format": "csv",
+          "sha256": "a871f7212dbd65caf1431fc3b025d0268b30698880b2921478a2b9f98d597d69",
+          "bytes": "4110",
+          "storage_key": "850013bc-934e-4b00-a210-21693da9340a/a871f7212dbd65caf1431fc3b025d0268b30698880b2921478a2b9f98d597d69"
+        }
+      ],
+      "elapsedMs": 65728
+    },
+    {
+      "caseId": "independent-research",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "64243161-1d3b-40c5-ad74-b16c07991050",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "64243161-1d3b-40c5-ad74-b16c07991050",
+          "model_calls": 12,
+          "tool_calls": 17,
+          "tokens": "117360",
+          "transfer_bytes": "2721924",
+          "artifact_bytes": "20461"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "f1cd734b-6206-431f-9726-aa8891d89d68",
+          "name": "python_csv_vs_pandas_read_csv_选择指南.md",
+          "format": "md",
+          "sha256": "b21b8fbb7913fffb22f064053248fcfda8b94664fcb38bbcea60bba30a459374",
+          "bytes": "16410",
+          "storage_key": "850013bc-934e-4b00-a210-21693da9340a/b21b8fbb7913fffb22f064053248fcfda8b94664fcb38bbcea60bba30a459374"
+        },
+        {
+          "id": "4393ade4-cb5a-477c-949f-a4552beb92cf",
+          "name": "csv_vs_pandas_read_csv.csv",
+          "format": "csv",
+          "sha256": "318105ad9463466d6010f3ab168e5b207feb63662d434b2543f56115269118a5",
+          "bytes": "4051",
+          "storage_key": "850013bc-934e-4b00-a210-21693da9340a/318105ad9463466d6010f3ab168e5b207feb63662d434b2543f56115269118a5"
+        }
+      ],
+      "elapsedMs": 82079
+    },
+    {
+      "caseId": "independent-research",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "63b230fc-0b25-4ab8-8d55-d684acb2938c",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "63b230fc-0b25-4ab8-8d55-d684acb2938c",
+          "model_calls": 11,
+          "tool_calls": 14,
+          "tokens": "107149",
+          "transfer_bytes": "2561036",
+          "artifact_bytes": "17678"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "5f4d1e45-e8fb-453a-bb62-07e98c974487",
+          "name": "csv_vs_pandas_decision.csv",
+          "format": "csv",
+          "sha256": "533dbb0c5dc23c6ad18c116f3d2a3ddeafe9566e48e5b861b9f65cdc5c2932da",
+          "bytes": "4009",
+          "storage_key": "9641eb94-72a0-4489-aca7-3f0e5176447e/533dbb0c5dc23c6ad18c116f3d2a3ddeafe9566e48e5b861b9f65cdc5c2932da"
+        },
+        {
+          "id": "57d0aab6-45f0-4e40-af2d-c66fea7f8a9a",
+          "name": "python_csv_vs_pandas_read_csv_中文报告.md",
+          "format": "md",
+          "sha256": "2e823952a6893801491404b1bee77d4f79c4861762bb981e6eec283e9e170dd7",
+          "bytes": "13669",
+          "storage_key": "9641eb94-72a0-4489-aca7-3f0e5176447e/2e823952a6893801491404b1bee77d4f79c4861762bb981e6eec283e9e170dd7"
+        }
+      ],
+      "elapsedMs": 69591
+    }
+  ],
+  "audit": {
+    "attempts": 60,
+    "actual_input": "563031",
+    "actual_output": "41166",
+    "unknown_usage_attempts": 0,
+    "budget_charged_tokens": "604197",
+    "transfer_bytes": "12507691",
+    "artifact_bytes": "108214",
+    "artifactFileCount": 9,
+    "auditedAt": "2026-11-03T07:58:58.119Z"
+  }
+}

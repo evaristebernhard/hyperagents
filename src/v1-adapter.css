@@ -1,0 +1,174 @@
+/* The main UI owns the layout; these rules cover adapter-only states. */
+.nav-item[aria-disabled="true"],
+.example-card[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.composer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.v1-canvas-collapsed {
+  grid-template-columns: minmax(300px, 1fr);
+}
+.v1-event-list {
+  max-height: 280px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.rt-artifact-editor a.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.v1-run-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.v1-run-heading .plain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  margin-left: auto;
+}
+.v1-run-symbol {
+  display: flex;
+  color: #6c8971;
+}
+.v1-run.is-running .v1-run-symbol {
+  color: #39879b;
+  animation: v1-breathe 1.8s ease-in-out infinite;
+}
+@keyframes v1-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v1-run.is-running .v1-run-symbol {
+    animation: none;
+  }
+}
+.v1-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0 4px;
+}
+.v1-activity {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 12px;
+  overflow: hidden;
+}
+.v1-activity summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.v1-activity summary > span {
+  min-width: 0;
+  flex: 1;
+}
+.v1-activity summary strong {
+  font-weight: 500;
+}
+.v1-activity summary small {
+  display: block;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 400px;
+  margin-top: 3px;
+}
+.v1-activity summary em {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--muted);
+}
+.v1-activity.has-error {
+  border-color: #cb9d7e;
+}
+.v1-activity-body {
+  padding: 4px 14px 14px;
+  color: var(--text);
+}
+.v1-activity-body > a {
+  display: block;
+  margin: 7px 0;
+  overflow-wrap: anywhere;
+}
+.v1-activity pre,
+.v1-code-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.6;
+  background: var(--hover);
+  padding: 12px;
+  border-radius: 6px;
+}
+.v1-agent-question {
+  border-left: 2px solid #619ca2;
+  padding: 12px 16px;
+  background: var(--hover);
+}
+.v1-resources > .card {
+  margin: 16px 0;
+  padding: 20px;
+}
+.v1-resources .card h3 {
+  margin: 10px 0;
+}
+.v1-inbox-row {
+  display: flex;
+  width: 100%;
+  gap: 16px;
+  align-items: center;
+  text-align: left;
+  background: var(--bg);
+  color: var(--text);
+  padding: 16px;
+}
+.v1-inbox-row strong {
+  flex: 1;
+  font-weight: 500;
+}
+.v1-inbox-row span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.v1-library-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  min-width: 0;
+}
+.v1-library-card h3 {
+  overflow-wrap: anywhere;
+}
+.v1-resources .grid2,
+.v1-resources .grid3 {
+  margin: 20px 0;
+}
+.v1-resources .rt-error {
+  margin: 16px 0;
+}
+.composer-popover {
+  max-height: 340px;
+  overflow: auto;
+}

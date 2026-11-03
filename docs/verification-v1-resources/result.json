@@ -1,0 +1,46 @@
+{
+  "recoveryCodes": [
+    "MODEL_UNAVAILABLE"
+  ],
+  "origin": "http://localhost:5173",
+  "checks": [
+    "Real Python calculation, saved Memory context, source/Markdown/PDF downloads",
+    "Follow-up creates versions; refresh restores every task and historical downloads",
+    "Accepted learning persists after refresh",
+    "Library contains real task artifacts",
+    "Team rooms persist and do not inherit personal files",
+    "No browser errors or legacy API requests"
+  ],
+  "conversation": "159b0f0e-854f-4c92-8570-455605db6917",
+  "firstTask": "2c667051-daea-4d2b-b739-1f32b45acc6f",
+  "artifactIds": [
+    "4c980f64-7c03-4b48-8fbd-b38788709344",
+    "207c7eb1-c842-4922-8e5d-11fb9993cbbc",
+    "984089ea-e414-4593-bf10-d3872175f1d8"
+  ],
+  "files": [
+    {
+      "id": "4c980f64-7c03-4b48-8fbd-b38788709344",
+      "name": "sum.py",
+      "bytes": 794,
+      "versions": 2,
+      "fileId": "6f6ccdaf-c738-403c-b42a-1c545573e1e7"
+    },
+    {
+      "id": "207c7eb1-c842-4922-8e5d-11fb9993cbbc",
+      "name": "result.md",
+      "bytes": 1374,
+      "versions": 2,
+      "fileId": "b973d1eb-e1c8-4f4b-949b-9ac607bd105a"
+    },
+    {
+      "id": "984089ea-e414-4593-bf10-d3872175f1d8",
+      "name": "result.pdf",
+      "bytes": 32473,
+      "versions": 2,
+      "fileId": "0bebd915-612a-4663-9f5c-2864d27352c8"
+    }
+  ],
+  "errors": [],
+  "legacy": []
+}

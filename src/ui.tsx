@@ -1,3 +1,5 @@
+import V1Composer from "./V1Composer";
+import { backendV1 } from "./v1-client";
 import { catalogSkill } from "./marketplace-catalog";
 import type { ReactNode } from "react";
 import {
@@ -46,17 +48,20 @@ export function IconButton({
   children,
   onClick,
   className = "",
+  disabled = false,
 }: {
   label: string;
   children: ReactNode;
   onClick?: () => void;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       className={"icon-btn " + className}
       aria-label={label}
+      disabled={disabled}
       title={label}
       onClick={onClick}
     >
@@ -162,7 +167,7 @@ const outputs = [
   ["Map", Map],
   ["Doc", FileText],
 ] as const;
-export function Composer({ navigate, onSend, notify, compact = false, agents = [], initialSettings, contextKey = "new", disabled = false, prefill }: {
+function LegacyComposer({ navigate, onSend, notify, compact = false, agents = [], initialSettings, contextKey = "new", disabled = false, prefill }: {
   navigate: Navigate;
   onSend: (text: string, context?: MessageContext, clientRequestId?: string) => void | Promise<void>;
   notify: (message: string) => void;
@@ -300,3 +305,6 @@ export function Composer({ navigate, onSend, notify, compact = false, agents = [
       onAgentSelection={(agentId, starterAgentName) => setChoices(current => ({ ...current, agentId, starterAgentName, tools: [...new Set([...current.tools, ...(w.data.agents.find(agent => agent.id === agentId)?.tools || [])])] }))} />
   </div>;
 }
+
+export type ComposerProps = Parameters<typeof LegacyComposer>[0];
+export function Composer(props: ComposerProps) { return backendV1 ? <V1Composer {...props} /> : <LegacyComposer {...props} />; }

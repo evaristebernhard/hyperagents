@@ -2,6 +2,11 @@
 
 This is an independent implementation, not Hyperagent's private source or backend.
 
+The new **Tasks** page shares this provider configuration but has its own durable
+Router/Worker lifecycle. See [TASK-RUNTIME.md](TASK-RUNTIME.md) for its plugins,
+editable prompts, follow-up delivery and restart recovery. The historical thread
+increments below do not describe the Tasks execution lifecycle.
+
 ## Configure a real provider
 
 1. Rotate any key that has appeared in chat or source history.

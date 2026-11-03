@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 export type Navigate = (path: string) => void;
-export type ArtifactKind = "Document" | "Webpage" | "Slides" | "Table" | "Image" | "File";
+export type ArtifactKind =
+  "Document" | "Webpage" | "Slides" | "Table" | "Image" | "File";
 export type Slide = { title: string; body: string; notes?: string };
 export type SlideDeck = { title: string; slides: Slide[] };
 export type ThreadSettings = {
@@ -14,15 +15,71 @@ export type ThreadSettings = {
   outputFormat?: string;
   visuals?: string;
 };
-export type FileMeta = { id: string; name: string; size: number; mimeType: string; createdAt: string; workspaceId: string };
-export type MessageContext = { settings: ThreadSettings; skillIds: string[]; memoryIds: string[]; artifactIds: string[]; integrationIds: string[]; projectId?: string; attachments: FileMeta[] };
-export type ToolRun = { id: string; name: string; status: "running" | "success" | "error"; summary: string };
-export type IntegrationApproval = { id: string; token: string; provider: string; operation: string; summary: string; args: Record<string, unknown>; status: "pending" | "completed" | "failed" | "dismissed"; result?: string };
+export type FileMeta = {
+  id: string;
+  name: string;
+  size: number;
+  mimeType: string;
+  createdAt: string;
+  workspaceId: string;
+};
+export type MessageContext = {
+  settings: ThreadSettings;
+  skillIds: string[];
+  memoryIds: string[];
+  artifactIds: string[];
+  integrationIds: string[];
+  projectId?: string;
+  roomId?: string;
+  rubricIds?: string[];
+  attachments: FileMeta[];
+};
+export type ToolRun = {
+  id: string;
+  name: string;
+  status: "running" | "success" | "error";
+  summary: string;
+};
+export type IntegrationApproval = {
+  id: string;
+  token: string;
+  provider: string;
+  operation: string;
+  summary: string;
+  args: Record<string, unknown>;
+  status: "pending" | "completed" | "failed" | "dismissed";
+  result?: string;
+};
 export type KnowledgeHints = { skillIds: string[]; memoryIds: string[] };
-export type DemoMessage = { id?: string; role: "user" | "assistant"; text: string; createdAt?: string; context?: MessageContext; toolRuns?: ToolRun[]; actionRequests?: IntegrationApproval[]; followUps?: string[]; reasoningMs?: number; knowledgeHints?: KnowledgeHints };
-export type WorkspacePreferences = { defaultThreadSettings?: ThreadSettings; [key: string]: unknown };
-export const defaultThreadSettings: ThreadSettings = { model: "", reasoning: "Medium", provider: "Any", mode: "Execute", tools: ["Thread Search", "Documents", "Webpages", "Tables"] };
-export type CanvasPreferences = { layout: "focus" | "tiles" | "carousel"; hidden: string[]; order: string[]; collapsed?: boolean };
+export type DemoMessage = {
+  id?: string;
+  role: "user" | "assistant";
+  text: string;
+  createdAt?: string;
+  context?: MessageContext;
+  toolRuns?: ToolRun[];
+  actionRequests?: IntegrationApproval[];
+  followUps?: string[];
+  reasoningMs?: number;
+  knowledgeHints?: KnowledgeHints;
+};
+export type WorkspacePreferences = {
+  defaultThreadSettings?: ThreadSettings;
+  [key: string]: unknown;
+};
+export const defaultThreadSettings: ThreadSettings = {
+  model: "",
+  reasoning: "Medium",
+  provider: "Any",
+  mode: "Execute",
+  tools: ["Thread Search", "Documents", "Webpages", "Tables"],
+};
+export type CanvasPreferences = {
+  layout: "focus" | "tiles" | "carousel";
+  hidden: string[];
+  order: string[];
+  collapsed?: boolean;
+};
 export type DemoThread = {
   canvas?: CanvasPreferences;
   id: string;

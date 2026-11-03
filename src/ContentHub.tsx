@@ -1,3 +1,4 @@
+import { backendV1 } from "./v1-client";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -50,7 +51,18 @@ export function Markdown({ content }: { content: string }) {
 export default function ContentHub({ path, navigate, notify }: PageProps) {
   const w = useWorkspace(),
     { skills, memories, rubrics } = w.data;
-  const discoverSkills = w.mode === "server" ? marketplaceCatalog.filter(e => e.kind === "skill" && e.implementation).slice(0, 6).map(e => ({ id: e.sourceId, name: e.name, author: "Independent implementation", description: e.summary })) : communitySkills;
+  const discoverSkills =
+    w.mode === "server" && !backendV1
+      ? marketplaceCatalog
+          .filter((e) => e.kind === "skill" && e.implementation)
+          .slice(0, 6)
+          .map((e) => ({
+            id: e.sourceId,
+            name: e.name,
+            author: "Independent implementation",
+            description: e.summary,
+          }))
+      : communitySkills;
   const section = path.split("/")[1],
     id = path.split("/")[2];
   const skill = skills.find((s) => s.id === id),
@@ -102,7 +114,11 @@ export default function ContentHub({ path, navigate, notify }: PageProps) {
     };
     const maxBytes = (options ? 5 : 1) * 1024 * 1024;
     if (file.size > maxBytes)
-      return fail(options ? "Skill files must be 5 MB or smaller." : "Skill files must be smaller than 1 MB.");
+      return fail(
+        options
+          ? "Skill files must be 5 MB or smaller."
+          : "Skill files must be smaller than 1 MB.",
+      );
     if (!(options ? /\.(json|md)$/i : /\.(json|md|txt)$/i).test(file.name))
       return fail("Choose a supported skill file.");
     try {
@@ -191,7 +207,13 @@ export default function ContentHub({ path, navigate, notify }: PageProps) {
     setCategory(m?.category || "User Fact");
     setImportance(String(m?.importance || 3));
     setPinned(m?.pinned || false);
-    setScope(m?.scope || "Global");
+    setScope(
+      backendV1
+        ? m?.scope === "personal"
+          ? "Personal"
+          : "Global"
+        : m?.scope || "Global",
+    );
     setModal("memory");
   };
   const saveMemory = () => {
@@ -256,7 +278,10 @@ export default function ContentHub({ path, navigate, notify }: PageProps) {
               {creating ? "Create skill" : "Edit skill"}
             </h1>
             {creating && (
-              <p className="demo-note">Local-only manual editor. Save your own instructions without research, model calls, or script execution.</p>
+              <p className="demo-note">
+                Local-only manual editor. Save your own instructions without
+                research, model calls, or script execution.
+              </p>
             )}
             {editing && !skill ? (
               <div className="empty-state">Skill not found.</div>
@@ -517,14 +542,19 @@ export default function ContentHub({ path, navigate, notify }: PageProps) {
                   <button
                     className="btn small"
                     onClick={() => {
-                      if (w.mode === "server") { navigate("/marketplace/s/" + s.id); return; }
+                      if (w.mode === "server") {
+                        navigate("/marketplace/s/" + s.id);
+                        return;
+                      }
                       const installedId = w.installSkill(s.id);
                       navigate("/skills/" + installedId);
                     }}
                   >
-                    {w.mode === "server" ? "View implementation" : skills.some((i) => i.sourceId === s.id || i.id === s.id)
-                      ? "Open installed skill"
-                      : "Add skill"}
+                    {w.mode === "server"
+                      ? "View implementation"
+                      : skills.some((i) => i.sourceId === s.id || i.id === s.id)
+                        ? "Open installed skill"
+                        : "Add skill"}
                   </button>
                 </article>
               ))}
@@ -813,8 +843,13 @@ export default function ContentHub({ path, navigate, notify }: PageProps) {
       {modal === "skill-create" && (
         <SkillCreationWizard
           onClose={() => setModal("")}
-          onManual={() => { setModal(""); navigate("/skills/new"); }}
-          onImport={(file, signal) => importSkill(file, { wizard: true, signal })}
+          onManual={() => {
+            setModal("");
+            navigate("/skills/new");
+          }}
+          onImport={(file, signal) =>
+            importSkill(file, { wizard: true, signal })
+          }
         />
       )}
       {modal === "memory" && (

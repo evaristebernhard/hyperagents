@@ -1,0 +1,11 @@
+FROM node:24-bookworm-slim AS node
+FROM python:3.12-slim-bookworm
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-wqy-zenhei poppler-utils && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir numpy==2.2.4 pandas==2.2.3 matplotlib==3.10.1 reportlab==4.3.1 pypdf==5.4.0 pillow==11.1.0
+COPY deploy/hyper_document.py /usr/local/lib/python3.12/site-packages/hyper_document.py
+RUN useradd -u 1000 -m sandbox && mkdir /work /inputs && chown sandbox:sandbox /work
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+USER sandbox
+WORKDIR /work
+CMD ["python3", "-c", "print('sandbox-ready')"]

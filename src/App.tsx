@@ -1,4 +1,13 @@
-import { useEffect, useLayoutEffect, useState, useRef, type ReactNode } from "react";
+import V1Panels from "./V1Panels";
+import { backendV1, submitTask, logout } from "./v1-client";
+import V1Thread from "./V1Thread";
+import {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useRef,
+  type ReactNode,
+} from "react";
 import {
   Search,
   Inbox,
@@ -36,7 +45,13 @@ import {
   Clock,
   Check,
 } from "lucide-react";
-import type { DemoThread, DemoAgent, DemoProject, DemoMemory, MessageContext } from "./types";
+import type {
+  DemoThread,
+  DemoAgent,
+  DemoProject,
+  DemoMemory,
+  MessageContext,
+} from "./types";
 import {
   initialThreads,
   initialProjects,
@@ -113,14 +128,24 @@ export default function App() {
     [recentExpanded, setRecentExpanded] = useState(true),
     [roomsExpanded, setRoomsExpanded] = useState(true),
     [dialog, setDialog] = useState("");
-  const [menuPosition, setMenuPosition] = useState<{ left: number; top?: number; bottom?: number }>({ left: 8 });
+  const [menuPosition, setMenuPosition] = useState<{
+    left: number;
+    top?: number;
+    bottom?: number;
+  }>({ left: 8 });
   const shellMenuRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLElement | null>(null);
   const profile = safeRead("profile", { name: "Demo User", company: "" });
-  const profileName = profile.name || "Demo User";
-  const profileInitials = profileName.split(/\s+/).slice(0, 2).map(n => n[0]).join("").toUpperCase();
+  const profileName = backendV1 ? "My workspace" : profile.name || "Demo User";
+  const profileInitials = profileName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase();
   useEffect(() => {
-    if (menu) shellMenuRef.current?.querySelector<HTMLElement>("button")?.focus();
+    if (menu)
+      shellMenuRef.current?.querySelector<HTMLElement>("button")?.focus();
   }, [menu]);
   useLayoutEffect(() => {
     if (!menu) return;
@@ -204,33 +229,106 @@ export default function App() {
       "Workspace";
     document.title = title + " · Hyperagents UI Demo";
   }, [path, threads]);
-  const notify = (t: string) => setToast(workspace.mode === "server" && /saved locally|updated locally|stored locally/i.test(t) ? "Change recorded. Check the storage status for server confirmation." : t);
+  const notify = (t: string) =>
+    setToast(
+      workspace.mode === "server" &&
+        /saved locally|updated locally|stored locally/i.test(t)
+        ? "Change recorded. Check the storage status for server confirmation."
+        : t,
+    );
   const toggle = (m: string, trigger?: HTMLElement) => {
     if (trigger) {
       menuTriggerRef.current = trigger;
       const rect = trigger.getBoundingClientRect();
-      const left = Math.max(8, Math.min(m === "learning" ? rect.right + 4 : rect.left, innerWidth - 248));
-      setMenuPosition(m === "account"
-        ? { left, bottom: Math.max(8, innerHeight - rect.top + 4) }
-        : { left, top: Math.max(8, Math.min(m === "learning" ? rect.top : rect.bottom + 4, innerHeight - 170)) });
+      const left = Math.max(
+        8,
+        Math.min(
+          m === "learning" ? rect.right + 4 : rect.left,
+          innerWidth - 248,
+        ),
+      );
+      setMenuPosition(
+        m === "account"
+          ? { left, bottom: Math.max(8, innerHeight - rect.top + 4) }
+          : {
+              left,
+              top: Math.max(
+                8,
+                Math.min(
+                  m === "learning" ? rect.top : rect.bottom + 4,
+                  innerHeight - 170,
+                ),
+              ),
+            },
+      );
     }
     setMenu(menu === m ? "" : m);
   };
-  const createThread = async (text: string, project?: string, context?: MessageContext, clientRequestId?: string) => {
+  const createThread = async (
+    text: string,
+    project?: string,
+    context?: MessageContext,
+    clientRequestId?: string,
+  ) => {
+    if (backendV1) {
+      const task = await submitTask(
+        text,
+        project
+          ? {
+              ...(context || {
+                settings: defaultThreadSettings,
+                skillIds: [],
+                memoryIds: [],
+                artifactIds: [],
+                integrationIds: [],
+                attachments: [],
+              }),
+              projectId: project,
+            }
+          : context,
+        clientRequestId,
+      );
+      await workspace.reload();
+      navigate("/thread/" + task.conversationId);
+      return;
+    }
     const id = clientRequestId ? "thread-" + clientRequestId : uid("thread");
     const timestamp = now();
     const t: DemoThread = {
       id,
-      title: text.split("\n")[0].slice(0, 65) || context?.attachments[0]?.name || "New conversation",
-      summary: text.slice(0, 150), time: "just now", project,
+      title:
+        text.split("\n")[0].slice(0, 65) ||
+        context?.attachments[0]?.name ||
+        "New conversation",
+      summary: text.slice(0, 150),
+      time: "just now",
+      project,
       projectId: context?.projectId,
-      createdAt: timestamp, updatedAt: timestamp,
-      config: context?.settings || workspace.data.preferences?.defaultThreadSettings || defaultThreadSettings,
-      messages: [{ id: clientRequestId || uid("message"), role: "user", text, createdAt: timestamp, ...(context ? { context } : {}) }],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      config:
+        context?.settings ||
+        workspace.data.preferences?.defaultThreadSettings ||
+        defaultThreadSettings,
+      messages: [
+        {
+          id: clientRequestId || uid("message"),
+          role: "user",
+          text,
+          createdAt: timestamp,
+          ...(context ? { context } : {}),
+        },
+      ],
     };
-    workspace.set("threads", items => items.some(item => item.id === id) ? items : [t, ...items]);
+    workspace.set("threads", (items) =>
+      items.some((item) => item.id === id) ? items : [t, ...items],
+    );
     await workspace.flush();
-    if (workspace.mode === "server" && t.messages?.[0]?.id) sessionStorage.setItem("llm-pending:" + workspace.state.active + ":" + id, t.messages[0].id);
+    if (workspace.mode === "server" && t.messages?.[0]?.id)
+      sessionStorage.setItem(
+        "llm-pending:" + workspace.state.active + ":" + id,
+        t.messages[0].id,
+      );
     navigate("/thread/" + id);
   };
   const link = (
@@ -256,6 +354,57 @@ export default function App() {
   );
   const recent = threads.filter((t) => !t.archived).slice(0, 6);
   const renderPage = () => {
+    if (backendV1 && settings)
+      return (
+        <V1Panels
+          path={settings === "integrations" ? "/integrations" : "/workspaces"}
+          navigate={navigate}
+          notify={notify}
+        />
+      );
+    if (backendV1 && path.startsWith("/thread/"))
+      return (
+        <V1Thread
+          key={path}
+          id={decodeURIComponent(path.split("/")[2])}
+          navigate={navigate}
+          notify={notify}
+        />
+      );
+    if (
+      backendV1 &&
+      [
+        "library",
+        "documents",
+        "learning",
+        "inbox",
+        "wiki",
+        "marketplace",
+        "workspaces",
+        "workflows",
+        "integrations",
+      ].includes(path.split("/")[1])
+    )
+      return (
+        <V1Panels
+          key={workspace.state.active + path}
+          path={path}
+          navigate={navigate}
+          notify={notify}
+        />
+      );
+    if (backendV1 && path === "/agents/new/cast")
+      return (
+        <Agents
+          key={workspace.state.active + path}
+          path="/agents/new"
+          creationManual
+          navigate={navigate}
+          notify={notify}
+          agents={agents}
+          setAgents={setAgents}
+        />
+      );
     if (
       path.startsWith("/skills") ||
       path.startsWith("/memories") ||
@@ -269,7 +418,8 @@ export default function App() {
     if (path === "/workspaces" || path === "/workflows")
       return <LocalWorkspace path={path} navigate={navigate} notify={notify} />;
 
-    if (workspace.mode === "server" && path.startsWith("/marketplace")) return <Marketplace path={path} navigate={navigate} notify={notify} />;
+    if (workspace.mode === "server" && path.startsWith("/marketplace"))
+      return <Marketplace path={path} navigate={navigate} notify={notify} />;
 
     if (path === "/threads/new" || path === "/home" || path === "/")
       return (
@@ -278,11 +428,14 @@ export default function App() {
             <h1>Let's get to work.</h1>
             <Composer
               navigate={navigate}
-              onSend={(text, context, clientId) => createThread(text, undefined, context, clientId)}
+              onSend={(text, context, clientId) =>
+                createThread(text, undefined, context, clientId)
+              }
               notify={notify}
               agents={agents.map((a) => a.name)}
             />
             <button
+              disabled={workspace.role === "viewer"}
               className="setup-agent"
               onClick={() => navigate("/agents/new")}
             >
@@ -348,7 +501,11 @@ export default function App() {
         <Thread
           key={id}
           thread={thread}
-          update={(t) => workspace.set("threads", current => current.map(x => x.id === id ? t : x))}
+          update={(t) =>
+            workspace.set("threads", (current) =>
+              current.map((x) => (x.id === id ? t : x)),
+            )
+          }
           navigate={navigate}
           notify={notify}
           settingsPanel={query.get("panel") === "settings"}
@@ -357,7 +514,12 @@ export default function App() {
       );
     }
     if (path === "/agents/new/cast")
-      return <AgentCasting key={workspace.state.active + ":casting"} navigate={navigate} />;
+      return (
+        <AgentCasting
+          key={workspace.state.active + ":casting"}
+          navigate={navigate}
+        />
+      );
     if (path.startsWith("/agents"))
       return (
         <Agents
@@ -398,7 +560,9 @@ export default function App() {
             Try this example
           </button>
           <p className="demo-note">
-            Starts a local demo conversation. No agent runtime is connected.
+            {backendV1
+              ? "Starts a new task with your configured agent."
+              : "Starts a local demo conversation. No agent runtime is connected."}
           </p>
         </div>
       );
@@ -624,7 +788,11 @@ export default function App() {
               ) : (
                 <>
                   Recent threads
-                  {recentExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  {recentExpanded ? (
+                    <ChevronDown size={12} />
+                  ) : (
+                    <ChevronRight size={12} />
+                  )}
                 </>
               )}
             </button>
@@ -667,7 +835,11 @@ export default function App() {
               ) : (
                 <>
                   Recent rooms
-                  {roomsExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  {roomsExpanded ? (
+                    <ChevronDown size={12} />
+                  ) : (
+                    <ChevronRight size={12} />
+                  )}
                 </>
               )}
             </button>
@@ -706,7 +878,9 @@ export default function App() {
               </>
             )}
           </button>
-          {projects.length ? link("/projects", "Projects", Folder) : link("/projects/new", "New project", Plus)}
+          {projects.length
+            ? link("/projects", "Projects", Folder)
+            : link("/projects/new", "New project", Plus)}
           {link("/library", "Library", BookOpen)}
           {link("/marketplace", "Marketplace", Store)}
         </nav>
@@ -721,7 +895,9 @@ export default function App() {
             <>
               <span>
                 <strong>{profileName}</strong>
-                <small>demo@example.com</small>
+                <small>
+                  {backendV1 ? "Private workspace" : "demo@example.com"}
+                </small>
               </span>
               <ChevronRight size={14} />
             </>
@@ -743,17 +919,42 @@ export default function App() {
           <div
             ref={shellMenuRef}
             role="menu"
-            aria-label={menu === "workspace" ? "Workspaces" : menu === "learning" ? "Learning" : "Account"}
+            aria-label={
+              menu === "workspace"
+                ? "Workspaces"
+                : menu === "learning"
+                  ? "Learning"
+                  : "Account"
+            }
             style={menuPosition}
             onKeyDown={(e) => {
               if (["Escape", "ArrowLeft"].includes(e.key)) {
-                e.preventDefault(); e.stopPropagation(); setMenu(""); menuTriggerRef.current?.focus(); return;
+                e.preventDefault();
+                e.stopPropagation();
+                setMenu("");
+                menuTriggerRef.current?.focus();
+                return;
               }
-              if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+              if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key))
+                return;
               e.preventDefault();
-              const buttons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button")];
-              const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-              const next = e.key === "Home" ? 0 : e.key === "End" ? buttons.length - 1 : (index + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+              const buttons = [
+                ...e.currentTarget.querySelectorAll<HTMLButtonElement>(
+                  "button",
+                ),
+              ];
+              const index = buttons.indexOf(
+                document.activeElement as HTMLButtonElement,
+              );
+              const next =
+                e.key === "Home"
+                  ? 0
+                  : e.key === "End"
+                    ? buttons.length - 1
+                    : (index +
+                        (e.key === "ArrowDown" ? 1 : -1) +
+                        buttons.length) %
+                      buttons.length;
               buttons[next]?.focus();
             }}
             className={
@@ -770,7 +971,8 @@ export default function App() {
                   {workspace.activeName}
                   <Check size={14} />
                 </button>
-                <button role="menuitem"
+                <button
+                  role="menuitem"
                   onClick={() => {
                     setMenu("");
                     navigate("/workspaces");
@@ -782,7 +984,8 @@ export default function App() {
                 {workspace.state.workspaces
                   .filter((w) => w.id !== workspace.state.active)
                   .map((w) => (
-                    <button role="menuitem"
+                    <button
+                      role="menuitem"
                       key={w.id}
                       onClick={() => {
                         workspace.switchWorkspace(w.id);
@@ -812,19 +1015,33 @@ export default function App() {
               <>
                 <div className="account-menu-heading">
                   <strong>{profileName}</strong>
-                  <small>demo@example.com</small>
+                  <small>
+                    {backendV1 ? "Private workspace" : "demo@example.com"}
+                  </small>
                 </div>
-                <button role="menuitem"
-                  onClick={() => navigate(path + "?settings=personalization")}
+                <button
+                  role="menuitem"
+                  onClick={() =>
+                    navigate(
+                      backendV1
+                        ? "/workspaces"
+                        : path + "?settings=personalization",
+                    )
+                  }
                 >
                   <Settings2 size={15} />
                   Account settings
                 </button>
-                <button role="menuitem" onClick={() => navigate(path + "?settings=billing")}>
+                <button
+                  role="menuitem"
+                  disabled={backendV1}
+                  onClick={() => navigate(path + "?settings=billing")}
+                >
                   <Star size={15} />
                   Plan & billing<span className="badge">Free</span>
                 </button>
-                <button role="menuitem"
+                <button
+                  role="menuitem"
                   onClick={() => {
                     setMenu("");
                     setDialog("help");
@@ -833,16 +1050,25 @@ export default function App() {
                   <HelpCircle size={15} />
                   Help & support
                 </button>
-                <button role="menuitem"
+                <button
+                  role="menuitem"
+                  disabled={backendV1}
                   onClick={() => {
                     setMenu("");
-                    setDialog("account");
+                    if (!backendV1) setDialog("account");
                   }}
                 >
                   <Plus size={15} />
                   Add account
                 </button>
-                <button role="menuitem" title="Return to the local demo login; no real account session is managed." onClick={() => navigate("/login")}>
+                <button
+                  role="menuitem"
+                  onClick={() =>
+                    backendV1
+                      ? void logout().catch((e) => notify(e.message))
+                      : navigate("/login")
+                  }
+                >
                   <LogOut size={15} />
                   Sign out
                 </button>
@@ -860,7 +1086,7 @@ export default function App() {
           navigate={navigate}
         />
       )}
-      {settings && (
+      {settings && !backendV1 && (
         <Settings
           section={settings}
           navigateSection={(s) => navigate(path + "?settings=" + s)}
@@ -948,7 +1174,9 @@ function ThreadList({
   const [listError, setListError] = useState("");
   const deleting = useRef(false);
   const projectOf = (thread: DemoThread) => thread.projectId || thread.project;
-  const projectLabel = (thread: DemoThread) => workspace.data.projects.find(p => p.id === projectOf(thread))?.name || projectOf(thread);
+  const projectLabel = (thread: DemoThread) =>
+    workspace.data.projects.find((p) => p.id === projectOf(thread))?.name ||
+    projectOf(thread);
   const [grid, setGrid] = useState(false),
     [filter, setFilter] = useState("Recent"),
     [text, setText] = useState(""),
@@ -1052,13 +1280,14 @@ function ThreadList({
               onChange={(e) => setProjectFilter(e.target.value)}
             >
               <option value="">All projects</option>
-              {[
-                ...new Set(allThreads.map(projectOf).filter(Boolean)),
-              ].map((p) => (
-                <option key={p} value={p}>
-                  {workspace.data.projects.find(project => project.id === p)?.name || p}
-                </option>
-              ))}
+              {[...new Set(allThreads.map(projectOf).filter(Boolean))].map(
+                (p) => (
+                  <option key={p} value={p}>
+                    {workspace.data.projects.find((project) => project.id === p)
+                      ?.name || p}
+                  </option>
+                ),
+              )}
             </select>
           </label>
           <button
@@ -1103,6 +1332,7 @@ function ThreadList({
             <div className="thread-card-actions">
               <IconButton
                 label={(t.starred ? "Unstar " : "Star ") + t.title}
+                disabled={workspace.role === "viewer"}
                 onClick={() =>
                   setThreads(
                     allThreads.map((x) =>
@@ -1114,6 +1344,7 @@ function ThreadList({
                 <Star size={15} fill={t.starred ? "currentColor" : "none"} />
               </IconButton>
               <IconButton
+                disabled={workspace.role === "viewer"}
                 label={(t.archived ? "Restore " : "Archive ") + t.title}
                 onClick={() => {
                   setThreads(
@@ -1129,10 +1360,30 @@ function ThreadList({
                 <IconButton
                   label={"Delete permanently " + t.title}
                   onClick={() => {
-                    if (deleting.current || !confirm("Permanently delete this thread? Artifacts are kept unlinked, and public snapshots will be revoked.")) return;
-                    if (workspace.mode === "fixture") { setThreads(allThreads.filter(x => x.id !== t.id)); return; }
-                    deleting.current = true; setListError("");
-                    void deleteThreadData(workspace, t.id).catch(e => setListError(e instanceof Error ? e.message : "Could not delete thread.")).finally(() => { deleting.current = false; });
+                    if (
+                      deleting.current ||
+                      !confirm(
+                        "Permanently delete this thread? Artifacts are kept unlinked, and public snapshots will be revoked.",
+                      )
+                    )
+                      return;
+                    if (workspace.mode === "fixture") {
+                      setThreads(allThreads.filter((x) => x.id !== t.id));
+                      return;
+                    }
+                    deleting.current = true;
+                    setListError("");
+                    void deleteThreadData(workspace, t.id)
+                      .catch((e) =>
+                        setListError(
+                          e instanceof Error
+                            ? e.message
+                            : "Could not delete thread.",
+                        ),
+                      )
+                      .finally(() => {
+                        deleting.current = false;
+                      });
                   }}
                 >
                   <X size={15} />
@@ -1153,7 +1404,11 @@ function ThreadList({
   );
 }
 function SearchDialog({
-  threads, projects, agents, onClose, navigate,
+  threads,
+  projects,
+  agents,
+  onClose,
+  navigate,
 }: {
   threads: DemoThread[];
   projects: DemoProject[];
@@ -1167,25 +1422,74 @@ function SearchDialog({
   const [status, setStatus] = useState("");
   const resultsRef = useRef<HTMLDivElement>(null);
   const query = q.trim().toLowerCase();
-  const threadResults = threads.filter(t => !t.archived).map(t => ({
-    title: t.title, path: "/thread/" + t.id, type: "Thread",
-    group: /yesterday|h ago|days? ago/.test(t.time) ? "Past week" : "Today",
-  }));
+  const threadResults = threads
+    .filter((t) => !t.archived)
+    .map((t) => ({
+      title: t.title,
+      path: "/thread/" + t.id,
+      type: "Thread",
+      group: /yesterday|h ago|days? ago/.test(t.time) ? "Past week" : "Today",
+    }));
   const allResults = [
     ...threadResults,
-    ...agents.filter(a => !a.archived).map(a => ({ title: a.name, path: "/agents/" + a.id, type: "Agent", group: "Agents" })),
-    ...projects.filter(p => !p.archived).map(p => ({ title: p.name, path: "/projects/" + p.id, type: "Project", group: "Projects" })),
-    ...workspace.data.skills.filter(s => !s.archived).map(s => ({ title: s.name, path: "/skills/" + s.id, type: "Skill", group: "Skills" })),
-    ...workspace.data.rooms.filter(r => !r.archived).map(r => ({ title: r.name, path: "/rooms/" + r.id, type: "Room", group: "Rooms" })),
-    ...workspace.data.artifacts.filter(a => !a.archived).map(a => ({ title: a.title, path: "/library?artifact=" + a.id, type: a.kind, group: "Library" })),
-    ...gotoItems.map(([title, path]) => ({ title, path, type: "Go to", group: "Go to" })),
+    ...agents
+      .filter((a) => !a.archived)
+      .map((a) => ({
+        title: a.name,
+        path: "/agents/" + a.id,
+        type: "Agent",
+        group: "Agents",
+      })),
+    ...projects
+      .filter((p) => !p.archived)
+      .map((p) => ({
+        title: p.name,
+        path: "/projects/" + p.id,
+        type: "Project",
+        group: "Projects",
+      })),
+    ...workspace.data.skills
+      .filter((s) => !s.archived)
+      .map((s) => ({
+        title: s.name,
+        path: "/skills/" + s.id,
+        type: "Skill",
+        group: "Skills",
+      })),
+    ...workspace.data.rooms
+      .filter((r) => !r.archived)
+      .map((r) => ({
+        title: r.name,
+        path: "/rooms/" + r.id,
+        type: "Room",
+        group: "Rooms",
+      })),
+    ...workspace.data.artifacts
+      .filter((a) => !a.archived)
+      .map((a) => ({
+        title: a.title,
+        path: "/library?artifact=" + a.id,
+        type: a.kind,
+        group: "Library",
+      })),
+    ...gotoItems.map(([title, path]) => ({
+      title,
+      path,
+      type: "Go to",
+      group: "Go to",
+    })),
   ];
   const results = query
-    ? allResults.filter(r => r.title.toLowerCase().includes(query))
-    : allResults.filter(r => r.type === "Thread" || r.type === "Go to");
-  useEffect(() => { setIndex(0); setStatus(""); }, [q]);
+    ? allResults.filter((r) => r.title.toLowerCase().includes(query))
+    : allResults.filter((r) => r.type === "Thread" || r.type === "Go to");
   useEffect(() => {
-    resultsRef.current?.querySelector(`#search-result-${index}`)?.scrollIntoView({ block: "nearest" });
+    setIndex(0);
+    setStatus("");
+  }, [q]);
+  useEffect(() => {
+    resultsRef.current
+      ?.querySelector(`#search-result-${index}`)
+      ?.scrollIntoView({ block: "nearest" });
   }, [index]);
   const selected = results[Math.min(index, results.length - 1)];
   const open = (result: (typeof results)[number], newTab = false) => {
@@ -1196,9 +1500,13 @@ function SearchDialog({
   const copy = async () => {
     if (!selected) return;
     try {
-      await navigator.clipboard.writeText(new URL(selected.path, location.origin).href);
+      await navigator.clipboard.writeText(
+        new URL(selected.path, location.origin).href,
+      );
       setStatus("Link copied");
-    } catch { setStatus("Clipboard unavailable in this browser"); }
+    } catch {
+      setStatus("Clipboard unavailable in this browser");
+    }
   };
   const icon = (type: string, title: string) => {
     if (type === "Thread") return MessageSquare;
@@ -1214,42 +1522,120 @@ function SearchDialog({
   };
   return (
     <Modal title="Search" onClose={onClose} headerless>
-      <div className="search-dialog-content" onKeyDown={e => {
-        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-          e.preventDefault();
-          setIndex(i => (i + (e.key === "ArrowDown" ? 1 : -1) + Math.max(results.length, 1)) % Math.max(results.length, 1));
-        }
-        if (e.key === "Enter" && selected) {
-          e.preventDefault(); open(selected, e.ctrlKey || e.metaKey);
-        }
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
-          const input = e.target as HTMLInputElement;
-          if (input.tagName === "INPUT" && input.selectionStart !== input.selectionEnd) return;
-          e.preventDefault(); void copy();
-        }
-      }}>
+      <div
+        className="search-dialog-content"
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            setIndex(
+              (i) =>
+                (i +
+                  (e.key === "ArrowDown" ? 1 : -1) +
+                  Math.max(results.length, 1)) %
+                Math.max(results.length, 1),
+            );
+          }
+          if (e.key === "Enter" && selected) {
+            e.preventDefault();
+            open(selected, e.ctrlKey || e.metaKey);
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
+            const input = e.target as HTMLInputElement;
+            if (
+              input.tagName === "INPUT" &&
+              input.selectionStart !== input.selectionEnd
+            )
+              return;
+            e.preventDefault();
+            void copy();
+          }
+        }}
+      >
         <div className="search-dialog-input">
           <Search size={18} />
-          <span className="search-scope"><Users size={14} />{workspace.activeName}</span>
-          <input autoFocus aria-label="Search workspace" aria-controls="workspace-search-results"
-            aria-activedescendant={selected ? `search-result-${Math.min(index, results.length - 1)}` : undefined}
-            autoComplete="off" value={q} onChange={e => setQ(e.target.value)} placeholder={"Search in " + workspace.activeName + "..."} />
+          <span className="search-scope">
+            <Users size={14} />
+            {workspace.activeName}
+          </span>
+          <input
+            autoFocus
+            aria-label="Search workspace"
+            aria-controls="workspace-search-results"
+            aria-activedescendant={
+              selected
+                ? `search-result-${Math.min(index, results.length - 1)}`
+                : undefined
+            }
+            autoComplete="off"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={"Search in " + workspace.activeName + "..."}
+          />
         </div>
-        <div className="search-results" id="workspace-search-results" role="listbox" aria-label="Search results" ref={resultsRef}>
+        <div
+          className="search-results"
+          id="workspace-search-results"
+          role="listbox"
+          aria-label="Search results"
+          ref={resultsRef}
+        >
           {results.map((result, i) => {
             const Icon = icon(result.type, result.title);
-            return <div key={result.path} role="presentation">
-              {(i === 0 || result.group !== results[i - 1].group) && <div className="search-group-label" role="presentation">{result.group}</div>}
-              <button type="button" role="option" id={`search-result-${i}`} data-kind={result.type} aria-selected={index === i} className={index === i ? "selected" : ""}
-                onMouseEnter={() => setIndex(i)} onClick={e => open(result, e.ctrlKey || e.metaKey)}>
-                <Icon size={19} /><span className="search-result-title">{result.title}</span>
-                {i === index && <span className="search-result-shortcuts" aria-hidden="true"><span><kbd>Ctrl</kbd><kbd>↵</kbd> open in new tab</span><span><kbd>Ctrl</kbd><kbd>C</kbd> copy</span></span>}
-              </button>
-            </div>;
+            return (
+              <div key={result.path} role="presentation">
+                {(i === 0 || result.group !== results[i - 1].group) && (
+                  <div className="search-group-label" role="presentation">
+                    {result.group}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  role="option"
+                  id={`search-result-${i}`}
+                  data-kind={result.type}
+                  aria-selected={index === i}
+                  className={index === i ? "selected" : ""}
+                  onMouseEnter={() => setIndex(i)}
+                  onClick={(e) => open(result, e.ctrlKey || e.metaKey)}
+                >
+                  <Icon size={19} />
+                  <span className="search-result-title">{result.title}</span>
+                  {i === index && (
+                    <span
+                      className="search-result-shortcuts"
+                      aria-hidden="true"
+                    >
+                      <span>
+                        <kbd>Ctrl</kbd>
+                        <kbd>↵</kbd> open in new tab
+                      </span>
+                      <span>
+                        <kbd>Ctrl</kbd>
+                        <kbd>C</kbd> copy
+                      </span>
+                    </span>
+                  )}
+                </button>
+              </div>
+            );
           })}
-          {!results.length && <div className="empty-state">No matches found.</div>}
+          {!results.length && (
+            <div className="empty-state">No matches found.</div>
+          )}
         </div>
-        <div className="search-keyboard"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span><span role="status">{status}</span></div>
+        <div className="search-keyboard">
+          <span>
+            <kbd>↑</kbd>
+            <kbd>↓</kbd> navigate
+          </span>
+          <span>
+            <kbd>↵</kbd> open
+          </span>
+          <span>
+            <kbd>esc</kbd> close
+          </span>
+          <span role="status">{status}</span>
+        </div>
       </div>
     </Modal>
   );

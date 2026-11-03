@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-const password = "synthetic-menu-e2e-password";
+const password = "local-e2e-owner-password-not-a-secret";
 async function signIn(page: import("@playwright/test").Page) {
   await page.goto("/threads/new");
   await page.getByLabel("Password",{exact:true}).fill(password);

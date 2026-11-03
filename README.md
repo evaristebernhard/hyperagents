@@ -2,7 +2,9 @@
 
 Independent recreation of Hyperagent's web UI, now with a real local data service.
 It is not the official application, does not include its private implementation,
-and optionally calls DeepSeek through the authenticated server. It does not control a browser; explicitly selected, server-configured integrations can read real APIs and perform human-confirmed writes.
+and optionally calls DeepSeek through the authenticated server. Explicitly selected,
+server-configured capabilities read workspace data and real APIs, save artifacts,
+and perform approved external writes.
 
 ## Run locally
 
@@ -25,6 +27,9 @@ context. With DEEPSEEK_API_KEY configured, it requests a real streamed reply; wi
 
 - `.data/workspace.sqlite`: SQLite workspace state, revision, owner/password hash,
   sessions, file metadata and share snapshots.
+- `.data/tasks.sqlite`: durable task goals, inputs, prompts, tool effects and results.
+- `.data/tasks.scheduler.sqlite`: operating-system-backed exclusive scheduler lock.
+- `.data/tasks.lock`: diagnostic owner metadata; released on normal shutdown.
 - `.data/uploads/`: actual private uploaded bytes.
 - `.data` and `.env` are excluded from Git and the Docker build context.
 - Restarting the service or updating code does not reset the database.
@@ -47,6 +52,8 @@ old demo cannot recover file bytes that were never uploaded.
 ## What is connected
 
 - Durable workspace/thread/message/project/Agent/skill/memory/artifact metadata.
+- A legacy task API with Router/Worker delegation, execution-time follow-ups,
+  persistent waiting and recovery, pluggable tools, and editable built-in prompts.
 - Messages carry IDs, timestamps, saved preferences, context references and actual
   attachment metadata; retries use stable request IDs rather than fake replies.
 - Upload/download private file bytes (UI maximum20MB), not merely file names.
@@ -59,10 +66,27 @@ old demo cannot recover file bytes that were never uploaded.
 - Owner-created immutable public share snapshots and revocation. Public views do
   not expose private attachment bytes, Agent prompts, credentials or whole workspaces.
 
-Local workspace tools and selected server-configured integration APIs execute; no browser runtime, browser OAuth onboarding, scheduled worker, payment service or
-remote skill research/import is connected. Such actions are disabled or explicitly
+Local workspace tools and selected server-configured integration APIs execute.
+Browser OAuth onboarding, scheduled workers, payment services and remote skill
+research/import are not connected. Such actions are disabled or explicitly
 state that they are unavailable; they do not report fake successful execution.
 Existing fixture-only controls are not evidence that execution exists.
+
+## Main UI with backend v1
+
+Run `npm run dev:v1` and open **http://localhost:5173** to use the original main
+sidebar, home composer, conversation and artifact panel with the isolated
+TypeScript backend. The extra Tasks page has been retired. The legacy service is stopped; its SQLite data is preserved.
+
+Build the backend first with `npm --prefix backend ci --ignore-scripts` and
+`npm --prefix backend run build`. The v1 launcher preserves the existing accounts,
+PostgreSQL database and files under `backend/.data-v1/interactive`. First-run local
+credentials are written to its private `access.json`; credentials are never committed.
+See [setup and verification](docs/verification-v1-ui/REPORT.md) for Runner/PDF
+requirements, startup, supported features and browser verification.
+
+The previous `.mjs` task API remains available to existing clients; its historical
+runtime documentation is in [TASK-RUNTIME.md](docs/TASK-RUNTIME.md).
 
 ## Real account integrations
 
@@ -150,6 +174,9 @@ Docker build/runtime has not been tested in the assistant sandbox.
 
 ```sh
 npm run test:backend       # built-in Node tests; real temp SQLite/files/HTTP
+npm run test:tasks         # model/plugin/prompt/runtime/API tests for Tasks
+npm run test:v1-adapter    # deterministic browser adapter tests; no model or DB
+npm run test:v1-ui         # live v1 browser verification; requires dev:v1 + model + Runner
 npm run test:fixtures     # existing UI regression suite in explicit fixture mode
 npm test                  # backend + fixture UI + real backend browser tests, in sequence
 npm run test:backend-flow  # real API + browser workflows in a temporary data directory
@@ -161,10 +188,13 @@ public share/revoke, revision conflict and confirmation-only browser migration.
 Tests do not use the owner's `.data` directory. Fixture mode is available separately
 as `npm run dev:fixtures`; it is for UI regression samples, not normal operation.
 
-See `docs/BACKEND-CONTRACT.md` for endpoints and security boundaries, and the earlier
-`docs/UI-FIDELITY-BATCH-*` audit notes for frontend replication history. Local sandbox
-npm access has been blocked by registry403, so full browser/build verification is
-reported from GitHub CI rather than falsely claimed as local execution.
+Browser suites require a Playwright Chromium installation (`npx playwright install
+chromium`). The legacy backend browser suite uses controlled model/tool adapters with real
+HTTP and SQLite; it does not call production DeepSeek or external services.
+
+See `docs/BACKEND-CONTRACT.md` for the existing endpoints and security boundaries,
+`docs/TASK-RUNTIME.md` for the Tasks API, and the earlier `docs/UI-FIDELITY-BATCH-*`
+audit notes for frontend replication history.
 
 ## Forgotten local owner password
 
@@ -193,6 +223,7 @@ bootstrap only; changing it does not replace an existing password.
 
 ## Development documentation
 
+- [Durable task runtime](docs/TASK-RUNTIME.md): legacy Router/Worker scheduling, plugins, prompts and crash recovery.
 - [Delegation runtime](docs/DELEGATION-RUNTIME.md): managed parent/child runs and authorization boundaries.
 - [Delegated resource access](docs/DELEGATION-RESOURCE-ACCESS-2026-11-01.md): read-only document/table access and capability intersection.
 - [Resource discovery](docs/RESOURCE-DISCOVERY-2026-10-31.md): workspace document/table search and pagination.
