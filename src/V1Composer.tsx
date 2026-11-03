@@ -20,6 +20,7 @@ export default function V1Composer({
   compact = false,
   disabled = false,
   prefill,
+  navigate,
 }: ComposerProps) {
   const w = useWorkspace(),
     capabilities = w.capabilities;
@@ -27,6 +28,29 @@ export default function V1Composer({
   const [files, setFiles] = useState<FileMeta[]>([]);
   const [formats, setFormats] = useState<string[]>([]);
   const [menu, setMenu] = useState("");
+  const [skillIds, setSkillIds] = useState<string[]>([]),
+    [memoryIds, setMemoryIds] = useState<string[]>([]),
+    [artifactIds, setArtifactIds] = useState<string[]>([]),
+    [rubricIds, setRubricIds] = useState<string[]>([]);
+  const [agentId, setAgentId] = useState(""),
+    [projectId, setProjectId] = useState("");
+  const contextOptions: Record<string, { id: string; name: string }[]> = {
+    skills: w.data.skills
+      .filter((x) => !x.archived)
+      .map((x) => ({ id: x.id, name: x.name })),
+    memories: w.data.memories.map((x) => ({
+      id: x.id,
+      name: x.content.slice(0, 100),
+    })),
+    assets: w.data.artifacts.map((x) => ({ id: x.id, name: x.title })),
+    rubrics: w.data.rubrics.map((x) => ({ id: x.id, name: x.name })),
+  };
+  const selection: Record<string, [string[], (v: string[]) => void]> = {
+    skills: [skillIds, setSkillIds],
+    memories: [memoryIds, setMemoryIds],
+    assets: [artifactIds, setArtifactIds],
+    rubrics: [rubricIds, setRubricIds],
+  };
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const box = useRef<HTMLDivElement>(null),
@@ -61,7 +85,14 @@ export default function V1Composer({
   const toggle = (name: string) =>
     setMenu((current) => (current === name ? "" : name));
   async function send() {
-    if (lock.current || disabled || !text.trim() || !model) return;
+    if (
+      lock.current ||
+      disabled ||
+      w.role === "viewer" ||
+      !text.trim() ||
+      !model
+    )
+      return;
     lock.current = true;
     setBusy(true);
     setError("");
@@ -69,6 +100,12 @@ export default function V1Composer({
       text.trim(),
       files.map((f) => f.id),
       formats,
+      skillIds,
+      memoryIds,
+      artifactIds,
+      rubricIds,
+      agentId,
+      projectId,
     ]);
     if (signature !== previous.current) {
       request.current = crypto.randomUUID();
@@ -82,13 +119,16 @@ export default function V1Composer({
             ...defaultThreadSettings,
             model: model.model,
             provider: model.provider,
+            agentId: agentId || undefined,
             tools: [],
             outputFormat: formats.join(","),
           },
           attachments: files,
-          skillIds: [],
-          memoryIds: [],
-          artifactIds: [],
+          skillIds,
+          memoryIds,
+          artifactIds,
+          rubricIds,
+          projectId: projectId || undefined,
           integrationIds: [],
         },
         request.current,
@@ -121,7 +161,7 @@ export default function V1Composer({
             : "Ask anything or start a task…"
         }
         value={text}
-        disabled={busy || disabled}
+        disabled={busy || disabled || w.role === "viewer"}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -130,6 +170,32 @@ export default function V1Composer({
           }
         }}
       />
+      {(skillIds.length +
+        memoryIds.length +
+        artifactIds.length +
+        rubricIds.length >
+        0 ||
+        projectId) && (
+        <div className="composer-context-chips">
+          {Object.entries(selection).flatMap(([kind, [ids, set]]) =>
+            ids.map((id) => (
+              <button
+                key={kind + id}
+                onClick={() => set(ids.filter((x) => x !== id))}
+              >
+                {contextOptions[kind].find((x) => x.id === id)?.name || kind}
+                <X size={12} />
+              </button>
+            )),
+          )}
+          {projectId && (
+            <button onClick={() => setProjectId("")}>
+              {w.data.projects.find((p) => p.id === projectId)?.name}
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      )}
       {!!files.length && (
         <div className="composer-context-chips">
           {files.map((f) => (
@@ -158,7 +224,7 @@ export default function V1Composer({
           <button
             className="icon-btn"
             aria-label="Add files or context"
-            disabled={busy || disabled}
+            disabled={busy || disabled || w.role === "viewer"}
             onClick={() => toggle("add")}
           >
             <Plus size={18} />
@@ -180,17 +246,16 @@ export default function V1Composer({
             </span>
             <ChevronDown size={12} />
           </button>
-          {!compact && (
-            <button
-              className="pill"
-              disabled
-              title="Custom agents are not available yet"
-            >
-              <Bot size={14} />
-              Agent
-              <ChevronDown size={12} />
-            </button>
-          )}
+          <button
+            className="pill"
+            aria-label="Select agent"
+            onClick={() => toggle("agents")}
+            disabled={busy || disabled}
+          >
+            <Bot size={14} />
+            {w.data.agents.find((a) => a.id === agentId)?.name || "Agent"}
+            <ChevronDown size={12} />
+          </button>
         </div>
         <div className="composer-bar-right">
           <button
@@ -222,10 +287,9 @@ export default function V1Composer({
       </div>
       <button
         className="integration-strip"
-        disabled
-        title="Integrations are not available yet"
+        onClick={() => navigate?.("/integrations")}
       >
-        Connect your integrations · Unavailable
+        Web research · Documents · Code · View capabilities ↗
       </button>
       <input
         ref={input}
@@ -234,7 +298,7 @@ export default function V1Composer({
         hidden
         aria-label="Attach files"
         accept={capabilities?.formats.map((f) => "." + f).join(",")}
-        disabled={busy || disabled}
+        disabled={busy || disabled || w.role === "viewer"}
         onChange={async (e) => {
           const selected = Array.from(e.target.files || []);
           e.target.value = "";
@@ -284,16 +348,98 @@ export default function V1Composer({
           </button>
           <button onClick={() => setMenu("output")}>Output as…</button>
           {[
-            "Skills",
-            "Memories",
-            "Assets",
-            "Integrations",
-            "Add to a project",
-          ].map((label) => (
-            <button key={label} disabled>
-              {label} · Unavailable
+            ["Skills", "skills"],
+            ["Memories", "memories"],
+            ["Assets", "assets"],
+            ["Rubrics", "rubrics"],
+            ["Add to a project", "projects"],
+          ].map(([label, key]) => (
+            <button key={key} onClick={() => setMenu(key)}>
+              {label}…
             </button>
           ))}
+        </div>
+      )}
+      {!!selection[menu] && (
+        <div className="popover composer-popover">
+          <small>
+            {menu === "memories"
+              ? "Relevant memories are also retrieved automatically."
+              : "Select task context"}
+          </small>
+          {contextOptions[menu].map((item) => (
+            <label key={item.id} className="rt-checkbox">
+              <input
+                type="checkbox"
+                checked={selection[menu][0].includes(item.id)}
+                onChange={() => {
+                  const [ids, set] = selection[menu];
+                  set(
+                    ids.includes(item.id)
+                      ? ids.filter((x) => x !== item.id)
+                      : [...ids, item.id],
+                  );
+                }}
+              />
+              {item.name}
+            </label>
+          ))}
+          {!contextOptions[menu].length && <p>No saved {menu} yet.</p>}
+        </div>
+      )}
+      {menu === "agents" && (
+        <div className="popover composer-popover">
+          <button
+            onClick={() => {
+              setAgentId("");
+              setMenu("");
+            }}
+          >
+            Default agent
+          </button>
+          {w.data.agents
+            .filter((a) => !a.archived)
+            .map((a) => (
+              <button
+                key={a.id}
+                onClick={() => {
+                  setAgentId(a.id);
+                  setMenu("");
+                }}
+              >
+                {a.name}
+                {agentId === a.id ? " ✓" : ""}
+              </button>
+            ))}
+          <button onClick={() => navigate?.("/agents/new?creation=manual")}>
+            Create agent…
+          </button>
+        </div>
+      )}
+      {menu === "projects" && (
+        <div className="popover composer-popover">
+          <button
+            onClick={() => {
+              setProjectId("");
+              setMenu("");
+            }}
+          >
+            No project
+          </button>
+          {w.data.projects
+            .filter((p) => !p.archived)
+            .map((p) => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  setProjectId(p.id);
+                  setMenu("");
+                }}
+              >
+                {p.name}
+                {projectId === p.id ? " ✓" : ""}
+              </button>
+            ))}
         </div>
       )}
       {menu === "output" && (
@@ -355,7 +501,8 @@ export default function V1Composer({
             {capabilities?.sandbox.available ? "Available" : "Unavailable"}
           </p>
           <button disabled>External actions · Unavailable</button>
-          <button disabled>Custom tool selection · Unavailable</button>
+          <p>Memory retrieval · Automatic, workspace scoped</p>
+          <p>Memory changes · Require your review</p>
         </div>
       )}
     </div>

@@ -1,3 +1,4 @@
+import { TaskActivity } from "./V1Activity";
 import { useEffect, useRef, useState } from "react";
 import { PanelRightClose, PanelRightOpen, Download } from "lucide-react";
 import { Composer, IconButton } from "./ui";
@@ -10,6 +11,7 @@ import {
   v1,
   V1Error,
   assistantText,
+  artifactKind,
   fileUrl,
   submitTask,
   stateLabel,
@@ -54,6 +56,24 @@ export default function V1Thread({
   const cursors = useRef(new Map<string, string>());
   const known = useRef(new Map<string, TaskEvent>());
   const signature = useRef("");
+  const canvasLoaded = useRef(false);
+  const canvasQueue = useRef(Promise.resolve());
+  const canvasClosed = collapsed || artifacts.length === 0;
+  const saveCanvas = (next: CanvasPreferences) => {
+    setCanvas(next);
+    if (next.collapsed !== undefined) setCollapsed(next.collapsed);
+    if (w.role === "viewer") return;
+    canvasQueue.current = canvasQueue.current
+      .catch(() => {})
+      .then(async () => {
+        const fresh = await v1<Conversation>("/conversations/" + id);
+        await v1("/conversations/" + id, {
+          method: "PATCH",
+          body: { revision: fresh.revision, metadata: { canvas: next } },
+        });
+      });
+    void canvasQueue.current.catch((e) => setError(e.message));
+  };
   useEffect(() => {
     const controller = new AbortController(),
       signal = controller.signal;
@@ -62,16 +82,24 @@ export default function V1Thread({
       try {
         const [detail, all] = await Promise.all([
           v1<Conversation>("/conversations/" + id, { signal }),
-          v1<Task[]>("/tasks", { signal }),
+          v1<Task[]>("/tasks?conversationId=" + id, { signal }),
         ]);
         const own = all.filter((t) => t.conversationId === id);
         if (signal.aborted) return;
         setConversation(detail);
+        if (!canvasLoaded.current) {
+          canvasLoaded.current = true;
+          if (detail.metadata?.canvas) {
+            setCanvas(detail.metadata.canvas);
+            setCollapsed(!!detail.metadata.canvas.collapsed);
+          }
+        }
         setTasks(own);
         // Drain every page before advancing the cursor. Each reconnect resumes after
         // the last acknowledged event; deduplication also handles repeated responses.
-        if (own[0]) {
-          const taskId = own[0].id;
+        for (const ownTask of own) {
+          const taskId = ownTask.id;
+          if (terminal(ownTask.state) && cursors.current.has(taskId)) continue;
           let cursor = cursors.current.get(taskId) || "0";
           for (;;) {
             const page = await v1<{ events: TaskEvent[]; nextCursor: string }>(
@@ -79,7 +107,8 @@ export default function V1Thread({
               { signal },
             );
             if (signal.aborted) return;
-            for (const row of page.events) known.current.set(row.id, row);
+            for (const row of page.events)
+              known.current.set(row.id, { ...row, taskId });
             cursors.current.set(taskId, page.nextCursor);
             if (page.events.length < 100 || page.nextCursor === cursor) break;
             cursor = page.nextCursor;
@@ -125,16 +154,25 @@ export default function V1Thread({
   }, [id, refresh]);
   async function send(text: string, context?: MessageContext, key?: string) {
     // Recheck immediately before sending so another tab's run is not missed.
-    const current = (await v1<Task[]>("/tasks")).find(
+    const current = (await v1<Task[]>("/tasks?conversationId=" + id)).find(
       (t) =>
         t.conversationId === id &&
         !terminal(t.state) &&
         t.state !== "uncertain",
     );
     if (current) {
-      if (context?.attachments.length)
+      if (
+        context &&
+        (context.attachments.length ||
+          context.settings.agentId ||
+          context.projectId ||
+          context.skillIds.length ||
+          context.memoryIds.length ||
+          context.artifactIds.length ||
+          context.rubricIds?.length)
+      )
         throw Error(
-          "Files can be attached to the next task after this run ends. Send a text instruction now.",
+          "Files and context can be changed for the next task after this run ends. Clear the context selections to send a text instruction now.",
         );
       await v1("/tasks/" + current.id + "/instructions", {
         method: "POST",
@@ -144,7 +182,8 @@ export default function V1Thread({
     setVersion("");
     setRefresh((n) => n + 1);
   }
-  const active = latest && !terminal(latest.state);
+  const active =
+    latest && !terminal(latest.state) && latest.state !== "uncertain";
   const chosen = artifacts.find((a) => a.id === selected);
   const chosenVersion =
     chosen?.versions.find((v) => String(v.version) === version) ||
@@ -152,7 +191,7 @@ export default function V1Thread({
   const canvasArtifacts: Artifact[] = artifacts.map((a) => ({
     id: a.id,
     title: a.name,
-    kind: "File",
+    kind: artifactKind(a.name.split(".").at(-1) || "txt"),
     content: "",
     versions: [],
     createdAt: a.versions.at(-1)?.created_at || "",
@@ -190,10 +229,10 @@ export default function V1Thread({
               "Model unavailable"}
           </span>
           <IconButton
-            label={collapsed ? "Show canvas" : "Hide canvas"}
-            onClick={() => setCollapsed(!collapsed)}
+            label={canvasClosed ? "Show canvas" : "Hide canvas"}
+            onClick={() => saveCanvas({ ...canvas, collapsed: !canvasClosed })}
           >
-            {collapsed ? (
+            {canvasClosed ? (
               <PanelRightOpen size={17} />
             ) : (
               <PanelRightClose size={17} />
@@ -201,16 +240,16 @@ export default function V1Thread({
           </IconButton>
           <button
             className="btn small"
-            disabled
-            title="Sharing is not available yet"
+            onClick={() => navigate("/workspaces")}
+            title="Manage workspace access"
           >
-            Share
+            Team access
           </button>
         </div>
       </header>
       <details className="rt-status">
         <summary>Connection & storage</summary>
-        <span>Private conversation · Saved to workspace</span>
+        <span>{w.activeName} · Saved to workspace</span>
         <span role="status">
           {latest ? stateLabel[latest.state] || latest.state : "Ready"}
         </span>
@@ -226,112 +265,85 @@ export default function V1Thread({
           </button>
         </p>
       )}
-      <div className={"rt-columns " + (collapsed ? "v1-canvas-collapsed" : "")}>
+      <div
+        className={"rt-columns " + (canvasClosed ? "v1-canvas-collapsed" : "")}
+      >
         <section className="rt-conversation" aria-label="Conversation">
           <div className="rt-messages">
-            {conversation.messages.map((message) => (
-              <article
-                key={message.id}
-                className={"rt-message " + message.role}
-              >
-                <div className="rt-message-meta">
-                  <strong>
-                    {message.role === "user" ? "You" : "Hyperagent"}
-                  </strong>
-                  <time>{new Date(message.created_at).toLocaleString()}</time>
-                </div>
-                {message.role === "assistant" ? (
-                  <div className="rt-answer">
-                    <AnswerMarkdown content={assistantText(message.content)} />
-                  </div>
-                ) : (
-                  <p>{message.content}</p>
-                )}
-              </article>
-            ))}
-            {latest && (
-              <article
-                className="rt-message assistant"
-                aria-label="Task progress"
-              >
-                <div className="rt-message-meta">
-                  <strong role="status">{stateLabel[latest.state]}</strong>
-                  {active && (
-                    <button
-                      className="btn small"
-                      disabled={busy}
-                      onClick={async () => {
-                        setBusy(true);
-                        try {
-                          await v1("/tasks/" + latest.id + "/cancel", {
-                            method: "POST",
-                          });
+            {[
+              ...conversation.messages.map((message) => ({
+                key: "m" + message.id,
+                time: new Date(message.created_at).getTime(),
+                message,
+                task: undefined as Task | undefined,
+              })),
+              ...tasks.map((task) => ({
+                key: "t" + task.id,
+                time: new Date(task.createdAt).getTime() + 1,
+                message: undefined as
+                  Conversation["messages"][number] | undefined,
+                task,
+              })),
+            ]
+              .sort((a, b) => a.time - b.time)
+              .map((entry) =>
+                entry.task ? (
+                  <TaskActivity
+                    key={entry.key}
+                    task={entry.task}
+                    events={events.filter((e) => e.taskId === entry.task!.id)}
+                    busy={busy}
+                    readonly={w.role === "viewer"}
+                    onRetry={() => {
+                      setBusy(true);
+                      void v1("/tasks/" + entry.task!.id + "/retry", {
+                        method: "POST",
+                      })
+                        .then(() => {
+                          cursors.current.delete(entry.task!.id);
                           setRefresh((n) => n + 1);
-                        } catch (e) {
-                          setError(
-                            e instanceof Error ? e.message : "Cancel failed",
-                          );
-                        } finally {
-                          setBusy(false);
-                        }
-                      }}
-                    >
-                      Cancel task
-                    </button>
-                  )}
-                </div>
-                {latest.errorCode && (
-                  <p role="alert">
-                    {latest.errorCode}. Saved files are preserved.
-                  </p>
-                )}
-                {latest.state === "uncertain" && (
-                  <p>
-                    The previous execution outcome is uncertain. Review saved
-                    files before starting a new task.
-                  </p>
-                )}
-                {latest.state === "waiting_approval" && (
-                  <p>
-                    External actions are unavailable. Add an instruction to
-                    continue with supported tools, or cancel.
-                  </p>
-                )}
-                {events
-                  .filter(
-                    (e) =>
-                      latest.state === "waiting_user" &&
-                      (e.payload.type === "question" ||
-                        (e.payload.name === "ask_user" &&
-                          e.payload.result?.question)),
-                  )
-                  .slice(-1)
-                  .map((e) => (
-                    <p key={e.id}>
-                      {e.payload.result?.question ||
-                        e.payload.question ||
-                        e.payload.message}
-                    </p>
-                  ))}
-                <details className="rt-run-details">
-                  <summary>Execution details · {events.length} events</summary>
-                  <div className="v1-event-list">
-                    {events.map((e) => (
-                      <div key={e.id} data-event-id={e.id}>
-                        <small>#{e.id}</small>{" "}
-                        {e.payload.name || e.payload.type} ·{" "}
-                        {e.payload.status ||
-                          e.payload.state ||
-                          e.payload.code ||
-                          e.payload.question ||
-                          e.payload.message ||
-                          "Recorded"}
+                        })
+                        .catch((e) => setError(e.message))
+                        .finally(() => setBusy(false));
+                    }}
+                    onCancel={() => {
+                      setBusy(true);
+                      void v1("/tasks/" + entry.task!.id + "/cancel", {
+                        method: "POST",
+                      })
+                        .then(() => setRefresh((n) => n + 1))
+                        .catch((e) => setError(e.message))
+                        .finally(() => setBusy(false));
+                    }}
+                  />
+                ) : (
+                  <article
+                    key={entry.key}
+                    className={"rt-message " + entry.message!.role}
+                  >
+                    <div className="rt-message-meta">
+                      <strong>
+                        {entry.message!.role === "user" ? "You" : "Hyperagent"}
+                      </strong>
+                      <time>
+                        {new Date(entry.message!.created_at).toLocaleTimeString(
+                          [],
+                          { hour: "2-digit", minute: "2-digit" },
+                        )}
+                      </time>
+                    </div>
+                    {entry.message!.role === "assistant" ? (
+                      <div className="rt-answer">
+                        <AnswerMarkdown
+                          content={assistantText(entry.message!.content)}
+                        />
                       </div>
-                    ))}
-                  </div>
-                </details>
-              </article>
-            )}
+                    ) : (
+                      <p>{entry.message!.content}</p>
+                    )}
+                  </article>
+                ),
+              )}
             {!!artifacts.length && !active && (
               <div className="rt-followups">
                 <button
@@ -346,16 +358,6 @@ export default function V1Thread({
                 </button>
               </div>
             )}
-            {tasks.length > 1 && (
-              <details className="rt-context">
-                <summary>Task history · {tasks.length}</summary>
-                {[...tasks].reverse().map((t) => (
-                  <p key={t.id}>
-                    {t.prompt} · {stateLabel[t.state]}
-                  </p>
-                ))}
-              </details>
-            )}
           </div>
           <div className="rt-composer">
             {active && (
@@ -367,7 +369,7 @@ export default function V1Thread({
             <Composer
               compact
               key={id}
-              disabled={!ready || busy}
+              disabled={!ready || busy || w.role === "viewer"}
               navigate={navigate}
               notify={notify}
               onSend={send}
@@ -375,7 +377,7 @@ export default function V1Thread({
             />
           </div>
         </section>
-        {!collapsed && (
+        {!canvasClosed && (
           <section className="rt-artifacts" aria-label="Thread artifacts">
             <div className="rt-section-heading">
               <h2>
@@ -403,7 +405,7 @@ export default function V1Thread({
               selectedId={selected}
               value={canvas}
               onSelect={select}
-              onChange={setCanvas}
+              onChange={saveCanvas}
               renderPreview={(artifact) => {
                 const file = artifacts.find((a) => a.id === artifact.id)
                   ?.versions[0]?.file_id;
@@ -441,7 +443,7 @@ export default function V1Thread({
                         onClick={() => select(a.id)}
                       >
                         <span>{a.title}</span>
-                        <small>File</small>
+                        <small>{a.kind}</small>
                       </button>
                     ))}
                 </nav>
@@ -500,7 +502,7 @@ export default function V1Thread({
   );
 }
 
-function ArtifactPreview({ fileId }: { fileId: string }) {
+export function ArtifactPreview({ fileId }: { fileId: string }) {
   const [preview, setPreview] = useState<{
     type: string;
     text: string;
@@ -562,5 +564,7 @@ function ArtifactPreview({ fileId }: { fileId: string }) {
         }
       />
     );
+  if (preview.type.includes("python") || preview.type.includes("javascript"))
+    return <pre className="v1-code-preview">{preview.text}</pre>;
   return <AnswerMarkdown content={preview.text} />;
 }

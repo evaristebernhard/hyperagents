@@ -1,3 +1,4 @@
+import { backendV1 } from "./v1-client";
 import { useState } from "react";
 import { Clock, Plus, Pencil, Trash2 } from "lucide-react";
 import { useWorkspace } from "./workspace";
@@ -43,8 +44,9 @@ export default function Schedules({
         </button>
       </div>
       <p className="demo-note">
-        Schedules are saved as local configuration. No background worker is
-        connected, so nothing runs automatically.
+        {backendV1
+          ? "Enabled schedules run daily in Asia/Shanghai time. Results and failures appear in Inbox."
+          : "Schedules are local configuration; no background worker is connected."}
       </p>
       {list.length ? (
         list.map((s) => (
@@ -59,8 +61,12 @@ export default function Schedules({
               </small>
               <p>{s.instructions}</p>
               <span className="badge">
-                {s.enabled ? "Enabled configuration" : "Disabled"} · Execution
-                off
+                {backendV1
+                  ? s.enabled
+                    ? "Enabled"
+                    : "Disabled"
+                  : (s.enabled ? "Enabled configuration" : "Disabled") +
+                    " · Execution off"}
               </span>
             </div>
             <div className="actions">
@@ -96,7 +102,9 @@ export default function Schedules({
               </button>
               <button
                 className="btn primary"
-                disabled={!name.trim() || !instructions.trim()}
+                disabled={
+                  w.role === "viewer" || !name.trim() || !instructions.trim()
+                }
                 onClick={() => {
                   const s: Schedule = {
                     id: id || uid("schedule"),
@@ -149,9 +157,11 @@ export default function Schedules({
                 "Weekly on Monday",
                 "Every 30 minutes",
                 "Monthly on the 1st",
-              ].map((n) => (
-                <option key={n}>{n}</option>
-              ))}
+              ]
+                .filter((n) => !backendV1 || n.startsWith("Daily"))
+                .map((n) => (
+                  <option key={n}>{n}</option>
+                ))}
             </select>
           </label>
           <label className="field">

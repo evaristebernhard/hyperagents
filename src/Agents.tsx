@@ -1,3 +1,4 @@
+import { backendV1 } from "./v1-client";
 import { useEffect, useState } from "react";
 import {
   Plus,
@@ -33,7 +34,14 @@ import { useWorkspace, download } from "./workspace";
 import Schedules from "./Schedules";
 import { uid } from "./local-model";
 import AgentPromptEditor, { sanitizePromptHtml } from "./AgentPromptEditor";
-import { readAgentDraft, writeAgentDraft, clearAgentDraft, knowledgeProfiles, normalizeMemoryProfile, type AgentCreationDraft } from "./agent-draft";
+import {
+  readAgentDraft,
+  writeAgentDraft,
+  clearAgentDraft,
+  knowledgeProfiles,
+  normalizeMemoryProfile,
+  type AgentCreationDraft,
+} from "./agent-draft";
 import "./agent-creation.css";
 export default function Agents({
   path,
@@ -42,64 +50,155 @@ export default function Agents({
   agents,
   setAgents,
   creationManual = false,
-}: PageProps & { agents: DemoAgent[]; setAgents: (a: DemoAgent[]) => void; creationManual?: boolean }) {
+}: PageProps & {
+  agents: DemoAgent[];
+  setAgents: (a: DemoAgent[]) => void;
+  creationManual?: boolean;
+}) {
   const workspace = useWorkspace();
   const id = path.split("/")[2];
   const editing = agents.find((a) => a.id === id);
   const creating = id === "new";
-  const [draft] = useState<AgentCreationDraft>(() => creating ? readAgentDraft(workspace.state.active) : {});
-  const initialProfile = normalizeMemoryProfile(editing?.memoryMode || draft.memoryMode);
-  const [promptHtml, setPromptHtml] = useState(editing?.promptHtml || draft.promptHtml || "");
+  const [draft] = useState<AgentCreationDraft>(() =>
+    creating ? readAgentDraft(workspace.state.active) : {},
+  );
+  const initialProfile = normalizeMemoryProfile(
+    editing?.memoryMode || draft.memoryMode,
+  );
+  const [promptHtml, setPromptHtml] = useState(
+    editing?.promptHtml || draft.promptHtml || "",
+  );
   const [promptOpen, setPromptOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [creationId] = useState(() => uid("agent"));
   const [executionNotice, setExecutionNotice] = useState("");
   const [draftWarning, setDraftWarning] = useState(false);
-  const [memoryReadScope, setMemoryReadScope] = useState(editing?.memoryReadScope || draft.memoryReadScope || (initialProfile === "Read-only memory" || initialProfile === "Separate memory" ? "linked" : "all"));
-  const [memorySaveTarget, setMemorySaveTarget] = useState(editing?.memorySaveTarget || draft.memorySaveTarget || (initialProfile === "Separate memory" ? "agent" : "library"));
-  const [learnsAutomatically, setLearnsAutomatically] = useState(editing?.learnsAutomatically ?? draft.learnsAutomatically ?? (initialProfile !== "Read-only memory"));
+  const [memoryReadScope, setMemoryReadScope] = useState(
+    editing?.memoryReadScope ||
+      draft.memoryReadScope ||
+      (initialProfile === "Read-only memory" ||
+      initialProfile === "Separate memory"
+        ? "linked"
+        : "all"),
+  );
+  const [memorySaveTarget, setMemorySaveTarget] = useState(
+    editing?.memorySaveTarget ||
+      draft.memorySaveTarget ||
+      (initialProfile === "Separate memory" ? "agent" : "library"),
+  );
+  const [learnsAutomatically, setLearnsAutomatically] = useState(
+    editing?.learnsAutomatically ??
+      draft.learnsAutomatically ??
+      initialProfile !== "Read-only memory",
+  );
   const [tab, setTab] = useState("Identity"),
-    [manual, setManual] = useState(!!editing || creationManual || !!draft.manual),
+    [manual, setManual] = useState(
+      backendV1 || !!editing || creationManual || !!draft.manual,
+    ),
     [name, setName] = useState(editing?.name || draft.name || ""),
-    [description, setDescription] = useState(editing?.description || draft.description || ""),
+    [description, setDescription] = useState(
+      editing?.description || draft.description || "",
+    ),
     [prompt, setPrompt] = useState(editing?.prompt || draft.prompt || ""),
     [job, setJob] = useState(draft.job || ""),
     [query, setQuery] = useState(""),
     [modal, setModal] = useState(""),
     [selected, setSelected] = useState(
-      editing?.tools || draft.tools || ["Search", "Webpages", "Documents", "Thread Search"],
+      editing?.tools ||
+        draft.tools || ["Search", "Webpages", "Documents", "Thread Search"],
     ),
-    [library, setLibrary] = useState(editing?.libraryEnabled ?? draft.library ?? false),
+    [library, setLibrary] = useState(
+      editing?.libraryEnabled ?? draft.library ?? false,
+    ),
     [model, setModel] = useState(editing?.model || draft.model || "Auto"),
-    [provider, setProvider] = useState(editing?.provider || draft.provider || "Any"),
-    [reasoning, setReasoning] = useState(editing?.reasoning || draft.reasoning || "Medium"),
+    [provider, setProvider] = useState(
+      editing?.provider || draft.provider || "Any",
+    ),
+    [reasoning, setReasoning] = useState(
+      editing?.reasoning || draft.reasoning || "Medium",
+    ),
     [memoryMode, setMemoryMode] = useState(
       normalizeMemoryProfile(editing?.memoryMode || draft.memoryMode),
     ),
     [learning, setLearning] = useState<Record<string, string>>(() => {
       const initial = { ...(editing?.learning || draft.learning || {}) };
-      if (initial["Skill suggestions"] === undefined && initial.Skills !== undefined) initial["Skill suggestions"] = initial.Skills;
+      if (
+        initial["Skill suggestions"] === undefined &&
+        initial.Skills !== undefined
+      )
+        initial["Skill suggestions"] = initial.Skills;
       return initial;
     }),
-    [skillIds, setSkillIds] = useState<string[]>(editing?.skillIds || draft.skillIds || []),
+    [skillIds, setSkillIds] = useState<string[]>(
+      editing?.skillIds || draft.skillIds || [],
+    ),
     [archived, setArchived] = useState(false),
     [sort, setSort] = useState("Starred first"),
     [starOnly, setStarOnly] = useState(false);
-  useEffect(() => { if (creationManual) setManual(true); }, [creationManual]);
+  useEffect(() => {
+    if (creationManual) setManual(true);
+  }, [creationManual]);
   useEffect(() => {
     if (!creating) return;
-    setDraftWarning(!writeAgentDraft(workspace.state.active, {
-      name, description, prompt, promptHtml, job, manual, tools: selected, library,
-      model, provider, reasoning, memoryMode, learning, skillIds,
-      memoryReadScope, memorySaveTarget, learnsAutomatically,
-    }));
-  }, [creating, workspace.state.active, name, description, prompt, promptHtml, job, manual, selected, library, model, provider, reasoning, memoryMode, learning, skillIds, memoryReadScope, memorySaveTarget, learnsAutomatically]);
+    setDraftWarning(
+      !writeAgentDraft(workspace.state.active, {
+        name,
+        description,
+        prompt,
+        promptHtml,
+        job,
+        manual,
+        tools: selected,
+        library,
+        model,
+        provider,
+        reasoning,
+        memoryMode,
+        learning,
+        skillIds,
+        memoryReadScope,
+        memorySaveTarget,
+        learnsAutomatically,
+      }),
+    );
+  }, [
+    creating,
+    workspace.state.active,
+    name,
+    description,
+    prompt,
+    promptHtml,
+    job,
+    manual,
+    selected,
+    library,
+    model,
+    provider,
+    reasoning,
+    memoryMode,
+    learning,
+    skillIds,
+    memoryReadScope,
+    memorySaveTarget,
+    learnsAutomatically,
+  ]);
   const chooseProfile = (value: string) => {
     setMemoryMode(value);
-    if (value === "Connected memory") { setMemoryReadScope("all"); setMemorySaveTarget("library"); setLearnsAutomatically(true); }
-    if (value === "Read-only memory") { setMemoryReadScope("linked"); setLearnsAutomatically(false); }
-    if (value === "Separate memory") { setMemoryReadScope("linked"); setMemorySaveTarget("agent"); setLearnsAutomatically(true); }
+    if (value === "Connected memory") {
+      setMemoryReadScope("all");
+      setMemorySaveTarget("library");
+      setLearnsAutomatically(true);
+    }
+    if (value === "Read-only memory") {
+      setMemoryReadScope("linked");
+      setLearnsAutomatically(false);
+    }
+    if (value === "Separate memory") {
+      setMemoryReadScope("linked");
+      setMemorySaveTarget("agent");
+      setLearnsAutomatically(true);
+    }
   };
   const tabs = [
     ["Identity", Sparkles],
@@ -108,7 +207,19 @@ export default function Agents({
     ["Invocations", Clock],
     ["Knowledge", Brain],
   ] as const;
+  const availableTools = [
+    "Search",
+    "Thread Search",
+    "Files",
+    "Skills",
+    "Delegation",
+    "Webpages",
+    "Tables",
+    "Documents",
+    "Code",
+  ];
   const tools = [
+    "Code",
     "Search",
     "Find Similar",
     "Exa Research",
@@ -245,7 +356,9 @@ export default function Agents({
               Starred agents only
             </label>
             <p className="demo-note">
-              All displayed agents are saved locally on this device.
+              {backendV1
+                ? "Agents are saved in this workspace and can be selected when starting a task."
+                : "All displayed agents are saved locally on this device."}
             </p>
           </Modal>
         )}
@@ -288,15 +401,33 @@ export default function Agents({
       learning,
       libraryEnabled: library,
     };
-    setSaving(true); setSaveError("");
+    setSaving(true);
+    setSaveError("");
     try {
-      workspace.set("agents", items => items.some(a => a.id === item.id) ? items.map(a => a.id === item.id ? item : a) : [...items, item]);
+      workspace.set("agents", (items) =>
+        items.some((a) => a.id === item.id)
+          ? items.map((a) => (a.id === item.id ? item : a))
+          : [...items, item],
+      );
       await workspace.flush();
       if (creating) clearAgentDraft(workspace.state.active);
-      notify(workspace.mode === "server" ? "Agent saved to the local server. Execution is not connected." : "Agent saved locally. No runtime or automation is connected.");
+      notify(
+        backendV1
+          ? "Agent saved. Select it in the composer to use its instructions and tools."
+          : workspace.mode === "server"
+            ? "Agent saved to the local server. Execution is not connected."
+            : "Agent saved locally. No runtime or automation is connected.",
+      );
       navigate("/agents");
-    } catch (e) { setSaveError(e instanceof Error ? e.message : "Could not confirm the save. Your creation draft is kept."); }
-    finally { setSaving(false); }
+    } catch (e) {
+      setSaveError(
+        e instanceof Error
+          ? e.message
+          : "Could not confirm the save. Your creation draft is kept.",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <div className="agent-editor" key={id}>
@@ -364,15 +495,28 @@ export default function Agents({
               </button>
             </>
           )}
-          <button className="btn primary" disabled={saving || !name.trim() || !prompt.trim()} onClick={() => void save()}>
+          <button
+            className="btn primary"
+            disabled={saving || !name.trim() || !prompt.trim()}
+            onClick={() => void save()}
+          >
             {editing ? "Save changes" : "Create Agent"}
           </button>
         </div>
       </header>
       <div className="agent-editor-body">
         <section className="agent-form">
-          {saveError && <p role="alert" className="creation-warning">{saveError}</p>}
-          {draftWarning && <p role="alert" className="creation-warning">Draft storage is unavailable. Keep this page open to retain your inputs.</p>}
+          {saveError && (
+            <p role="alert" className="creation-warning">
+              {saveError}
+            </p>
+          )}
+          {draftWarning && (
+            <p role="alert" className="creation-warning">
+              Draft storage is unavailable. Keep this page open to retain your
+              inputs.
+            </p>
+          )}
           <nav className="agent-tabs" aria-label="Agent configuration">
             {tabs.map(([n, I]) => (
               <button
@@ -450,14 +594,20 @@ export default function Agents({
                         className="btn small"
                         disabled={!job.trim()}
                         onClick={() => {
-                          setExecutionNotice("Identity drafting is not connected in this local preview. No identity was generated. Use Fill these in manually to configure an agent.");
+                          setExecutionNotice(
+                            "Identity drafting is not connected in this local preview. No identity was generated. Use Fill these in manually to configure an agent.",
+                          );
                         }}
                       >
                         Draft identity
                       </button>
                     </div>
                   </div>
-                  {executionNotice && <p role="status" className="creation-notice">{executionNotice}</p>}
+                  {executionNotice && (
+                    <p role="status" className="creation-notice">
+                      {executionNotice}
+                    </p>
+                  )}
                   <h4>Or add an agent another way</h4>
                   <div className="grid2 agent-source-options">
                     <button
@@ -511,20 +661,64 @@ export default function Agents({
                   </label>
                   <div className="field">
                     <span>Trust profile</span>
-                    <button className="trust-profile-button" onClick={() => setTab("Knowledge")} aria-label="Edit trust profile">
-                      <span><strong>{memoryMode}</strong><small>{knowledgeProfiles.find(([value]) => value === memoryMode)?.[1]}</small></span><ChevronRight size={16} />
+                    <button
+                      className="trust-profile-button"
+                      onClick={() => setTab("Knowledge")}
+                      aria-label="Edit trust profile"
+                    >
+                      <span>
+                        <strong>{memoryMode}</strong>
+                        <small>
+                          {
+                            knowledgeProfiles.find(
+                              ([value]) => value === memoryMode,
+                            )?.[1]
+                          }
+                        </small>
+                      </span>
+                      <ChevronRight size={16} />
                     </button>
                   </div>
                   <div className="field">
-                    <span>System prompt <span aria-hidden="true">*</span></span>
-                    <button className="agent-prompt-trigger" aria-label="Edit system prompt" onClick={() => setPromptOpen(true)}>
-                      {prompt ? <div className="agent-prompt-preview" dangerouslySetInnerHTML={{ __html: sanitizePromptHtml(promptHtml || prompt.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>")) }} /> : "Add a system prompt…"}
+                    <span>
+                      System prompt <span aria-hidden="true">*</span>
+                    </span>
+                    <button
+                      className="agent-prompt-trigger"
+                      aria-label="Edit system prompt"
+                      onClick={() => setPromptOpen(true)}
+                    >
+                      {prompt ? (
+                        <div
+                          className="agent-prompt-preview"
+                          dangerouslySetInnerHTML={{
+                            __html: sanitizePromptHtml(
+                              promptHtml ||
+                                prompt
+                                  .replace(/&/g, "&amp;")
+                                  .replace(/</g, "&lt;")
+                                  .replace(/>/g, "&gt;")
+                                  .replace(/\n/g, "<br>"),
+                            ),
+                          }}
+                        />
+                      ) : (
+                        "Add a system prompt…"
+                      )}
                     </button>
                   </div>
-                  <p className="muted creation-redraft-hint">Want to start over from a posting? Re-drafting replaces name, description, prompt, and any cast portrait and persona.</p>
-                  <button className="plain" onClick={() => setModal("redraft")}>Re-draft from a posting</button>
+                  <p className="muted creation-redraft-hint">
+                    Want to start over from a posting? Re-drafting replaces
+                    name, description, prompt, and any cast portrait and
+                    persona.
+                  </p>
+                  <button className="plain" onClick={() => setModal("redraft")}>
+                    Re-draft from a posting
+                  </button>
                   <p className="demo-note">
-                    Saved locally. No model or tool execution is connected.
+                    {backendV1
+                      ? "Saved to this workspace. Select the agent in the composer to run it."
+                      : "Saved locally. No execution connected."}
                   </p>
                 </>
               )}
@@ -541,9 +735,19 @@ export default function Agents({
                   onChange={(e) => setModel(e.target.value)}
                 >
                   <option>Auto</option>
-                  <option>GPT-6.1 Sol</option>
-                  <option>Claude Opus</option>
-                  <option>Gemini Pro</option>
+                  {backendV1 ? (
+                    workspace.capabilities?.models.map((m) => (
+                      <option key={m.model} disabled={!m.configured}>
+                        {m.model}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option>GPT-6.1 Sol</option>
+                      <option>Claude Opus</option>
+                      <option>Gemini Pro</option>
+                    </>
+                  )}
                 </select>
               </label>
               <div className="grid2">
@@ -556,13 +760,26 @@ export default function Agents({
                     onChange={(e) => setProvider(e.target.value)}
                   >
                     <option>Any</option>
-                    <option>OpenAI</option>
-                    <option>Anthropic</option>
+                    {backendV1 ? (
+                      workspace.capabilities?.models.map((m) => (
+                        <option key={m.provider}>{m.provider}</option>
+                      ))
+                    ) : (
+                      <>
+                        <option>OpenAI</option>
+                        <option>Anthropic</option>
+                      </>
+                    )}
                   </select>
                 </label>
                 <label className="field">
                   Quality preference
-                  <select aria-label="Quality preference" className="input">
+                  <select
+                    aria-label="Quality preference"
+                    className="input"
+                    disabled={backendV1}
+                    title="Managed by the configured model"
+                  >
                     <option>Balanced</option>
                     <option>Low cost</option>
                     <option>High capability</option>
@@ -572,6 +789,7 @@ export default function Agents({
               <label className="field">
                 Reasoning effort
                 <select
+                  disabled={backendV1}
                   aria-label="Reasoning effort"
                   className="input"
                   value={reasoning}
@@ -583,7 +801,9 @@ export default function Agents({
                 </select>
               </label>
               <p className="demo-note">
-                These are UI selections, not available model connections.
+                {backendV1
+                  ? "Only the configured model is available. Reasoning is managed by the server."
+                  : "These are UI selections, not available model connections."}
               </p>
             </>
           )}
@@ -592,7 +812,13 @@ export default function Agents({
               <h4>Integrations</h4>
               <button
                 className="card integration-add"
-                onClick={() => navigate(path + "?settings=integrations")}
+                onClick={() =>
+                  navigate(
+                    backendV1
+                      ? "/integrations"
+                      : path + "?settings=integrations",
+                  )
+                }
               >
                 <Plus size={24} />
                 Add integration
@@ -616,11 +842,16 @@ export default function Agents({
                         <Puzzle size={16} />
                         <strong>{n}</strong>
                         <small>
-                          Available to the agent in a connected environment.
+                          {backendV1
+                            ? availableTools.includes(n)
+                              ? "Available in this workspace"
+                              : "No free service connected"
+                            : "Available in a connected environment."}
                         </small>
                       </span>
                       <input
                         type="checkbox"
+                        disabled={backendV1 && !availableTools.includes(n)}
                         checked={selected.includes(n)}
                         onChange={() =>
                           setSelected(
@@ -634,7 +865,9 @@ export default function Agents({
                   ))}
               </div>
               <p className="demo-note">
-                Tool toggles are local preview state only.
+                {backendV1
+                  ? "These selections restrict which tools this agent may execute."
+                  : "Tool toggles are local preview state only."}
               </p>
             </>
           )}
@@ -692,45 +925,176 @@ export default function Agents({
           )}
           {tab === "Knowledge" && (
             <>
-              <section className="knowledge-profile-section" aria-label="Knowledge profile">
+              <section
+                className="knowledge-profile-section"
+                aria-label="Knowledge profile"
+              >
                 <h3>Knowledge profile</h3>
-                <p className="muted">What should this agent know, and how should it learn?</p>
+                <p className="muted">
+                  What should this agent know, and how should it learn?
+                </p>
                 <div className="knowledge-profile-grid">
-                  {knowledgeProfiles.map(([value, explanation]) => <label className={"card " + (memoryMode === value ? "selected" : "")} key={value}>
-                    <input type="radio" name="memory-mode" checked={memoryMode === value} onChange={() => chooseProfile(value)} />
-                    <span><strong>{value}</strong><p className="muted">{explanation}</p></span>
-                  </label>)}
+                  {knowledgeProfiles.map(([value, explanation]) => (
+                    <label
+                      className={
+                        "card " + (memoryMode === value ? "selected" : "")
+                      }
+                      key={value}
+                    >
+                      <input
+                        type="radio"
+                        name="memory-mode"
+                        checked={memoryMode === value}
+                        onChange={() => chooseProfile(value)}
+                      />
+                      <span>
+                        <strong>{value}</strong>
+                        <p className="muted">{explanation}</p>
+                      </span>
+                    </label>
+                  ))}
                 </div>
               </section>
               <h3>Self-learning</h3>
-              <label className="setting-line"><span><strong>Learns automatically</strong><small>Allow the agent to learn and create new memories and skills</small></span>
-                <input type="checkbox" role="switch" aria-label="Learns automatically" checked={learnsAutomatically} onChange={e => { setLearnsAutomatically(e.target.checked); setMemoryMode("Custom memory"); }} />
+              <label className="setting-line">
+                <span>
+                  <strong>Learns automatically</strong>
+                  <small>
+                    Allow the agent to learn and create new memories and skills
+                  </small>
+                </span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  aria-label="Learns automatically"
+                  checked={learnsAutomatically}
+                  onChange={(e) => {
+                    setLearnsAutomatically(e.target.checked);
+                    setMemoryMode("Custom memory");
+                  }}
+                />
               </label>
-              {learnsAutomatically && ["Memory suggestions", "Skill suggestions", "Prompt suggestions", "Rubric suggestions", "Agent configurations"].map(value => <label className="setting-line" key={value}>{value}
-                <select className="compact-select" aria-label={value} value={learning[value] || (value === "Agent configurations" ? "Disabled" : "Suggest")} onChange={e => { setLearning({ ...learning, [value]: e.target.value, ...(value === "Skill suggestions" ? { Skills: e.target.value } : {}) }); setMemoryMode("Custom memory"); }}>
-                  <option value="Suggest">Suggested</option><option value="Disabled">Off</option>
-                </select>
-              </label>)}
-              <label className="setting-line">Thread search<input type="checkbox" defaultChecked /></label>
+              {learnsAutomatically &&
+                [
+                  "Memory suggestions",
+                  "Skill suggestions",
+                  "Prompt suggestions",
+                  "Rubric suggestions",
+                  "Agent configurations",
+                ]
+                  .filter(
+                    (value) =>
+                      !backendV1 ||
+                      ["Memory suggestions", "Skill suggestions"].includes(
+                        value,
+                      ),
+                  )
+                  .map((value) => (
+                    <label className="setting-line" key={value}>
+                      {value}
+                      <select
+                        className="compact-select"
+                        aria-label={value}
+                        value={
+                          learning[value] ||
+                          (value === "Agent configurations"
+                            ? "Disabled"
+                            : "Suggest")
+                        }
+                        onChange={(e) => {
+                          setLearning({
+                            ...learning,
+                            [value]: e.target.value,
+                            ...(value === "Skill suggestions"
+                              ? { Skills: e.target.value }
+                              : {}),
+                          });
+                          setMemoryMode("Custom memory");
+                        }}
+                      >
+                        <option value="Suggest">Suggested</option>
+                        <option value="Disabled">Off</option>
+                      </select>
+                    </label>
+                  ))}
+              <label className="setting-line">
+                Thread search
+                <input type="checkbox" defaultChecked />
+              </label>
               <h3>Memories</h3>
-              <label className="field">Which memories can this agent see?
-                <select className="input" aria-label="Memory read scope" value={memoryReadScope} onChange={e => { setMemoryReadScope(e.target.value); setMemoryMode("Custom memory"); }}>
-                  <option value="all">All memories</option><option value="linked">Only linked memories</option>
+              <label className="field">
+                Which memories can this agent see?
+                <select
+                  className="input"
+                  aria-label="Memory read scope"
+                  value={memoryReadScope}
+                  onChange={(e) => {
+                    setMemoryReadScope(e.target.value);
+                    setMemoryMode("Custom memory");
+                  }}
+                >
+                  <option value="all">All memories</option>
+                  <option value="linked">Only linked memories</option>
                 </select>
               </label>
-              <label className="field">Where should this agent save what it learns?
-                <select className="input" aria-label="Memory save target" value={memorySaveTarget} onChange={e => { setMemorySaveTarget(e.target.value); setMemoryMode("Custom memory"); }}>
-                  <option value="library">Memory library</option><option value="agent">This agent's memories</option>
+              <label className="field">
+                Where should this agent save what it learns?
+                <select
+                  className="input"
+                  aria-label="Memory save target"
+                  value={memorySaveTarget}
+                  onChange={(e) => {
+                    setMemorySaveTarget(e.target.value);
+                    setMemoryMode("Custom memory");
+                  }}
+                >
+                  <option value="library">Memory library</option>
+                  <option value="agent">This agent's memories</option>
                 </select>
               </label>
-              <p className="demo-note">These preferences are saved locally. No memories are created and no learning process runs.</p>
+              <p className="demo-note">
+                {backendV1
+                  ? "Relevant memories are retrieved when a task starts. New learning always requires your confirmation."
+                  : "These preferences are saved locally."}
+              </p>
               <h3>Skills</h3>
-              <p className="muted">Local skill instructions linked to this identity.</p>
-              {workspace.data.skills.filter(s => !s.archived).map(s => <label className="check-row" key={s.id}>
-                <input type="checkbox" checked={skillIds.includes(s.id)} onChange={e => setSkillIds(e.target.checked ? [...skillIds, s.id] : skillIds.filter(id => id !== s.id))} />{s.name}
-              </label>)}
-              <label className="setting-line">Use workspace library<input type="checkbox" checked={library} onChange={e => setLibrary(e.target.checked)} /></label>
-              <div className="actions"><button className="btn" onClick={() => navigate("/skills")}>Browse skills</button><button className="btn" onClick={() => navigate("/library")}>Browse library</button></div>
+              <p className="muted">
+                Local skill instructions linked to this identity.
+              </p>
+              {workspace.data.skills
+                .filter((s) => !s.archived)
+                .map((s) => (
+                  <label className="check-row" key={s.id}>
+                    <input
+                      type="checkbox"
+                      checked={skillIds.includes(s.id)}
+                      onChange={(e) =>
+                        setSkillIds(
+                          e.target.checked
+                            ? [...skillIds, s.id]
+                            : skillIds.filter((id) => id !== s.id),
+                        )
+                      }
+                    />
+                    {s.name}
+                  </label>
+                ))}
+              <label className="setting-line">
+                Use workspace library
+                <input
+                  type="checkbox"
+                  checked={library}
+                  onChange={(e) => setLibrary(e.target.checked)}
+                />
+              </label>
+              <div className="actions">
+                <button className="btn" onClick={() => navigate("/skills")}>
+                  Browse skills
+                </button>
+                <button className="btn" onClick={() => navigate("/library")}>
+                  Browse library
+                </button>
+              </div>
             </>
           )}
         </section>
@@ -769,7 +1133,13 @@ export default function Agents({
       </div>
       {modal && modal !== "redraft" && (
         <Modal
-          title={modal === "import" ? "Import an agent" : modal === "live" ? "Set up Live mode" : modal.replace("invocation:", "Set up ")}
+          title={
+            modal === "import"
+              ? "Import an agent"
+              : modal === "live"
+                ? "Set up Live mode"
+                : modal.replace("invocation:", "Set up ")
+          }
           onClose={() => setModal("")}
         >
           {modal === "import" ? (
@@ -788,7 +1158,11 @@ export default function Agents({
                           const v = JSON.parse(s);
                           if (typeof v.name !== "string") throw Error();
                           setName(v.name);
-                          setPromptHtml(typeof v.promptHtml === "string" ? sanitizePromptHtml(v.promptHtml) : "");
+                          setPromptHtml(
+                            typeof v.promptHtml === "string"
+                              ? sanitizePromptHtml(v.promptHtml)
+                              : "",
+                          );
                           setDescription(
                             typeof v.description === "string"
                               ? v.description
@@ -846,11 +1220,52 @@ export default function Agents({
           )}
         </Modal>
       )}
-      {promptOpen && <AgentPromptEditor text={prompt} html={promptHtml} onClose={() => setPromptOpen(false)} onApply={(text, html) => { setPrompt(text); setPromptHtml(html); setPromptOpen(false); }} />}
-      {modal === "redraft" && <Modal dialogRole="alertdialog" title="Re-draft from a posting?" onClose={() => setModal("")} footer={<>
-        <button className="btn" onClick={() => setModal("")}>Cancel</button>
-        <button className="btn primary" onClick={() => { setManual(false); setModal(""); setExecutionNotice(""); }}>Continue</button>
-      </>}><p>Re-drafting will replace the current name, description, and system prompt with new ones generated from your posting, along with any cast portrait and persona. Existing values will be lost.</p><p className="demo-note">Continue returns to the posting form. Existing values stay intact until a replacement is applied. Generation is not connected.</p></Modal>}
+      {promptOpen && (
+        <AgentPromptEditor
+          text={prompt}
+          html={promptHtml}
+          onClose={() => setPromptOpen(false)}
+          onApply={(text, html) => {
+            setPrompt(text);
+            setPromptHtml(html);
+            setPromptOpen(false);
+          }}
+        />
+      )}
+      {modal === "redraft" && (
+        <Modal
+          dialogRole="alertdialog"
+          title="Re-draft from a posting?"
+          onClose={() => setModal("")}
+          footer={
+            <>
+              <button className="btn" onClick={() => setModal("")}>
+                Cancel
+              </button>
+              <button
+                className="btn primary"
+                onClick={() => {
+                  setManual(false);
+                  setModal("");
+                  setExecutionNotice("");
+                }}
+              >
+                Continue
+              </button>
+            </>
+          }
+        >
+          <p>
+            Re-drafting will replace the current name, description, and system
+            prompt with new ones generated from your posting, along with any
+            cast portrait and persona. Existing values will be lost.
+          </p>
+          <p className="demo-note">
+            Continue returns to the posting form. Existing values stay intact
+            until a replacement is applied. Generation is not connected.
+          </p>
+        </Modal>
+      )}
     </div>
   );
 }

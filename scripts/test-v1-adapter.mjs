@@ -50,6 +50,8 @@ const task = {
   conversationId,
   prompt: "A durable task",
   state: "running",
+  createdAt: date,
+  updatedAt: date,
 };
 const conversation = {
   id: conversationId,
@@ -57,6 +59,8 @@ const conversation = {
   created_at: date,
   messages: [{ id: "1", role: "user", content: task.prompt, created_at: date }],
   artifacts: [],
+  metadata: {},
+  revision: 1,
 };
 await context.route("**/api/**", async (route) => {
   const request = route.request(),
@@ -73,6 +77,9 @@ await context.route("**/api/**", async (route) => {
   if (expired) return reply({ error: "UNAUTHENTICATED" }, 401);
   if (path === "/auth/session")
     return reply({ userId: "user", workspaceId: "workspace", admin: true });
+  if (path === "/workspaces")
+    return reply([{ id: "workspace", name: "Personal", role: "admin" }]);
+  if (["/resources", "/library"].includes(path)) return reply([]);
   if (path === "/capabilities")
     return reply({
       models: [{ provider: "deepseek", model: "test-model", configured: true }],

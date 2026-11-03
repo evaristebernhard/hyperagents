@@ -1,7 +1,13 @@
 import type { MessageContext } from "./types";
 
 export const backendV1 = import.meta.env.VITE_BACKEND_V1 === "true";
-export type Identity = { userId: string; workspaceId: string; admin: boolean };
+export type Identity = {
+  userId: string;
+  workspaceId: string;
+  admin: boolean;
+  email: string;
+  role: string;
+};
 export type Capabilities = {
   models: { provider: string; model: string; configured: boolean }[];
   search: { provider: string; degraded: boolean };
@@ -13,6 +19,14 @@ export type Conversation = {
   id: string;
   title: string;
   created_at: string;
+  revision: number;
+  metadata: {
+    starred?: boolean;
+    archived?: boolean;
+    projectId?: string;
+    roomId?: string;
+    canvas?: import("./types").CanvasPreferences;
+  };
   messages: {
     id: string;
     role: "user" | "assistant";
@@ -25,9 +39,12 @@ export type Task = {
   id: string;
   conversationId: string;
   prompt: string;
+  createdAt: string;
+  updatedAt: string;
   state: string;
   errorCode?: string;
   inputFileIds?: string[];
+  context?: { id: string; kind: string; name: string; revision: number }[];
   result?: {
     summary: string;
     artifacts: {
@@ -48,9 +65,31 @@ export type TaskEvent = {
     code?: string;
     message?: string;
     question?: string;
-    result?: { question?: string };
+    operationId?: string;
+    input?: {
+      query?: string;
+      url?: string;
+      language?: string;
+      code?: string;
+      name?: string;
+    };
+    result?: {
+      question?: string;
+      stdout?: string;
+      stderr?: string;
+      error?: string;
+      details?: { stdout?: string; stderr?: string };
+      outputErrors?: { path: string; error: string }[];
+      url?: string;
+      title?: string;
+      results?: { url: string; title: string }[];
+      warning?: string;
+    };
+    issues?: string[];
+    passed?: boolean;
   };
   created_at: string;
+  taskId?: string;
 };
 export type ArtifactDetail = {
   id: string;
@@ -72,6 +111,11 @@ export const stateLabel: Record<string, string> = {
 };
 const csrfKey = "hyperagents:v1:csrf";
 let epoch = 0;
+let activeWorkspace = "";
+export const sessionEpoch = () => epoch;
+export function setActiveWorkspace(id: string) {
+  activeWorkspace = id;
+}
 export class V1Error extends Error {
   constructor(
     public status: number,
@@ -82,6 +126,7 @@ export class V1Error extends Error {
 }
 export function invalidateSessionRequests() {
   epoch++;
+  activeWorkspace = "";
 }
 export function clearSession() {
   invalidateSessionRequests();
@@ -95,11 +140,18 @@ export async function v1<T>(
     key?: string;
     signal?: AbortSignal;
     quiet?: boolean;
+    expectedEpoch?: number;
+    workspace?: string;
   } = {},
 ): Promise<T> {
-  const requestEpoch = epoch;
+  const requestEpoch = options.expectedEpoch ?? epoch;
+  if (requestEpoch !== epoch)
+    throw new DOMException("Session changed", "AbortError");
   const method = options.method || "GET";
   const headers: Record<string, string> = {};
+  const workspace = options.workspace ?? activeWorkspace;
+  if (workspace && !path.startsWith("/auth/"))
+    headers["x-workspace-id"] = workspace;
   if (method !== "GET") {
     headers["x-csrf-token"] = localStorage.getItem(csrfKey) || "";
     if (options.body !== undefined && !(options.body instanceof FormData))
@@ -177,6 +229,26 @@ export async function submitTask(
       ...(conversationId ? { conversationId } : {}),
       inputFileIds: context?.attachments.map((f) => f.id) || [],
       acceptance: { formats, requiredText: [], requireSources: false },
+      ...(context &&
+      (context.settings.agentId ||
+        context.projectId ||
+        context.roomId ||
+        context.skillIds.length ||
+        context.memoryIds.length ||
+        context.artifactIds.length ||
+        context.rubricIds?.length)
+        ? {
+            context: {
+              agentId: context.settings.agentId,
+              projectId: context.projectId,
+              roomId: context.roomId,
+              skillIds: context.skillIds,
+              memoryIds: context.memoryIds,
+              artifactIds: context.artifactIds,
+              rubricIds: context.rubricIds || [],
+            },
+          }
+        : {}),
     },
   });
   const task = await v1<Task>("/tasks/" + taskId);
@@ -200,4 +272,16 @@ export function assistantText(content: string): string {
       return result.summary;
   } catch {}
   return content;
+}
+
+export function artifactKind(format: string): import("./types").ArtifactKind {
+  return format === "png"
+    ? "Image"
+    : format === "html"
+      ? "Webpage"
+      : format === "csv"
+        ? "Table"
+        : ["md", "pdf", "txt"].includes(format)
+          ? "Document"
+          : "File";
 }
