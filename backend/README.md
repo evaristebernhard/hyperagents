@@ -59,7 +59,7 @@ npm run cli -- download FILE_UUID ./result.md
 
 ## API 与客户端
 
-全部业务 API 在 `/api/v1`。登录响应给出 `csrfToken`，服务端设置 HttpOnly/SameSite Cookie。所有修改请求必须带与 `PUBLIC_ORIGIN` 一致的 `Origin`；登录后还须带 `x-csrf-token`。CLI 自动处理这两项。任务创建要求 `idempotency-key`，返回 202。同一个工作区里重复同键同参数返回原 taskId，不同参数返回 409。
+全部业务 API 在 `/api/v1`。登录响应给出 `csrfToken`，服务端设置 HttpOnly/SameSite Cookie。所有修改请求必须带 `PUBLIC_ORIGIN` 或显式配置的 `ADDITIONAL_ORIGINS` 中的 `Origin`；登录后还须带 `x-csrf-token`。CLI 自动处理这两项。任务创建要求 `idempotency-key`，返回 202。同一个工作区里重复同键同参数返回原 taskId，不同参数返回 409。
 
 | 路径                                                              | 用途                                |
 | ----------------------------------------------------------------- | ----------------------------------- |
@@ -126,4 +126,6 @@ npm run eval
 
 ## 原版前端接入
 
-仓库根目录运行 `npm run dev:v1`，访问 `http://localhost:5174`。入口复用 main 的侧栏、首页、对话布局和产物面板；任务进度、追加指令、取消和产物历史版本均在原对话中处理。新账号、数据库、文件目录保持独立并持久保存。完整步骤和本次验收见 [前端接入报告](../docs/verification-v1-ui/REPORT.md)。
+仓库根目录运行 `npm run dev:v1`，访问 `http://localhost:5173`。入口复用 main 的侧栏、首页、对话布局和产物面板；任务进度、追加指令、取消和产物历史版本均在原对话中处理。新账号、数据库、文件目录保持独立并持久保存。完整步骤和本次验收见 [前端接入报告](../docs/verification-v1-ui/REPORT.md)。
+
+本机开发入口允许 `http://localhost:5173` 和 `http://127.0.0.1:5173`；公开地址读取 `V1_PUBLIC_ORIGIN`，未设置时沿用 `.env` 的 `APP_PUBLIC_ORIGIN`。例如配置 `V1_PUBLIC_ORIGIN=https://hyper.chayu123.me`。公开地址及已有 `APP_PUBLIC_ORIGIN` 别名同时加入 Vite Host 和后端 Origin 白名单，HTTPS 登录使用 Secure Cookie；来源校验和 CSRF 校验仍启用。

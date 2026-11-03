@@ -19,7 +19,7 @@ npm --prefix backend run build
 npm run dev:v1
 ```
 
-访问 **http://localhost:5174**。旧服务继续使用 `5173/8787`，v1 使用 `5174/8081/55432`。重复启动先检查端口并退出，不停止已有服务。
+访问 **http://localhost:5173**。按后续要求，旧服务已停止，v1 改用 `5173/8081/55432`；下方历史验收结果是在切换前的 5174 上完成。重复启动先检查端口并退出，不停止已有服务。
 
 新账号、PostgreSQL 和文件位于 `backend/.data-v1/interactive`。首次初始化自动生成本机账号，登录凭据只写到该目录的 `access.json`（0600）；已有账号不重置。`.env` 提供模型配置，私有 `backend/.data-v1/runner.env` 提供 Runner 地址/令牌；无 Runner 时 PDF/PNG 选项禁用，不回退宿主执行。Runner 单独启动，参见 [部署说明](../../backend/deploy/OPERATIONS.md)。本地入口仅绑定回环地址。
 
@@ -58,3 +58,9 @@ PDF 内嵌预览使用浏览器原生阅读器；无原生阅读器的环境需�
 原有完整真实模型评测 **35/36**、数学/PDF/修订 **3/3** 和 gVisor 验收保留在 [后端报告](../../backend/VERIFICATION.md)。这些是历史质量证据；本次前端验收不声称重新执行全部 36 次评测。先前简化工作区的报告保留为历史记录，与本报告区分。
 
 没有提交数据库、密钥、账号凭据或运行缓存，也没有 push。
+
+## 后续端口与域名登录修复
+
+按后续要求，v1 默认启动端口已改为 5173，旧服务停止，账号、数据库和文件保留。公开域名使用私有环境配置 `V1_PUBLIC_ORIGIN=https://hyper.chayu123.me`；该配置值和已有 `APP_PUBLIC_ORIGIN` 别名用于生成 Vite Host 与后端 Origin 白名单，同时允许本机 localhost/127.0.0.1:5173。只信任显式配置的来源，不反射任意 Origin；HTTPS 登录保留 Secure Cookie，所有已登录修改请求仍验证 CSRF。
+
+本轮后端测试 **50/50** 通过（含类型检查）：新增公开/本机来源登录、HTTPS Cookie、缺少 CSRF、未知/缺失/null 来源及伪装域名回归。真实浏览器已验证 localhost 与 127.0.0.1 的登录和注销；公网 `https://hyper.chayu123.me` 页面 HTTP 200，在本机代理上携带该域名 Host/HTTPS Origin 的登录、历史读取和注销通过，未知来源仍返回 403。密钥、凭据和运行数据不提交。

@@ -9,7 +9,7 @@ import path from "node:path";
 import privateDataPlugin, { privateFsDeny } from "./private-data.mjs";
 
 // Fail before opening the persistent database if any v1 port is occupied.
-for (const port of [5174, 8081, 55432]) {
+for (const port of [5173, 8081, 55432]) {
   const probe = createTcpServer();
   try {
     await new Promise((resolve, reject) => {
@@ -39,6 +39,23 @@ for (const filename of [".env", "backend/.data-v1/runner.env"]) {
     if (error.code !== "ENOENT") throw error;
   }
 }
+const publicOrigin = new URL(
+  process.env.V1_PUBLIC_ORIGIN ||
+    process.env.APP_PUBLIC_ORIGIN ||
+    "http://localhost:5173",
+).origin;
+const allowedOrigins = [
+  ...new Set(
+    [
+      publicOrigin,
+      process.env.APP_PUBLIC_ORIGIN,
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+    ]
+      .filter(Boolean)
+      .map((value) => new URL(value).origin),
+  ),
+];
 const pg = new EmbeddedPostgres({
   databaseDir: path.join(root, "postgres"),
   port: 55432,
@@ -95,7 +112,10 @@ try {
     ...process.env,
     DATABASE_URL: "postgres://hyper:hyper@127.0.0.1:55432/hyper_v1",
     DATA_DIR: path.join(root, "files"),
-    PUBLIC_ORIGIN: "http://localhost:5174",
+    PUBLIC_ORIGIN: publicOrigin,
+    ADDITIONAL_ORIGINS: allowedOrigins
+      .filter((origin) => origin !== publicOrigin)
+      .join(","),
     HOST: "127.0.0.1",
     PORT: "8081",
   };
@@ -148,8 +168,11 @@ try {
     plugins: [privateDataPlugin(), react()],
     server: {
       host: "127.0.0.1",
-      port: 5174,
+      port: 5173,
       strictPort: true,
+      allowedHosts: [
+        ...new Set(allowedOrigins.map((origin) => new URL(origin).hostname)),
+      ],
       fs: { strict: true, deny: [...privateFsDeny, "**/backend/**"] },
       watch: {
         ignored: [
@@ -170,7 +193,7 @@ try {
     },
   });
   await vite.listen();
-  console.log("Main UI + backend v1: http://localhost:5174");
+  console.log("Main UI + backend v1: http://localhost:5173");
   console.log(
     "Local login credentials: backend/.data-v1/interactive/access.json",
   );

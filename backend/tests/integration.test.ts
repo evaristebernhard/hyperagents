@@ -1154,3 +1154,64 @@ test("persisted deliverables enter validation instead of an unbounded self-read 
   assert.equal(fileReads, 0);
   assert.equal((await getTask(db, id)).state, "succeeded");
 });
+
+test("configured public and loopback origins support login while unknown origins and missing CSRF are rejected", async () => {
+  const origins = [
+    "https://workspace.example",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ];
+  const originApp = await buildApp(db, {
+    ...c,
+    PUBLIC_ORIGIN: origins[0]!,
+    ADDITIONAL_ORIGINS: origins.slice(1),
+  });
+  try {
+    for (const origin of origins) {
+      const response = await originApp.inject({
+        method: "POST",
+        url: "/api/v1/auth/login",
+        headers: { origin },
+        payload: { email: "owner@example.com", password },
+      });
+      assert.equal(response.statusCode, 200, response.body);
+      const cookieHeader = String(response.headers["set-cookie"]);
+      assert.equal(
+        /; Secure(?:;|$)/i.test(cookieHeader),
+        origin.startsWith("https:"),
+      );
+      const cookie = cookieHeader.split(";")[0]!;
+      const denied = await originApp.inject({
+        method: "POST",
+        url: "/api/v1/auth/logout",
+        headers: { origin, cookie },
+      });
+      assert.equal(denied.statusCode, 403);
+      assert.equal(denied.json().error, "CSRF_REJECTED");
+      const logout = await originApp.inject({
+        method: "POST",
+        url: "/api/v1/auth/logout",
+        headers: { origin, cookie, "x-csrf-token": response.json().csrfToken },
+      });
+      assert.equal(logout.statusCode, 200);
+    }
+    for (const origin of [
+      undefined,
+      "null",
+      "https://evil.example",
+      "http://localhost:5174",
+      "https://workspace.example.evil.example",
+    ]) {
+      const response = await originApp.inject({
+        method: "POST",
+        url: "/api/v1/auth/login",
+        headers: origin ? { origin } : {},
+        payload: { email: "owner@example.com", password },
+      });
+      assert.equal(response.statusCode, 403);
+      assert.equal(response.json().error, "ORIGIN_REJECTED");
+    }
+  } finally {
+    await originApp.close();
+  }
+});

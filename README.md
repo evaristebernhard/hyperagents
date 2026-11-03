@@ -74,10 +74,9 @@ Existing fixture-only controls are not evidence that execution exists.
 
 ## Main UI with backend v1
 
-Run `npm run dev:v1` and open **http://localhost:5174** to use the original main
+Run `npm run dev:v1` and open **http://localhost:5173** to use the original main
 sidebar, home composer, conversation and artifact panel with the isolated
-TypeScript backend. The extra Tasks page has been retired. The legacy service
-continues on its existing ports and keeps its SQLite data.
+TypeScript backend. The extra Tasks page has been retired. The legacy service is stopped; its SQLite data is preserved.
 
 Build the backend first with `npm --prefix backend ci --ignore-scripts` and
 `npm --prefix backend run build`. The v1 launcher preserves the existing accounts,

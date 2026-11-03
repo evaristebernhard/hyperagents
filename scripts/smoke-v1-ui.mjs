@@ -2,7 +2,7 @@ import { chromium } from "@playwright/test";
 import assert from "node:assert/strict";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-const origin = process.env.V1_UI_ORIGIN || "http://localhost:5174";
+const origin = process.env.V1_UI_ORIGIN || "http://localhost:5173";
 const access = JSON.parse(
   await readFile("backend/.data-v1/interactive/access.json", "utf8"),
 );
@@ -123,15 +123,13 @@ try {
   );
   await page.keyboard.press("Escape");
   check("main sidebar, homepage and actual capabilities");
-  await page
-    .getByLabel("Attach files", { exact: true })
-    .setInputFiles({
-      name: "requirements.txt",
-      mimeType: "text/plain",
-      buffer: Buffer.from(
-        "标题：一元一次方程练习。所有题目在前，答案与解析在后。",
-      ),
-    });
+  await page.getByLabel("Attach files", { exact: true }).setInputFiles({
+    name: "requirements.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(
+      "标题：一元一次方程练习。所有题目在前，答案与解析在后。",
+    ),
+  });
   await page
     .getByRole("button", { name: "Remove attachment requirements.txt" })
     .waitFor();
@@ -275,17 +273,15 @@ try {
   check(
     "second user cannot list or access conversations, tasks, events, files or artifacts",
   );
-  for (const port of [5173, 5174]) {
-    for (const path of [
-      "/backend/.data-v1/interactive/access.json",
-      "/backend/%2edata-v1/runner.env?raw",
-      "/@fs/home/ubuntu/hyperagents/backend/.data-v1/interactive/access.json?raw",
-    ]) {
-      const response = await fetch("http://localhost:" + port + path);
-      assert.equal(response.status, 403, port + path);
-    }
+  for (const path of [
+    "/backend/.data-v1/interactive/access.json",
+    "/backend/%2edata-v1/runner.env?raw",
+    "/@fs/home/ubuntu/hyperagents/backend/.data-v1/interactive/access.json?raw",
+  ]) {
+    const response = await fetch(new URL(path, origin));
+    assert.equal(response.status, 403, path);
   }
-  check("private files denied on both old and new development ports");
+  check("private files denied on the active development port");
   assert.deepEqual(errors, []);
   assert.deepEqual(legacyRequests, []);
   check("no browser exceptions or legacy API requests");

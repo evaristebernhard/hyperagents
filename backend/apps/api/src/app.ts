@@ -106,6 +106,11 @@ export async function buildApp(db: Db, config: Config) {
         requestId: req.id,
       });
   });
+  const trustedOrigins = new Set(
+    [config.PUBLIC_ORIGIN, ...config.ADDITIONAL_ORIGINS].map(
+      (value) => new URL(value).origin,
+    ),
+  );
   app.addHook("onRequest", async (req, reply) => {
     reply
       .header("cache-control", "no-store")
@@ -115,7 +120,7 @@ export async function buildApp(db: Db, config: Config) {
     const authPublic =
       path === "/api/v1/auth/login" || path === "/api/v1/auth/register";
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
-      if (req.headers.origin !== new URL(config.PUBLIC_ORIGIN).origin)
+      if (!req.headers.origin || !trustedOrigins.has(req.headers.origin))
         throw new DomainError("ORIGIN_REJECTED", 403);
     }
     if (authPublic) return;
@@ -152,7 +157,7 @@ export async function buildApp(db: Db, config: Config) {
       const r = await login(db, req.body);
       reply.setCookie("hyper_session", r.session, {
         httpOnly: true,
-        secure: new URL(config.PUBLIC_ORIGIN).protocol === "https:",
+        secure: new URL(req.headers.origin!).protocol === "https:",
         sameSite: "strict",
         path: "/",
         maxAge: 7 * 24 * 3600,
