@@ -1,0 +1,70 @@
+npm notice run hyperagents-backend@1.0.0 test
+npm notice run npm run typecheck && tsx --test --test-concurrency=1 tests/*.test.ts
+npm notice run hyperagents-backend@1.0.0 typecheck
+npm notice run npm run build && tsc -p tsconfig.verify.json
+npm notice run hyperagents-backend@1.0.0 build
+npm notice run npm run build --workspaces
+npm notice run @hyper/contracts@1.0.0 build
+npm notice run tsc -p tsconfig.json
+npm notice run @hyper/runtime@1.0.0 build
+npm notice run @hyper/api@1.0.0 build
+npm notice run @hyper/worker@1.0.0 build
+npm notice run @hyper/runner@1.0.0 build
+npm notice run @hyper/cli@1.0.0 build
+✔ migrations are repeatable and PostgreSQL queue wakes tasks (2359.424045ms)
+✔ binary control characters in tool output persist safely in PostgreSQL (115.045783ms)
+✔ invites are single use, expire and bootstrap cannot run twice (2264.169508ms)
+✔ Origin CSRF auth and admin checks are enforced (7.665242ms)
+✔ task idempotency handles concurrency and detects changed request (22.236264ms)
+✔ cross-user tasks, conversations, events, sources, mutations are inaccessible (24.43538ms)
+✔ files are scoped, traversal blocked and downloaded bytes verified (17.862981ms)
+✔ document loop resolves omitted saved delivery IDs and hides provider context (190.375793ms)
+✔ artifact persistence crash window is idempotent and revisions keep history (29.941755ms)
+✔ missing requested output cannot succeed after two repair rounds (122.34329ms)
+✔ invalid tool args become safe tool errors without creating files (120.054852ms)
+✔ crashed non-replayable code goes uncertain and cannot retry (25.12875ms)
+✔ expired read lease resumes and previous worker cannot commit (19.580033ms)
+✔ followup supersedes only unexecuted operations at a safe boundary (33.505298ms)
+✔ cancellation aborts in-flight model and prevents success (1015.651323ms)
+✔ shared model attempt budget blocks before transport (26.512517ms)
+✔ long context checkpoint keeps constraints and actual artifact references (22.043401ms)
+✔ delegation runs two children through same engine and resumes parent (271.100039ms)
+✔ SSE cursor pagination returns each persisted event once (28.871355ms)
+✔ external approval is exact and never executes anything (81.227619ms)
+✔ PDF must render and extract text; image-only PDF requests OCR (2059.128239ms)
+✔ sandbox template cannot mount socket, secrets or enable networking (0.622526ms)
+✔ unconfigured sandbox reports unavailable and no host execution (19.782506ms)
+✔ OpenAPI comes from shared Zod contracts (13.207904ms)
+✔ runner requires internal authentication and fails closed without gVisor (2793.223008ms)
+✔ late instruction racing finish is queued instead of publishing stale success (197.759688ms)
+✔ crashed reserved model attempt is accounted and does not strand quota (71.064115ms)
+✔ global and workspace scheduling limits are atomic (99.206707ms)
+✔ SSE disconnect leaves task alive and Last-Event-ID resumes over HTTP (101.652857ms)
+✔ delivery checks inspect visible HTML and do not accept summary-only content (76.38057ms)
+✔ research phase preserves budget for actual delivery (130.154787ms)
+✔ instruction arriving before wait transition is not lost (28.940077ms)
+✔ SIGKILL after artifact save recovers without duplicate files or versions (2991.152277ms)
+✔ database heartbeat failure aborts work and lease recovery remains possible (1080.658397ms)
+✔ known HTTP rejection releases reserved tokens and keeps failed attempt audit (48.018377ms)
+✔ persisted deliverables enter validation instead of an unbounded self-read loop (164.572578ms)
+✔ DeepSeek preserves reasoning privately and assembles split tool arguments (14.547715ms)
+✔ bounded pre-stream retry HTTP 429 (604.676742ms)
+✔ bounded pre-stream retry HTTP 503 (603.816891ms)
+✔ auth errors do not retry or reveal provider body (1.278259ms)
+✔ truncation cannot execute or retry tools (1.586898ms)
+✔ incomplete JSON cannot execute or retry tools (1.124881ms)
+✔ missing DONE cannot execute or retry tools (0.554137ms)
+✔ mid-stream network failure is not retried (0.975552ms)
+✔ cancelled models do not call transport (0.299958ms)
+✔ private, metadata, encoded and mapped IPs are blocked (5.790057ms)
+✔ CSV JSON HTML PNG reject malformed and mismatched data (2.845802ms)
+✔ HTTP 402 reports model quota and never retries (0.82423ms)
+✔ failed sandbox code returns bounded actionable stderr for repair (37.359565ms)
+ℹ tests 49
+ℹ suites 0
+ℹ pass 49
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20006.608494

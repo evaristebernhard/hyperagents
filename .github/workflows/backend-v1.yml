@@ -1,0 +1,46 @@
+name: backend-v1
+on:
+  push:
+    paths: ["backend/**", ".github/workflows/backend-v1.yml", "scripts/private-data.mjs", "server/frontend-safety.test.mjs", "vite.config.ts"]
+  pull_request:
+    paths: ["backend/**", ".github/workflows/backend-v1.yml", "scripts/private-data.mjs", "server/frontend-safety.test.mjs", "vite.config.ts"]
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          {
+            POSTGRES_USER: hyper,
+            POSTGRES_PASSWORD: hyper,
+            POSTGRES_DB: hyper_test,
+          }
+        ports: ["55432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 20
+    defaults:
+      run: { working-directory: backend }
+    env:
+      TEST_DATABASE_URL: postgres://hyper:hyper@127.0.0.1:55432/hyper_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          {
+            node-version: 24,
+            cache: npm,
+            cache-dependency-path: backend/package-lock.json,
+          }
+      - run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      - run: npm ci --ignore-scripts
+      - run: node --test server/frontend-safety.test.mjs
+        working-directory: .
+      - run: mkdir -p evals/results
+      - run: npm test | tee evals/results/ci-tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          {
+            name: backend-verification,
+            path: backend/evals/results/ci-tests.log,
+          }

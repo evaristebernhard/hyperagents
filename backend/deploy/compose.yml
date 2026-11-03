@@ -1,0 +1,69 @@
+name: hyperagents-v1
+services:
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: hyper_v1
+      POSTGRES_USER: hyper
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes: ["database:/var/lib/postgresql/data"]
+    networks: [private]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hyper -d hyper_v1"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+  migrate:
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    image: hyperagents-backend:1
+    command: ["node", "apps/cli/dist/index.js", "migrate"]
+    environment:
+      DATABASE_URL: postgres://hyper:${POSTGRES_PASSWORD}@postgres:5432/hyper_v1
+    depends_on: { postgres: { condition: service_healthy } }
+    networks: [private]
+  api:
+    image: hyperagents-backend:1
+    environment: &common
+      DATABASE_URL: postgres://hyper:${POSTGRES_PASSWORD}@postgres:5432/hyper_v1
+      DATA_DIR: /data
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8081}
+      HOST: 0.0.0.0
+      NODE_ENV: production
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      EXA_API_KEY: ${EXA_API_KEY:-}
+      RUNNER_URL: http://runner:8082
+      RUNNER_TOKEN: ${RUNNER_TOKEN:?Set RUNNER_TOKEN}
+    ports: ["127.0.0.1:8081:8081"]
+    volumes: ["files:/data"]
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    networks: [private, outbound]
+    restart: unless-stopped
+  worker:
+    image: hyperagents-backend:1
+    command: ["node", "apps/worker/dist/index.js"]
+    environment: *common
+    volumes: ["files:/data"]
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    networks: [private, outbound]
+    restart: unless-stopped
+  runner:
+    image: hyperagents-backend:1
+    user: "0:0"
+    command: ["node", "apps/runner/dist/index.js"]
+    environment:
+      DATA_DIR: /var/lib/hyperagents-runner
+      HOST: 0.0.0.0
+      RUNNER_TOKEN: ${RUNNER_TOKEN}
+      SANDBOX_IMAGE: hyperagents-sandbox:1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/hyperagents-runner:/var/lib/hyperagents-runner
+    networks: [private]
+    restart: unless-stopped
+networks:
+  private: { internal: true }
+  outbound: {}
+volumes:
+  database: {}
+  files: {}

@@ -1,0 +1,57 @@
+{
+  "verifiedAt": "2026-11-03T07:58:56.397Z",
+  "deterministic": {
+    "passed": 49,
+    "failed": 0,
+    "skipped": 0,
+    "strictTypes": true
+  },
+  "sandbox": {
+    "status": "passed",
+    "checks": [
+      "python",
+      "node",
+      "no-secrets",
+      "no-socket",
+      "network-off",
+      "idempotency",
+      "chinese-pdf-render",
+      "png",
+      "symlink-rejection",
+      "memory-limit",
+      "workdir-limit",
+      "pid-limit",
+      "cancellation",
+      "timeout",
+      "no-residual-containers"
+    ]
+  },
+  "realModel": {
+    "report": "2026-11-03T07-51-23-167Z.json",
+    "total": 36,
+    "passed": 35,
+    "blocked": 0,
+    "passRate": 0.9722222222222222,
+    "gatePassed": true,
+    "mathPassed": 3
+  },
+  "deployment": {
+    "backendImage": "hyperagents-backend:1",
+    "sandboxImage": "hyperagents-sandbox:1",
+    "buildPassed": true,
+    "composeConfigPassed": true,
+    "node": "24.22.2",
+    "gVisor": "release-20261102.0"
+  },
+  "usage": {
+    "attempts": 213,
+    "actual_input": "1115283",
+    "actual_output": "101252",
+    "unknown_usage_attempts": 0,
+    "budget_charged_tokens": "1216535",
+    "transfer_bytes": "30161195",
+    "artifact_bytes": "761238",
+    "artifactFileCount": 59,
+    "auditedAt": "2026-11-03T07:58:57.454Z"
+  }
+}
