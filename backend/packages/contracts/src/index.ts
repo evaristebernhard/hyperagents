@@ -39,6 +39,8 @@ export const Format = z.enum([
   "html",
   "png",
   "pdf",
+  "py",
+  "js",
 ]);
 export type Format = z.infer<typeof Format>;
 export const mime: Record<Format, string> = {
@@ -49,19 +51,39 @@ export const mime: Record<Format, string> = {
   html: "text/html",
   png: "image/png",
   pdf: "application/pdf",
+  py: "text/x-python",
+  js: "text/javascript",
 };
 export const Acceptance = z
   .object({
-    formats: z.array(Format).max(7).default([]),
+    formats: z.array(Format).max(9).default([]),
     requiredText: z.array(z.string().min(1).max(200)).max(30).default([]),
     requireSources: z.boolean().default(false),
   })
   .strict();
+export const ResourceId = z
+  .string()
+  .min(1)
+  .max(120)
+  .regex(/^[a-zA-Z0-9_-]+$/);
+export const TaskContext = z
+  .object({
+    agentId: ResourceId.optional(),
+    projectId: ResourceId.optional(),
+    roomId: ResourceId.optional(),
+    skillIds: z.array(ResourceId).max(20).default([]),
+    memoryIds: z.array(ResourceId).max(20).default([]),
+    artifactIds: z.array(Id).max(20).default([]),
+    rubricIds: z.array(ResourceId).max(10).default([]),
+  })
+  .strict();
+export type TaskContext = z.infer<typeof TaskContext>;
 export const CreateTask = z
   .object({
     prompt: z.string().min(1).max(30000),
     conversationId: Id.optional(),
     inputFileIds: z.array(Id).max(20).default([]),
+    context: TaskContext.optional(),
     acceptance: Acceptance.default({
       formats: [],
       requiredText: [],
@@ -86,6 +108,22 @@ export const Followup = z
   .object({ message: z.string().min(1).max(30000) })
   .strict();
 export const ToolSchemas = {
+  image_search: z
+    .object({
+      query: z.string().min(1).max(300),
+      limit: z.number().int().min(1).max(5).default(3),
+    })
+    .strict(),
+  thread_search: z.object({ query: z.string().min(1).max(500) }).strict(),
+  knowledge_search: z.object({ query: z.string().min(1).max(500) }).strict(),
+  learning_propose: z
+    .object({
+      kind: z.enum(["memories", "skills", "wiki"]),
+      name: z.string().min(1).max(160),
+      content: z.string().min(1).max(12000),
+      reason: z.string().min(1).max(1000),
+    })
+    .strict(),
   web_search: z
     .object({
       query: z.string().min(1).max(500),
@@ -220,6 +258,7 @@ export const Event = z.discriminatedUnion("type", [
     name: z.string(),
     status: z.enum(["prepared", "completed", "failed", "obsolete"]),
     result: z.unknown().optional(),
+    input: z.record(z.string(), z.unknown()).optional(),
   }),
   z.object({ type: z.literal("message"), message: z.string() }),
   z.object({
@@ -245,6 +284,16 @@ export const TaskResponse = z.object({
   state: State,
   prompt: z.string(),
   result: z.unknown().nullable(),
+  context: z
+    .array(
+      z.object({
+        id: z.string(),
+        kind: z.string(),
+        name: z.string(),
+        revision: z.number(),
+      }),
+    )
+    .default([]),
   errorCode: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),

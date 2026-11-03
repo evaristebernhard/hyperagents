@@ -178,17 +178,29 @@ test("migrations are repeatable and PostgreSQL queue wakes tasks", async () => {
   }
 });
 test("binary control characters in tool output persist safely in PostgreSQL", async () => {
-  const id = await task(), claimed = await claimId(id);
+  const id = await task(),
+    claimed = await claimId(id);
   let step = 0;
-  const engine = new Engine(db, c, scripted(() => ++step === 1
-    ? call("web_search", { query: "test" })
-    : call("finish", { summary: "hello", artifactIds: [] })));
+  const engine = new Engine(
+    db,
+    c,
+    scripted(() =>
+      ++step === 1
+        ? call("web_search", { query: "test" })
+        : call("finish", { summary: "hello", artifactIds: [] }),
+    ),
+  );
   const execute = engine.tools.execute.bind(engine.tools);
-  engine.tools.execute = async (...args) => args[1].name === "web_search"
-    ? { data: { stdout: "before\0after" } } : execute(...args);
+  engine.tools.execute = async (...args) =>
+    args[1].name === "web_search"
+      ? { data: { stdout: "before\0after" } }
+      : execute(...args);
   await engine.run(claimed);
   assert.equal((await getTask(db, id)).state, "succeeded");
-  const recorded = await db.query("SELECT result FROM operations WHERE task_id=$1 AND name='web_search'", [id]);
+  const recorded = await db.query(
+    "SELECT result FROM operations WHERE task_id=$1 AND name='web_search'",
+    [id],
+  );
   assert.equal(recorded.rows[0].result.stdout, "before\uFFFDafter");
 });
 test("invites are single use, expire and bootstrap cannot run twice", async () => {
@@ -1214,4 +1226,559 @@ test("configured public and loopback origins support login while unknown origins
   } finally {
     await originApp.close();
   }
+});
+
+test("workspace resources feed task snapshots, reject stale edits and isolate users", async () => {
+  const id = randomUUID();
+  const value = {
+    id,
+    content: "Use exact fractions for algebra calculations.",
+    category: "Preference",
+    importance: 5,
+    pinned: true,
+  };
+  const put = await app.inject({
+    method: "PUT",
+    url: "/api/v1/resources/memories/" + id,
+    headers,
+    payload: { revision: 0, value },
+  });
+  assert.equal(put.statusCode, 200, put.body);
+  const stale = await app.inject({
+    method: "PUT",
+    url: "/api/v1/resources/memories/" + id,
+    headers,
+    payload: { revision: 0, value },
+  });
+  assert.equal(stale.statusCode, 409);
+  const invisible = await app.inject({
+    url: "/api/v1/resources",
+    headers: second,
+  });
+  assert.ok(!invisible.json().some((r: any) => r.id === id));
+  const created = await createTask(
+    db,
+    owner.workspaceId,
+    { prompt: "Compute an algebra result" },
+    randomUUID(),
+  );
+  const saved = await getTask(db, created.taskId);
+  assert.ok(saved.context.items?.some((r) => r.id === id));
+  await app.inject({
+    method: "PUT",
+    url: "/api/v1/resources/memories/" + id,
+    headers,
+    payload: {
+      revision: 1,
+      value: { ...value, content: "A newer preference" },
+    },
+  });
+  assert.equal(
+    (await getTask(db, created.taskId)).context.items?.find((r) => r.id === id)
+      ?.value.content,
+    value.content,
+  );
+  await assert.rejects(
+    createTask(
+      db,
+      other,
+      { prompt: "hello", context: { memoryIds: [id] } },
+      randomUUID(),
+    ),
+    /RESOURCE_NOT_FOUND/,
+  );
+});
+
+test("separate memory retrieves only the selected agent's memories even with linked read scope", async () => {
+  const { taskContext, ToolExecutor } = await import("@hyper/runtime");
+  const agentId = randomUUID(),
+    ownMemory = randomUUID(),
+    sharedMemory = randomUUID(),
+    otherMemory = randomUUID();
+  const rows = [
+    [
+      "agents",
+      agentId,
+      {
+        id: agentId,
+        name: "Isolated analyst",
+        memoryMode: "Separate memory",
+        memoryReadScope: "linked",
+        skillIds: [],
+      },
+    ],
+    [
+      "memories",
+      ownMemory,
+      { id: ownMemory, content: "Use exact fractions", agentId },
+    ],
+    [
+      "memories",
+      sharedMemory,
+      { id: sharedMemory, content: "Use decimal fractions" },
+    ],
+    [
+      "memories",
+      otherMemory,
+      {
+        id: otherMemory,
+        content: "Use rounded fractions",
+        agentId: randomUUID(),
+      },
+    ],
+  ];
+  for (const [kind, id, value] of rows)
+    await db.query(
+      "INSERT INTO resources(workspace_id,kind,id,value) VALUES($1,$2,$3,$4)",
+      [owner.workspaceId, kind, id, JSON.stringify(value)],
+    );
+  const context = await taskContext(db, owner.workspaceId, "fractions", {
+    agentId,
+  });
+  assert.deepEqual(
+    context.items.filter((r) => r.kind === "memories").map((r) => r.id),
+    [ownMemory],
+  );
+  const taskId = await task("Retrieve fractions"),
+    t = await claimId(taskId);
+  t.context = context;
+  const result = await new ToolExecutor(db, c).execute(
+    t,
+    {
+      id: randomUUID(),
+      task_id: taskId,
+      step: 1,
+      call_id: "search",
+      name: "knowledge_search",
+      status: "running",
+      replay: "safe",
+      result: null,
+      args: { query: "fractions" },
+    },
+    new AbortController().signal,
+  );
+  assert.deepEqual(
+    (result.data as any).items.map((r: any) => r.id),
+    [ownMemory],
+  );
+});
+
+test("team invitations enforce identity, roles, revocation and private workspace boundaries", async () => {
+  const created = await app.inject({
+    method: "POST",
+    url: "/api/v1/workspaces",
+    headers,
+    payload: { name: "Shared research" },
+  });
+  assert.equal(created.statusCode, 200, created.body);
+  const team = created.json().id;
+  assert.equal(
+    (
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/workspaces/" + team + "/select",
+        headers,
+      })
+    ).statusCode,
+    200,
+  );
+  const staleTab = await app.inject({
+    method: "POST",
+    url: "/api/v1/tasks",
+    headers: {
+      ...headers,
+      "x-workspace-id": owner.workspaceId,
+      "idempotency-key": randomUUID(),
+    },
+    payload: {
+      prompt: "This personal task must not land in the team workspace",
+    },
+  });
+  assert.equal(staleTab.statusCode, 409, staleTab.body);
+  assert.equal(staleTab.json().error, "WORKSPACE_CHANGED");
+  assert.equal(
+    (await db.query("SELECT count(*) FROM tasks WHERE workspace_id=$1", [team]))
+      .rows[0].count,
+    "0",
+  );
+  const invitation = await app.inject({
+    method: "POST",
+    url: "/api/v1/team-invites",
+    headers,
+    payload: { email: "other@example.com", role: "viewer" },
+  });
+  assert.equal(invitation.statusCode, 200, invitation.body);
+  assert.equal(
+    (
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/team-invites/accept",
+        headers,
+        payload: { token: invitation.json().token },
+      })
+    ).statusCode,
+    400,
+  );
+  assert.equal(
+    (
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/team-invites/accept",
+        headers: second,
+        payload: { token: invitation.json().token },
+      })
+    ).statusCode,
+    200,
+  );
+  assert.equal(
+    (
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/workspaces/" + team + "/select",
+        headers: second,
+      })
+    ).statusCode,
+    200,
+  );
+  const blocked = await app.inject({
+    method: "POST",
+    url: "/api/v1/tasks",
+    headers: { ...second, "idempotency-key": randomUUID() },
+    payload: { prompt: "must not run" },
+  });
+  assert.equal(blocked.statusCode, 403, blocked.body);
+  assert.equal(
+    (
+      await app.inject({
+        method: "PUT",
+        url: "/api/v1/resources/projects/" + randomUUID(),
+        headers: second,
+        payload: {},
+      })
+    ).statusCode,
+    403,
+  );
+  const teamTask = await createTask(
+    db,
+    team,
+    { prompt: "Shared task" },
+    randomUUID(),
+  );
+  assert.equal(
+    (
+      await app.inject({
+        url: "/api/v1/tasks/" + teamTask.taskId,
+        headers: second,
+      })
+    ).statusCode,
+    200,
+  );
+  const otherUser = (
+    await db.query("SELECT id FROM users WHERE email=$1", ["other@example.com"])
+  ).rows[0].id;
+  assert.equal(
+    (
+      await app.inject({
+        method: "DELETE",
+        url: "/api/v1/members/" + otherUser,
+        headers,
+      })
+    ).statusCode,
+    200,
+  );
+  assert.equal(
+    (
+      await app.inject({
+        url: "/api/v1/tasks/" + teamTask.taskId,
+        headers: second,
+      })
+    ).statusCode,
+    404,
+  );
+  assert.equal(
+    (
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/workspaces/" + team + "/select",
+        headers: second,
+      })
+    ).statusCode,
+    404,
+  );
+  await app.inject({
+    method: "POST",
+    url: "/api/v1/workspaces/" + owner.workspaceId + "/select",
+    headers,
+  });
+  assert.equal(
+    (await app.inject({ url: "/api/v1/tasks/" + teamTask.taskId, headers }))
+      .statusCode,
+    404,
+  );
+});
+
+test("team invitation registers a new user with a separate personal workspace", async () => {
+  const team = (
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/workspaces",
+      headers,
+      payload: { name: "New members" },
+    })
+  ).json().id;
+  await app.inject({
+    method: "POST",
+    url: "/api/v1/workspaces/" + team + "/select",
+    headers,
+  });
+  const inv = (
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/team-invites",
+      headers,
+      payload: { email: "new-teammate@example.com", role: "member" },
+    })
+  ).json();
+  const registered = await app.inject({
+    method: "POST",
+    url: "/api/v1/auth/register",
+    headers: { origin: c.PUBLIC_ORIGIN },
+    payload: { email: "new-teammate@example.com", password, invite: inv.token },
+  });
+  assert.equal(registered.statusCode, 201, registered.body);
+  const fresh = await login("new-teammate@example.com");
+  const spaces = (
+    await app.inject({ url: "/api/v1/workspaces", headers: fresh })
+  ).json();
+  assert.equal(spaces.length, 2);
+  assert.ok(spaces.some((w: any) => w.kind === "personal"));
+  assert.ok(spaces.some((w: any) => w.id === team));
+  const again = await app.inject({
+    method: "POST",
+    url: "/api/v1/auth/register",
+    headers: { origin: c.PUBLIC_ORIGIN },
+    payload: { email: "replay@example.com", password, invite: inv.token },
+  });
+  assert.equal(again.statusCode, 400);
+  await app.inject({
+    method: "POST",
+    url: "/api/v1/workspaces/" + owner.workspaceId + "/select",
+    headers,
+  });
+});
+
+test("calculation output survives delivery errors and Python source is saved as a real file", async () => {
+  const { ToolExecutor } = await import("@hyper/runtime");
+  const id = await task("Sum from one to a thousand"),
+    t = await claimId(id),
+    executor = new ToolExecutor(db, c);
+  executor.runner.health = async () => ({ available: true });
+  executor.runner.run = async () =>
+    ({
+      stdout: "500500\n",
+      stderr: "",
+      exitCode: 0,
+      outputs: [
+        {
+          path: "sum.py",
+          data: Buffer.from("print(sum(range(1,1001)))").toString("base64"),
+        },
+        { path: "bad.pdf", data: Buffer.from("not a PDF").toString("base64") },
+      ],
+    }) as any;
+  const r = await executor.execute(
+    t,
+    {
+      id: randomUUID(),
+      task_id: id,
+      step: 1,
+      call_id: "sum",
+      name: "code_execute",
+      status: "running",
+      replay: "uncertain",
+      result: null,
+      args: {
+        language: "python",
+        code: "print(sum(range(1,1001)))",
+        outputs: [
+          { path: "sum.py", format: "txt" },
+          { path: "bad.pdf", format: "pdf" },
+        ],
+      },
+    },
+    new AbortController().signal,
+  );
+  const data = r.data as any;
+  assert.equal(data.stdout, "500500\n");
+  assert.equal(data.computationSucceeded, true);
+  assert.equal(data.artifacts.length, 1);
+  assert.deepEqual(data.outputErrors, [
+    { path: "bad.pdf", error: "MIME_MISMATCH" },
+  ]);
+  const f = await executor.storage.get(
+    owner.workspaceId,
+    data.artifacts[0].fileId,
+  );
+  assert.equal(f.format, "py");
+  assert.equal(f.name, "sum.py");
+});
+
+test("learning proposals require confirmation and remain workspace scoped", async () => {
+  const { ToolExecutor } = await import("@hyper/runtime");
+  const id = await task("Remember our algebra convention"),
+    t = await claimId(id),
+    op = randomUUID();
+  await db.query(
+    "INSERT INTO operations(id,task_id,step,call_id,name,args,status,replay) VALUES($1,$2,1,'learn','learning_propose','{}','running','safe')",
+    [op, id],
+  );
+  const executor = new ToolExecutor(db, c);
+  const r = await executor.execute(
+    t,
+    {
+      id: op,
+      task_id: id,
+      step: 1,
+      call_id: "learn",
+      name: "learning_propose",
+      status: "running",
+      replay: "safe",
+      result: null,
+      args: {
+        kind: "memories",
+        name: "Fraction convention",
+        content: "Always use fractions in this project.",
+        reason: "Explicitly requested in the task.",
+      },
+    },
+    new AbortController().signal,
+  );
+  const suggestion = (r.data as any).suggestionId;
+  const before = (
+    await db.query(
+      "SELECT count(*) FROM resources WHERE workspace_id=$1 AND value->>'content'='Always use fractions in this project.'",
+      [owner.workspaceId],
+    )
+  ).rows[0].count;
+  assert.equal(before, "0");
+  assert.equal(
+    (
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/learning/" + suggestion,
+        headers: second,
+        payload: { decision: "accepted" },
+      })
+    ).statusCode,
+    409,
+  );
+  assert.equal(
+    (
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/learning/" + suggestion,
+        headers,
+        payload: { decision: "accepted" },
+      })
+    ).statusCode,
+    200,
+  );
+  assert.equal(
+    (
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/learning/" + suggestion,
+        headers,
+        payload: { decision: "accepted" },
+      })
+    ).statusCode,
+    409,
+  );
+  assert.equal(
+    (
+      await db.query(
+        "SELECT count(*) FROM resources WHERE workspace_id=$1 AND value->>'content'='Always use fractions in this project.'",
+        [owner.workspaceId],
+      )
+    ).rows[0].count,
+    "1",
+  );
+});
+
+test("daily schedules enqueue once across concurrent workers and a restart", async () => {
+  const { runSchedules } = await import("@hyper/runtime"),
+    id = randomUUID();
+  await db.query(
+    "INSERT INTO resources(workspace_id,kind,id,value) VALUES($1,'schedules',$2,$3)",
+    [
+      owner.workspaceId,
+      id,
+      JSON.stringify({
+        id,
+        name: "Daily check",
+        instructions: "Summarize our goals",
+        cadence: "Daily at 09:00",
+        timeZone: "Asia/Shanghai",
+        enabled: true,
+      }),
+    ],
+  );
+  const at = new Date("2026-11-04T01:00:00Z");
+  await Promise.all([runSchedules(db, at), runSchedules(db, at)]);
+  await runSchedules(db, at);
+  const runs = await db.query(
+    "SELECT task_id FROM schedule_runs WHERE workspace_id=$1 AND schedule_id=$2",
+    [owner.workspaceId, id],
+  );
+  assert.equal(runs.rowCount, 1);
+  assert.ok(runs.rows[0].task_id);
+  const t = await getTask(db, runs.rows[0].task_id);
+  assert.equal(t.state, "queued");
+});
+
+test("same-name outputs append versions instead of creating duplicate artifacts", async () => {
+  const id = await task("Version a source file"),
+    t = await claimId(id),
+    storage = new Storage(c.DATA_DIR, db);
+  const a = await storage.artifact(
+    t,
+    randomUUID(),
+    {
+      name: "source.py",
+      format: "py",
+      bytes: Buffer.from("print(1)"),
+      sourceIds: [],
+    },
+    t.lease_owner!,
+  );
+  const b = await storage.artifact(
+    t,
+    randomUUID(),
+    {
+      name: "source.py",
+      format: "py",
+      bytes: Buffer.from("print(2)"),
+      sourceIds: [],
+    },
+    t.lease_owner!,
+  );
+  assert.equal(a.artifactId, b.artifactId);
+  assert.equal(b.version, 2);
+  assert.notEqual(a.fileId, b.fileId);
+});
+
+test("provider timeout is distinguished from user cancellation", async () => {
+  const { DomainError } = await import("@hyper/contracts");
+  const id = await task("Timeout classification"),
+    t = await claimId(id);
+  const engine = new Engine(
+    db,
+    c,
+    scripted(() => {
+      throw new DomainError("CANCELLED");
+    }),
+  );
+  await engine.run(t);
+  assert.equal((await getTask(db, id)).error_code, "MODEL_TIMEOUT");
+  assert.equal((await getTask(db, id)).state, "failed");
 });

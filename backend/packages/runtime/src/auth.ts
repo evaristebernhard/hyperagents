@@ -21,6 +21,7 @@ export interface Identity {
   admin: boolean;
   email: string;
   csrfHash: string;
+  role: "admin" | "member" | "viewer";
 }
 const hashPassword = (s: string) =>
   argon2.hash(s, {
@@ -65,7 +66,15 @@ export async function register(db: Db, input: unknown) {
       "SELECT id FROM invites WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() FOR UPDATE",
       [hash(v.invite)],
     );
-    if (!r.rowCount) throw new DomainError("INVALID_INVITE", 400);
+    const team = r.rowCount
+      ? undefined
+      : (
+          await c.query(
+            "SELECT * FROM team_invites WHERE token_hash=$1 AND email=$2 AND used_at IS NULL AND expires_at>now() FOR UPDATE",
+            [hash(v.invite), v.email],
+          )
+        ).rows[0];
+    if (!r.rowCount && !team) throw new DomainError("INVALID_INVITE", 400);
     const id = randomUUID();
     await c.query(
       "INSERT INTO users(id,email,password_hash) VALUES($1,$2,$3)",
@@ -75,6 +84,15 @@ export async function register(db: Db, input: unknown) {
       randomUUID(),
       id,
     ]);
+    if (team) {
+      await c.query(
+        "INSERT INTO workspace_members(workspace_id,user_id,role) VALUES($1,$2,$3)",
+        [team.workspace_id, id, team.role],
+      );
+      await c.query("UPDATE team_invites SET used_at=now() WHERE id=$1", [
+        team.id,
+      ]);
+    }
     await c.query("UPDATE invites SET used_at=now() WHERE token_hash=$1", [
       hash(v.invite),
     ]);
@@ -112,8 +130,9 @@ export async function authenticate(
     email: string;
     admin: boolean;
     csrf_hash: string;
+    role: "admin" | "member" | "viewer";
   }>(
-    "SELECT u.id,u.email,u.admin,w.id workspace_id,s.csrf_hash FROM sessions s JOIN users u ON u.id=s.user_id JOIN workspaces w ON w.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>now()",
+    "SELECT u.id,u.email,u.admin,w.id workspace_id,s.csrf_hash,CASE WHEN w.user_id=u.id THEN 'admin' ELSE m.role END role FROM sessions s JOIN users u ON u.id=s.user_id JOIN workspaces personal ON personal.user_id=u.id AND personal.kind='personal' JOIN workspaces w ON w.id=COALESCE(s.active_workspace_id,personal.id) LEFT JOIN workspace_members m ON m.workspace_id=w.id AND m.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>now() AND (w.user_id=u.id OR m.user_id=u.id)",
     [hash(session)],
   );
   const u = r.rows[0];
@@ -124,5 +143,6 @@ export async function authenticate(
     email: u.email,
     admin: u.admin,
     csrfHash: u.csrf_hash,
+    role: u.role,
   };
 }

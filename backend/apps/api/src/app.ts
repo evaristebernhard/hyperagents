@@ -1,3 +1,4 @@
+import { workspaceRoutes } from "./workspace-routes.js";
 import Fastify, { type FastifyRequest } from "fastify";
 import cookie from "@fastify/cookie";
 import multipart from "@fastify/multipart";
@@ -56,7 +57,13 @@ export async function buildApp(db: Db, config: Config) {
   await app.register(multipart, {
     limits: { fileSize: Limits.fileBytes, files: 1, fields: 2, parts: 3 },
   });
-  await app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
+  const identities = new WeakMap<FastifyRequest, Identity>();
+  await app.register(rateLimit, {
+    max: 600,
+    timeWindow: "1 minute",
+    hook: "preHandler",
+    keyGenerator: (req) => identities.get(req)?.userId || req.ip,
+  });
   await app.register(swagger, {
     openapi: {
       info: { title: "Hyperagents API", version: "1.0.0" },
@@ -68,7 +75,6 @@ export async function buildApp(db: Db, config: Config) {
     },
     transform: jsonSchemaTransform,
   });
-  const identities = new WeakMap<FastifyRequest, Identity>();
   const who = (req: FastifyRequest) => {
     const identity = identities.get(req);
     if (!identity) throw new DomainError("UNAUTHENTICATED", 401);
@@ -92,19 +98,17 @@ export async function buildApp(db: Db, config: Config) {
             : e.statusCode && e.statusCode < 500
               ? e.statusCode
               : 500;
-    void reply
-      .code(status)
-      .send({
-        error:
-          status >= 500
-            ? "INTERNAL_ERROR"
-            : e.code === "23505"
-              ? "CONFLICT"
-              : e.validation
-                ? "INVALID_ARGUMENTS"
-                : codeOf(err),
-        requestId: req.id,
-      });
+    void reply.code(status).send({
+      error:
+        status >= 500
+          ? "INTERNAL_ERROR"
+          : e.code === "23505"
+            ? "CONFLICT"
+            : e.validation
+              ? "INVALID_ARGUMENTS"
+              : codeOf(err),
+      requestId: req.id,
+    });
   });
   const trustedOrigins = new Set(
     [config.PUBLIC_ORIGIN, ...config.ADDITIONAL_ORIGINS].map(
@@ -125,8 +129,20 @@ export async function buildApp(db: Db, config: Config) {
     }
     if (authPublic) return;
     const identity = await authenticate(db, req.cookies.hyper_session);
+    if (
+      req.headers["x-workspace-id"] &&
+      req.headers["x-workspace-id"] !== identity.workspaceId
+    )
+      throw new DomainError("WORKSPACE_CHANGED", 409);
     identities.set(req, identity);
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+      if (
+        identity.role === "viewer" &&
+        !/^\/api\/v1\/(auth\/logout|workspaces(?:\/[^/]+\/select)?|team-invites\/accept)$/.test(
+          path || "",
+        )
+      )
+        throw new DomainError("READ_ONLY_WORKSPACE", 403);
       const csrf = req.headers["x-csrf-token"];
       if (typeof csrf !== "string" || !equal(hash(csrf), identity.csrfHash))
         throw new DomainError("CSRF_REJECTED", 403);
@@ -214,7 +230,7 @@ export async function buildApp(db: Db, config: Config) {
     async (req) =>
       (
         await db.query(
-          "SELECT id,title,created_at FROM conversations WHERE workspace_id=$1 ORDER BY created_at DESC LIMIT 100",
+          "SELECT id,title,created_at,metadata,revision FROM conversations WHERE workspace_id=$1 ORDER BY created_at DESC LIMIT 100",
           [who(req).workspaceId],
         )
       ).rows,
@@ -225,7 +241,7 @@ export async function buildApp(db: Db, config: Config) {
     async (req) => {
       const workspace = who(req).workspaceId;
       const c = await db.query(
-        "SELECT id,title,created_at FROM conversations WHERE id=$1 AND workspace_id=$2",
+        "SELECT id,title,created_at,metadata,revision FROM conversations WHERE id=$1 AND workspace_id=$2",
         [req.params.id, workspace],
       );
       if (!c.rowCount) throw new DomainError("NOT_FOUND", 404);
@@ -269,17 +285,21 @@ export async function buildApp(db: Db, config: Config) {
           ),
         ),
   );
-  app.get("/api/v1/tasks", async (req) => {
-    const r = await db.query(
-      "SELECT id FROM tasks WHERE workspace_id=$1 AND parent_id IS NULL ORDER BY created_at DESC LIMIT 100",
-      [who(req).workspaceId],
-    );
-    return Promise.all(
-      r.rows.map(async (r) =>
-        publicTask(await getTask(db, r.id, who(req).workspaceId)),
-      ),
-    );
-  });
+  app.get(
+    "/api/v1/tasks",
+    { schema: { querystring: z.object({ conversationId: Id.optional() }) } },
+    async (req) => {
+      const r = await db.query(
+        "SELECT id FROM tasks WHERE workspace_id=$1 AND parent_id IS NULL AND ($2::uuid IS NULL OR conversation_id=$2) ORDER BY created_at DESC LIMIT 500",
+        [who(req).workspaceId, req.query.conversationId || null],
+      );
+      return Promise.all(
+        r.rows.map(async (r) =>
+          publicTask(await getTask(db, r.id, who(req).workspaceId)),
+        ),
+      );
+    },
+  );
   app.get(
     "/api/v1/tasks/:id",
     { schema: { params: Params, response: { 200: TaskResponse } } },
@@ -356,7 +376,8 @@ export async function buildApp(db: Db, config: Config) {
       try {
         const start = Date.now();
         while (!closed && Date.now() - start < 25000) {
-          await authenticate(db, req.cookies.hyper_session);
+          const current = await authenticate(db, req.cookies.hyper_session);
+          if (current.workspaceId !== who(req).workspaceId) break;
           const rows = await read();
           for (const e of rows) {
             if (closed) break;
@@ -469,15 +490,13 @@ export async function buildApp(db: Db, config: Config) {
       format,
       bytes,
     );
-    return reply
-      .code(201)
-      .send({
-        id: saved.id,
-        name: saved.name,
-        format: saved.format,
-        bytes: Number(saved.bytes),
-        sha256: saved.sha256,
-      });
+    return reply.code(201).send({
+      id: saved.id,
+      name: saved.name,
+      format: saved.format,
+      bytes: Number(saved.bytes),
+      sha256: saved.sha256,
+    });
   });
   app.get(
     "/api/v1/files",
@@ -537,14 +556,16 @@ export async function buildApp(db: Db, config: Config) {
       },
     ],
     search: {
-      provider: config.EXA_API_KEY ? "exa" : "public-bing-rss",
-      degraded: !config.EXA_API_KEY,
+      provider: "public-web-search",
+      degraded: false,
+      paidApi: false,
     },
     sandbox: await runner.health(),
     formats: Format.options,
     externalActions: false,
     limits: Limits,
   }));
+  workspaceRoutes(app, db, who);
   app.get("/api/v1/openapi.json", async () => app.swagger());
   return app;
 }

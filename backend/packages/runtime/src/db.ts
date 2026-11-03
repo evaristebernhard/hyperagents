@@ -66,6 +66,14 @@ export interface Task {
   input_file_ids: string[];
   state: TaskState;
   checkpoint: Checkpoint;
+  context: {
+    selection?: import("@hyper/contracts").TaskContext;
+    items?: import("./resources.js").ResourceRow[];
+    memoryMode?: string;
+    memoryReadScope?: string;
+    memorySaveTarget?: string;
+    learnsAutomatically?: boolean;
+  };
   result: unknown;
   error_code: string | null;
   step: number;
@@ -220,6 +228,12 @@ export const publicTask = (t: Task) => ({
   state: t.state,
   prompt: t.prompt,
   result: t.result,
+  context: (t.context?.items || []).map((i) => ({
+    id: i.id,
+    kind: i.kind,
+    name: String(i.value.name || i.value.content || i.id).slice(0, 160),
+    revision: i.revision,
+  })),
   errorCode: t.error_code,
   createdAt: t.created_at.toISOString(),
   updatedAt: t.updated_at.toISOString(),

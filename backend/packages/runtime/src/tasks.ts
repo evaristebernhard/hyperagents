@@ -1,3 +1,4 @@
+import { taskContext } from "./resources.js";
 import { randomUUID } from "node:crypto";
 import {
   CreateTask,
@@ -55,6 +56,38 @@ export async function createTask(
         "INSERT INTO conversations(id,workspace_id,title) VALUES($1,$2,$3)",
         [conversation, workspace, input.prompt.slice(0, 100)],
       );
+    const previous = input.conversationId
+      ? (
+          await c.query(
+            "SELECT context FROM tasks WHERE conversation_id=$1 AND workspace_id=$2 ORDER BY created_at DESC LIMIT 1",
+            [conversation, workspace],
+          )
+        ).rows[0]?.context?.selection
+      : undefined;
+    const context = await taskContext(
+      c,
+      workspace,
+      input.prompt,
+      input.context ?? previous,
+    );
+    input.inputFileIds = [
+      ...new Set([...input.inputFileIds, ...context.fileIds]),
+    ];
+    if (context.selection.roomId || context.selection.projectId)
+      await c.query(
+        "UPDATE conversations SET metadata=metadata||$2::jsonb WHERE id=$1",
+        [
+          conversation,
+          JSON.stringify({
+            ...(context.selection.roomId
+              ? { roomId: context.selection.roomId }
+              : {}),
+            ...(context.selection.projectId
+              ? { projectId: context.selection.projectId }
+              : {}),
+          }),
+        ],
+      );
     const formats = [...input.acceptance.formats];
     for (const [pattern, format] of [
       [/\bpdf\b/i, "pdf"],
@@ -71,7 +104,7 @@ export async function createTask(
       formats.push("md");
     const id = randomUUID();
     await c.query(
-      "INSERT INTO tasks(id,workspace_id,conversation_id,root_id,prompt,acceptance,input_file_ids,state,idempotency_key,request_hash) VALUES($1,$2,$3,$1,$4,$5,$6,'queued',$7,$8)",
+      "INSERT INTO tasks(id,workspace_id,conversation_id,root_id,prompt,acceptance,input_file_ids,state,idempotency_key,request_hash,context) VALUES($1,$2,$3,$1,$4,$5,$6,'queued',$7,$8,$9)",
       [
         id,
         workspace,
@@ -81,6 +114,7 @@ export async function createTask(
         JSON.stringify(input.inputFileIds),
         key,
         digest,
+        JSON.stringify(context),
       ],
     );
     await c.query(

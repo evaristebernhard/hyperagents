@@ -1,5 +1,5 @@
 import { PgBoss } from "pg-boss";
-import { config, pool, Engine } from "@hyper/runtime";
+import { config, pool, Engine, runSchedules } from "@hyper/runtime";
 const c = config(),
   db = pool(c.DATABASE_URL),
   engine = new Engine(db, c),
@@ -16,6 +16,7 @@ async function drain() {
   if (scanning || stopping) return;
   scanning = true;
   try {
+    await runSchedules(db);
     while (running.size < 6) {
       const { claim, wakeParents } = await import("@hyper/runtime");
       await wakeParents(db);

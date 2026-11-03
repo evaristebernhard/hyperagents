@@ -94,7 +94,10 @@ export async function validate(
         { timeout: 30000, maxBuffer: 1024 * 1024 },
       );
       for (let page = 1; page <= pdf.getPageCount(); page++) {
-        const suffix = String(page).padStart(String(pdf.getPageCount()).length, "0");
+        const suffix = String(page).padStart(
+          String(pdf.getPageCount()).length,
+          "0",
+        );
         PNG.sync.read(await readFile(join(dir, `render-${suffix}.png`)));
       }
       if (/[\u3400-\u9fff]/.test(text)) {
@@ -261,9 +264,20 @@ export class Storage {
         )
           throw new DomainError("INVALID_SOURCE");
       }
-      const artifactId = options.artifactId ?? randomUUID();
+      // A same-name output in this conversation revises its existing artifact.
+      // The workspace lock above serializes concurrent writers and operation keys
+      // still make retries idempotent. Historical versions are never overwritten.
+      const named = options.artifactId
+        ? undefined
+        : (
+            await c.query<{ id: string }>(
+              "SELECT a.id FROM artifacts a JOIN artifact_versions v ON v.artifact_id=a.id WHERE a.workspace_id=$1 AND a.conversation_id=$2 AND a.name=$3 GROUP BY a.id ORDER BY max(v.created_at) DESC LIMIT 1",
+              [task.workspace_id, task.conversation_id, options.name],
+            )
+          ).rows[0]?.id;
+      const artifactId = options.artifactId ?? named ?? randomUUID();
       let version = 1;
-      if (options.artifactId) {
+      if (options.artifactId || named) {
         const r = await c.query(
           "SELECT 1 FROM artifacts WHERE id=$1 AND workspace_id=$2 AND conversation_id=$3 FOR UPDATE",
           [artifactId, task.workspace_id, task.conversation_id],

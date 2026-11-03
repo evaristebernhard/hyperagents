@@ -3,7 +3,6 @@ import { isIP } from "node:net";
 import ipaddr from "ipaddr.js";
 import { Agent, request } from "undici";
 import { load } from "cheerio";
-import { z } from "zod";
 import { DomainError } from "@hyper/contracts";
 export function publicAddress(address: string) {
   try {
@@ -114,7 +113,7 @@ async function fetchPublicRaw(
         type: String(r.headers["content-type"] ?? ""),
       };
     } finally {
-      await agent.close();
+      await agent.destroy();
     }
   }
   throw new DomainError("REDIRECT_BLOCKED");
@@ -125,61 +124,81 @@ export async function search(
   signal: AbortSignal,
   key?: string,
 ) {
-  if (key) {
-    const r = await publicFetch("https://api.exa.ai/search", signal, {
-      method: "POST",
-      headers: { "x-api-key": key, "content-type": "application/json" },
-      body: JSON.stringify({
-        query,
-        numResults: limit,
-        contents: { text: { maxCharacters: 8000 } },
-      }),
-    });
-    const parsed = z
-      .object({
-        results: z.array(
-          z.object({
-            url: z.url(),
-            title: z.string().nullish(),
-            text: z.string().nullish(),
-          }),
-        ),
-      })
-      .parse(JSON.parse(r.text));
-    return {
-      provider: "exa",
-      degraded: false,
-      results: parsed.results.map((r) => ({
-        url: publicUrl(r.url).href,
-        title: r.title ?? r.url,
-        excerpt: (r.text ?? "").slice(0, 8000),
-        read: !!r.text,
-      })),
-    };
+  // No paid search provider. Parse public search pages locally, then read the
+  // underlying sources separately. Never treat a search snippet as a read source.
+  const endpoints = [
+    "https://www.bing.com/search",
+    "https://cn.bing.com/search",
+    "https://html.duckduckgo.com/html/",
+  ];
+  const errors: string[] = [];
+  for (const endpoint of endpoints) {
+    signal.throwIfAborted();
+    const u = new URL(endpoint);
+    u.searchParams.set("q", query);
+    const rss = u.hostname.includes("bing.com");
+    if (rss) u.searchParams.set("format", "rss");
+    try {
+      const r = await publicFetch(u.href, signal, { maxBytes: 512 * 1024 });
+      const results = parseSearch(r.text, rss ? "bing" : "duckduckgo", limit);
+      if (!results.length) throw new DomainError("SEARCH_EMPTY_OR_BLOCKED");
+      return {
+        provider: rss ? "public-bing-rss" : "public-duckduckgo-html",
+        degraded: errors.length > 0,
+        results,
+      };
+    } catch (e) {
+      if (signal.aborted) throw e;
+      errors.push(e instanceof DomainError ? e.code : "SEARCH_UNAVAILABLE");
+    }
   }
-  const u = new URL("https://cn.bing.com/search");
-  u.search = new URLSearchParams({ q: query, format: "rss" }).toString();
-  const r = await publicFetch(u.href, signal, {
-    redirects: 0,
-    maxBytes: 128 * 1024,
-  });
-  if (/<!\s*(DOCTYPE|ENTITY)/i.test(r.text))
+  throw new DomainError("SEARCH_UNAVAILABLE", 503);
+}
+export function parseSearch(
+  text: string,
+  provider: "bing" | "duckduckgo",
+  limit: number,
+) {
+  if (provider === "bing" && /<!\s*(DOCTYPE|ENTITY)/i.test(text))
     throw new DomainError("INVALID_RSS");
-  const $ = load(r.text, { xml: true });
-  if (!$("rss > channel").length) throw new DomainError("SEARCH_UNAVAILABLE");
-  return {
-    provider: "public-bing-rss",
-    degraded: true,
-    results: $("item")
-      .slice(0, limit)
-      .toArray()
-      .map((el) => ({
-        url: publicUrl($(el).find("link").text()).href,
-        title: $(el).find("title").text().slice(0, 500),
-        excerpt: $(el).find("description").text().slice(0, 1500),
+  const $ = load(text, provider === "bing" ? { xml: true } : undefined);
+  const results: {
+    url: string;
+    title: string;
+    excerpt: string;
+    read: boolean;
+  }[] = [];
+  const seen = new Set<string>();
+  $(provider === "bing" ? "rss > channel > item" : ".result").each((_, el) => {
+    try {
+      const raw =
+        provider === "bing"
+          ? $(el).find("link").text()
+          : $(el).find(".result__a").attr("href");
+      if (!raw) return;
+      let u = new URL(raw, "https://duckduckgo.com");
+      if (u.hostname.endsWith("duckduckgo.com") && u.searchParams.has("uddg"))
+        u = new URL(u.searchParams.get("uddg")!);
+      const url = publicUrl(u.href).href;
+      if (seen.has(url) || results.length >= limit) return;
+      seen.add(url);
+      results.push({
+        url,
+        title: $(el)
+          .find(provider === "bing" ? "title" : ".result__a")
+          .text()
+          .slice(0, 500),
+        excerpt: $(el)
+          .find(provider === "bing" ? "description" : ".result__snippet")
+          .text()
+          .slice(0, 1500),
         read: false,
-      })),
-  };
+      });
+    } catch {
+      /* Skip malformed and private-network results, not the entire page. */
+    }
+  });
+  return results;
 }
 export async function readWeb(url: string, signal: AbortSignal) {
   const r = await publicFetch(url, signal);
@@ -217,4 +236,75 @@ export async function publicFetch(
       502,
     );
   }
+}
+
+// Public, keyless Wikimedia Commons lookup. This finds existing media and
+// attribution metadata; it does not claim to generate images.
+export async function searchImages(
+  query: string,
+  limit: number,
+  signal: AbortSignal,
+) {
+  const u = new URL("https://commons.wikimedia.org/w/api.php");
+  u.search = new URLSearchParams({
+    action: "query",
+    format: "json",
+    generator: "search",
+    gsrsearch: query + " filetype:bitmap",
+    gsrnamespace: "6",
+    gsrlimit: String(Math.min(limit, 5)),
+    prop: "imageinfo",
+    iiprop: "url|extmetadata",
+    iiurlwidth: "640",
+  }).toString();
+  const r = await publicFetch(u.href, signal, { maxBytes: 512 * 1024 });
+  return {
+    provider: "wikimedia-commons",
+    results: parseImages(JSON.parse(r.text)),
+  };
+}
+export function parseImages(data: unknown) {
+  const root = data as {
+    query?: {
+      pages?: Record<
+        string,
+        {
+          title?: string;
+          imageinfo?: {
+            url?: string;
+            descriptionurl?: string;
+            extmetadata?: Record<string, { value?: string }>;
+          }[];
+        }
+      >;
+    };
+  };
+  const plain = (value: string) =>
+    load(value).text().replace(/\s+/g, " ").trim().slice(0, 1500);
+  return Object.values(root.query?.pages || {})
+    .slice(0, 5)
+    .flatMap((page) => {
+      try {
+        const info = page.imageinfo?.[0];
+        if (!info?.url || !info.descriptionurl) return [];
+        const metadata = info.extmetadata || {},
+          license = plain(
+            metadata.LicenseShortName?.value || "Check source license",
+          ),
+          artist = plain(metadata.Artist?.value || "See source credits");
+        return [
+          {
+            url: publicUrl(info.descriptionurl).href,
+            imageUrl: publicUrl(info.url).href,
+            title: page.title || info.descriptionurl,
+            license,
+            artist,
+            excerpt: `Image credit: ${artist}. License: ${license}. Verify attribution and reuse conditions on the source page.`,
+            read: true,
+          },
+        ];
+      } catch {
+        return [];
+      }
+    });
 }
