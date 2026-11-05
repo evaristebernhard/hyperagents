@@ -688,7 +688,13 @@ export default function App() {
       </div>
     );
   return (
-    <div className={"app-shell " + (collapsed ? "sidebar-collapsed" : "")}>
+    <div
+      className={
+        "app-shell " +
+        (backendV1 ? "v1-workspace " : "") +
+        (collapsed ? "sidebar-collapsed" : "")
+      }
+    >
       <aside className="sidebar">
         <div className="brand-row">
           <a
@@ -895,8 +901,19 @@ export default function App() {
             <>
               <span>
                 <strong>{profileName}</strong>
-                <small>
-                  {backendV1 ? "Private workspace" : "demo@example.com"}
+                <small
+                  role={backendV1 ? "status" : undefined}
+                  aria-label={backendV1 ? "Storage status" : undefined}
+                >
+                  {backendV1
+                    ? workspace.persistence === "saving"
+                      ? "Saving…"
+                      : workspace.persistence === "error"
+                        ? "Changes not saved"
+                        : workspace.role === "viewer"
+                          ? "Read-only workspace"
+                          : "Saved to workspace"
+                    : "demo@example.com"}
                 </small>
               </span>
               <ChevronRight size={14} />
@@ -1177,7 +1194,7 @@ function ThreadList({
   const projectLabel = (thread: DemoThread) =>
     workspace.data.projects.find((p) => p.id === projectOf(thread))?.name ||
     projectOf(thread);
-  const [grid, setGrid] = useState(false),
+  const [grid, setGrid] = useState(home),
     [filter, setFilter] = useState("Recent"),
     [text, setText] = useState(""),
     [filters, setFilters] = useState(false),

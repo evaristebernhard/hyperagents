@@ -6,9 +6,12 @@ import BackendGate from "./BackendGate";
 import SharedThreadPage from "./SharedThreadPage";
 import "./styles.css";
 import "./menu-fidelity.css";
+import "./hyperagent-workspace.css";
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {location.pathname.startsWith("/share/") ? <SharedThreadPage /> : (
+    {location.pathname.startsWith("/share/") ? (
+      <SharedThreadPage />
+    ) : (
       <BackendGate>
         <WorkspaceProvider>
           <App />

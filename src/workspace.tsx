@@ -1302,29 +1302,31 @@ function V1WorkspaceProvider({ children }: { children: ReactNode }) {
   return (
     <Context.Provider value={store}>
       <div className="backend-owner-root">
-        <div className="backend-savebar">
-          <span role="status" aria-label="Storage status">
-            {persistence === "saving"
-              ? "Saving…"
-              : persistence === "error"
-                ? "Changes not saved"
-                : role === "viewer"
-                  ? "Read-only workspace"
-                  : "Saved to workspace"}
-          </span>
-          {error && (
-            <>
-              <span role="alert">{error}</span>
-              <button onClick={() => void reload()}>Reload saved data</button>
-            </>
-          )}
-          <button
-            className="backend-signout"
-            onClick={() => void logout().catch((e) => setError(e.message))}
-          >
-            Sign out
-          </button>
-        </div>
+        {(error || persistence === "error") && (
+          <div className="backend-savebar error">
+            <span role="status" aria-label="Storage status">
+              {persistence === "saving"
+                ? "Saving…"
+                : persistence === "error"
+                  ? "Changes not saved"
+                  : role === "viewer"
+                    ? "Read-only workspace"
+                    : "Saved to workspace"}
+            </span>
+            {error && (
+              <>
+                <span role="alert">{error}</span>
+                <button onClick={() => void reload()}>Reload saved data</button>
+              </>
+            )}
+            <button
+              className="backend-signout"
+              onClick={() => void logout().catch((e) => setError(e.message))}
+            >
+              Sign out
+            </button>
+          </div>
+        )}
         {children}
       </div>
     </Context.Provider>

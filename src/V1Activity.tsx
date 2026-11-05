@@ -8,6 +8,7 @@ import {
   Search,
   AlertCircle,
   ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { type Task, type TaskEvent, stateLabel, terminal } from "./v1-client";
 const titles: Record<string, string> = {
@@ -206,6 +207,7 @@ export function TaskActivity({
                           ? "Stopped"
                           : "In progress"}
                   </em>
+                  <ChevronRight className="v1-activity-chevron" size={14} />
                 </summary>
                 <div className="v1-activity-body">
                   {p.input?.code && (
