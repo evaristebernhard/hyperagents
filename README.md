@@ -19,6 +19,11 @@ Open **http://127.0.0.1:5173**. One foreground command starts Vite and the local
 API. On first use, create the single-owner password in the browser (12+ characters).
 No external database is needed. A server-side DeepSeek key is required only for generated replies. Keep the terminal running.
 
+If startup reports a port already in use, stop the existing development server.
+To use different ports, set `APP_PORT=8788` in `.env` for the API and run
+`npm run dev -- --port 5174` for Vite (choose ports that are available).
+Changing Vite's `--port` alone does not change the API port.
+
 Normal mode starts empty: no fake threads, tool logs, assistant replies, or
 generated artifacts are inserted. Saving a message stores a user message and its
 context. With DEEPSEEK_API_KEY configured, it requests a real streamed reply; without it, the message is saved and the UI explains how to enable generation.

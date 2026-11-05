@@ -47,7 +47,7 @@ const apiPort=Number(process.env.APP_PORT ?? 8787);
 const apiHost=process.env.APP_HOST ?? '127.0.0.1';
 const proxyHost=apiHost==='::1'?'[::1]':apiHost==='localhost'?'localhost':'127.0.0.1';
 if (!Number.isSafeInteger(apiPort) || apiPort<1 || apiPort>65535) throw Error('Invalid APP_PORT.');
-let app,vite,closing=false;
+let app,vite,closing=false,startupStage='api';
 async function shutdown(code=0) {
   if (closing) return; closing=true;
   await Promise.allSettled([vite?.close(),app?.close()]); process.exitCode=code;
@@ -63,10 +63,19 @@ try {
       if (!response.ok || session.setupRequired) throw Error('Initialize the owner over loopback before exposing Vite.');
     }
   }
+  startupStage='vite';
   const { createServer }=await import('vite');
   // Overrides the legacy config's public bind. The API validates original Host/Origin.
   const allowedHosts=['localhost','127.0.0.1','hyper.chayu123.me'];
   if (process.env.APP_PUBLIC_ORIGIN) allowedHosts.push(new URL(process.env.APP_PUBLIC_ORIGIN).hostname);
   vite=await createServer({server:{host,port,strictPort:true,allowedHosts,proxy:fixture?{}:{'/api':{target:`http://${proxyHost}:${apiPort}`,changeOrigin:false}}}});
   await vite.listen(); vite.printUrls();
-} catch { console.error('Development startup failed. Check installed dependencies, available ports, origin configuration, Node 24+, and owner/bootstrap requirements.'); await shutdown(1); }
+} catch (error) {
+  if (error.code==='EADDRINUSE' || (startupStage==='vite' && error.message===`Port ${port} is already in use`)) {
+    const apiConflict=startupStage==='api';
+    console.error(`Development startup failed: ${apiConflict?'API':'Vite'} port ${apiConflict?apiPort:port} is already in use. Stop the existing server or ${apiConflict?'set APP_PORT to an unused port in .env':'choose an unused port with npm run dev -- --port <port>'}.`);
+  } else {
+    console.error('Development startup failed. Check installed dependencies, available ports, origin configuration, Node 24+, and owner/bootstrap requirements.');
+  }
+  await shutdown(1);
+}
