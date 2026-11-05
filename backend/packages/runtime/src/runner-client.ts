@@ -3,6 +3,10 @@ import { DomainError, ToolFailure, Format, Id, Limits } from "@hyper/contracts";
 import { type Config } from "./config.js";
 export const RunRequest = z
   .object({
+    protocol: z.literal(1).optional(),
+    threadId: Id.optional(),
+    eventId: z.string().max(200).optional(),
+    leaseEpoch: z.string().regex(/^\d+$/).optional(),
     operationId: Id,
     taskId: Id,
     language: z.enum(["python", "node"]),
@@ -14,6 +18,24 @@ export const RunRequest = z
           .strict(),
       )
       .max(20),
+    skillFiles: z
+      .record(
+        z
+          .string()
+          .regex(
+            /^(SKILL\.md|(?:scripts|references|assets)\/[a-zA-Z0-9_./-]+)$/,
+          )
+          .refine((p) =>
+            p.split("/").every((s) => s && s !== "." && s !== ".."),
+          ),
+        z.string().max(200000),
+      )
+      .refine(
+        (f) =>
+          Object.keys(f).length <= 200 &&
+          Buffer.byteLength(JSON.stringify(f)) <= 2_000_000,
+      )
+      .optional(),
     outputs: z
       .array(z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,120}$/))
       .max(10),
@@ -40,9 +62,16 @@ export class RunnerClient {
         signal: AbortSignal.timeout(20000),
       });
       if (!r.ok) return { available: false, reason: "RUNNER_UNREACHABLE" };
-      return z
-        .object({ available: z.boolean(), reason: z.string().optional() })
+      const health = z
+        .object({
+          available: z.boolean(),
+          reason: z.string().optional(),
+          protocol: z.number().optional(),
+        })
         .parse(await r.json());
+      if (health.available && health.protocol !== 1)
+        return { available: false, reason: "RUNNER_PROTOCOL_MISMATCH" };
+      return health;
     } catch {
       return { available: false, reason: "RUNNER_UNREACHABLE" };
     }

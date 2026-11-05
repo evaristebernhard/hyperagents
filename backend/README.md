@@ -6,7 +6,7 @@
 
 ## 运行
 
-需要 Node.js 24、PostgreSQL 17+、Poppler（`pdftotext`、`pdftoppm`、`pdffonts`）。代码和图表/PDF 生成还需要安装 Docker/gVisor 的 Runner 主机；缺少它不会回退到宿主 Python 或 shell。
+需要 Node.js 24、PostgreSQL 17+、Rust（构建 kernel）、Poppler（`pdftotext`、`pdftoppm`、`pdffonts`）。代码和图表/PDF 生成使用直接启动 gVisor 的 Runner；Docker 可选。安装和真实验收见 [轻量沙箱](sandbox/README.md) 与 [Rust 内核](kernel/README.md)。缺少隔离能力不会回退到宿主 Python 或 shell。
 
 ```bash
 cd backend
@@ -129,3 +129,11 @@ npm run eval
 仓库根目录运行 `npm run dev:v1`，访问 `http://localhost:5173`。入口复用 main 的侧栏、首页、对话布局和产物面板；任务进度、追加指令、取消和产物历史版本均在原对话中处理。新账号、数据库、文件目录保持独立并持久保存。完整步骤和本次验收见 [前端接入报告](../docs/verification-v1-ui/REPORT.md)。
 
 本机开发入口允许 `http://localhost:5173` 和 `http://127.0.0.1:5173`；公开地址读取 `V1_PUBLIC_ORIGIN`，未设置时沿用 `.env` 的 `APP_PUBLIC_ORIGIN`。例如配置 `V1_PUBLIC_ORIGIN=https://hyper.chayu123.me`。公开地址及已有 `APP_PUBLIC_ORIGIN` 别名同时加入 Vite Host 和后端 Origin 白名单，HTTPS 登录使用 Secure Cookie；来源校验和 CSRF 校验仍启用。
+
+## 持久浏览器与人工接管（默认关闭）
+
+新增独立浏览器服务、异步工具等待、身份授权及 thread Browser 面板。部署和恢复说明见 [BROWSER.md](deploy/BROWSER.md)，本次测试与尚待容器验收项目见 [验证记录](../docs/verification-browser/REPORT.md)。浏览器服务不健康时能力关闭，不回退共享宿主进程。
+
+## Rust 与轻量沙箱
+
+增量迁移保留现有账户、PostgreSQL、文件版本和 localhost:5173。默认 `RUST_NEW_TASKS=false`、`BROWSER_ENABLED=false`；完成验收后再开启新分配。部署、回滚、按需运行包和测试命令分别见 [kernel/README.md](kernel/README.md) 与 [sandbox/README.md](sandbox/README.md)。

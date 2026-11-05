@@ -48,7 +48,11 @@ try {
     const python = await run(
       'import os,json\nprint(json.dumps({"answer":2+2,"keyPresent":"DEEPSEEK_API_KEY" in os.environ,"socket":os.path.exists("/var/run/docker.sock")}))',
     );
-    assert.equal(python.result.status, "completed", JSON.stringify(python.result));
+    assert.equal(
+      python.result.status,
+      "completed",
+      JSON.stringify(python.result),
+    );
     assert.deepEqual(JSON.parse(python.result.stdout), {
       answer: 4,
       keyPresent: false,
@@ -91,7 +95,9 @@ try {
       ["escape.txt"],
     );
     assert.notEqual(symlink.result.status, "completed");
-    const memory = await run("a=bytearray(3*1024*1024*1024)\nfor i in range(0,len(a),4096): a[i]=1");
+    const memory = await run(
+      "a=bytearray(3*1024*1024*1024)\nfor i in range(0,len(a),4096): a[i]=1",
+    );
     assert.equal(memory.result.status, "failed", JSON.stringify(memory.result));
     const disk = await run(
       'import os\ntry:\n for i in range(90):\n  with open(str(i),"wb") as f:\n   for j in range(19): f.write(b"x"*1024*1024)\n print("UNSAFE")\nexcept OSError:\n print("LIMITED")',
@@ -127,6 +133,17 @@ try {
     const timeout = await run("import time\ntime.sleep(300)");
     assert.equal(timeout.result.status, "failed");
     for (const id of ids) {
+      if (config(process.env).SANDBOX_BACKEND === "runsc") {
+        const inspection = await exec("systemctl", [
+          "--user",
+          "show",
+          "hyperagents-compute-" + id + ".service",
+          "-p",
+          "ActiveState",
+        ]);
+        assert.ok(!inspection.stdout.includes("ActiveState=active"));
+        continue;
+      }
       const inspection = await exec("docker", [
         "ps",
         "-aq",

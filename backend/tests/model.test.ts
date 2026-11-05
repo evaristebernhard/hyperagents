@@ -277,3 +277,38 @@ test("failed sandbox code returns bounded actionable stderr for repair", async (
     await once(server, "close");
   }
 });
+
+test("Runner readiness rejects legacy and incompatible protocols", async () => {
+  const { createServer } = await import("node:http");
+  const { once } = await import("node:events");
+  const { RunnerClient, config } = await import("@hyper/runtime");
+  let health: object = { available: true };
+  const server = createServer((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify(health));
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  try {
+    const address = server.address() as { port: number };
+    const runner = new RunnerClient(
+      config({
+        RUNNER_URL: `http://127.0.0.1:${address.port}`,
+        RUNNER_TOKEN: "r".repeat(40),
+      }),
+    );
+    assert.deepEqual(await runner.health(), {
+      available: false,
+      reason: "RUNNER_PROTOCOL_MISMATCH",
+    });
+    health = { available: true, protocol: 2 };
+    assert.equal((await runner.health()).available, false);
+    health = { available: true, protocol: 1 };
+    assert.equal((await runner.health()).available, true);
+    health = { available: false, protocol: 1, reason: "ISOLATION_UNAVAILABLE" };
+    assert.equal((await runner.health()).reason, "ISOLATION_UNAVAILABLE");
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});

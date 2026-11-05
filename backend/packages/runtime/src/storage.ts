@@ -53,6 +53,8 @@ export async function validate(
   let text = "";
   if (!bytes.length || bytes.length > Limits.fileBytes)
     throw new DomainError("FILE_SIZE");
+  if (format === "bin")
+    return { passed: true, issues: [], text: "", checks: ["binary-preserved"] };
   if (format === "png") {
     if (
       bytes.length < 24 ||
@@ -229,14 +231,17 @@ export class Storage {
       artifactId?: string;
       sourceIds: string[];
     },
-    owner: string,
+    owner: string | { operationId: string; epoch: number },
   ) {
     const existing = await this.db.query<SavedRow>(
       "SELECT artifact_id,file_id,version,validation FROM artifact_versions WHERE operation_key=$1 AND workspace_id=$2",
       [operationKey, task.workspace_id],
     );
     if (existing.rows[0]) return savedArtifact(existing.rows[0]);
-    if (options.name.split(".").at(-1)?.toLowerCase() !== options.format)
+    if (
+      options.format !== "bin" &&
+      options.name.split(".").at(-1)?.toLowerCase() !== options.format
+    )
       throw new DomainError("MIME_MISMATCH");
     const validation = await validate(options.bytes, options.format);
     const { digest, key } = await this.persist(
@@ -244,7 +249,15 @@ export class Storage {
       options.bytes,
     );
     return tx(this.db, async (c) => {
-      await fenced(c, task.id, owner);
+      if (typeof owner === "string") await fenced(c, task.id, owner);
+      else {
+        const valid = await c.query(
+          "SELECT 1 FROM browser_outbox b JOIN tasks t ON t.id=b.task_id WHERE b.operation_id=$1 AND b.task_id=$2 AND b.control_epoch=$3 AND b.status='running' AND t.state NOT IN ('succeeded','failed','cancelled') FOR UPDATE OF b,t",
+          [owner.operationId, task.id, owner.epoch],
+        );
+        if (!valid.rowCount)
+          throw new DomainError("BROWSER_OPERATION_REVOKED", 409);
+      }
       await c.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
         task.workspace_id,
       ]);
@@ -339,7 +352,8 @@ export class Storage {
   async readText(workspace: string, id: string) {
     const file = await this.get(workspace, id),
       bytes = await this.bytes(file);
-    if (file.format === "png") throw new DomainError("UNSUPPORTED_FILE_READ");
+    if (file.format === "png" || file.format === "bin")
+      throw new DomainError("UNSUPPORTED_FILE_READ");
     return file.format === "pdf"
       ? (await validate(bytes, file.format)).text
       : new TextDecoder("utf-8", { fatal: true }).decode(bytes);

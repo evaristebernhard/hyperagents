@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { createServer as createTcpServer } from "node:net";
 import path from "node:path";
+import { homedir } from "node:os";
 import privateDataPlugin, { privateFsDeny } from "./private-data.mjs";
 
 // Fail before opening the persistent database if any v1 port is occupied.
@@ -32,12 +33,24 @@ const { default: EmbeddedPostgres } = await import(
 const runtime = await import("../backend/packages/runtime/dist/index.js");
 const root = path.resolve("backend/.data-v1/interactive");
 await mkdir(root, { recursive: true, mode: 0o700 });
-for (const filename of [".env", "backend/.data-v1/runner.env"]) {
+for (const filename of [".env"]) {
   try {
     process.loadEnvFile(filename);
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
   }
+}
+// Legacy runner.env is intentionally not loaded: it can silently select a stale
+// daemon. A remote Runner must now be explicitly configured in .env/environment.
+if (!process.env.RUNNER_URL && !process.env.COMPUTE_RUNTIME_DIR) {
+  const installed = path.join(
+    homedir(),
+    ".local/share/hyperagents/runtimes/compute",
+  );
+  try {
+    await access(path.join(installed, "manifest.json"));
+    process.env.COMPUTE_RUNTIME_DIR = installed;
+  } catch {}
 }
 const publicOrigin = new URL(
   process.env.V1_PUBLIC_ORIGIN ||
@@ -119,9 +132,18 @@ try {
     HOST: "127.0.0.1",
     PORT: "8081",
   };
+  env.KERNEL_SOCKET ||= path.join(root, "run", "kernel.sock");
+  env.KERNEL_BRIDGE_SOCKET ||= path.join(root, "run", "bridge.sock");
   const db = runtime.pool(env.DATABASE_URL);
+  let needsKernel =
+    env.RUST_NEW_TASKS === "true" || env.KERNEL_ENABLED === "true";
   try {
     await runtime.migrate(db);
+    needsKernel ||= !!(
+      await db.query(
+        "SELECT 1 FROM tasks WHERE runtime_kind='rust' AND state NOT IN ('succeeded','failed','cancelled') LIMIT 1",
+      )
+    ).rowCount;
     if (!(await db.query("SELECT 1 FROM users LIMIT 1")).rowCount) {
       const credentials = {
         email: "demo@example.com",
@@ -137,11 +159,93 @@ try {
   } finally {
     await db.end();
   }
-  for (const service of ["api", "worker"]) {
+  const services = ["api", "worker"];
+  if (env.COMPUTE_RUNTIME_DIR && !env.RUNNER_URL) {
+    env.RUNNER_URL = "http://127.0.0.1:" + (env.RUNNER_PORT || "8084");
+    env.RUNNER_PORT ||= "8084";
+    env.RUNNER_TOKEN ||= randomBytes(32).toString("hex");
+    services.unshift("runner");
+  }
+  if (env.BROWSER_ENABLED === "true" && !env.BROWSER_URL) {
+    env.BROWSER_URL = "http://127.0.0.1:" + (env.BROWSER_PORT || "8083");
+    env.BROWSER_TOKEN ||= randomBytes(32).toString("hex");
+    env.BROWSER_PROFILE_DIR ||= path.join(root, "browser-profiles");
+    services.unshift("browser");
+  }
+  if (needsKernel) {
+    await new Promise((resolve, reject) => {
+      const build = spawn(
+        "cargo",
+        ["build", "--locked", "--manifest-path", "backend/kernel/Cargo.toml"],
+        { stdio: ["ignore", "inherit", "inherit"] },
+      );
+      build.once("error", reject);
+      build.once("exit", (code) =>
+        code === 0 ? resolve() : reject(new Error("Kernel build failed")),
+      );
+    });
+    services.unshift("kernel");
+  }
+  const internalEnv = (service) => {
+    if (service === "api" || service === "worker") return env;
+    const common = [
+      "PATH",
+      "HOME",
+      "USER",
+      "LANG",
+      "XDG_RUNTIME_DIR",
+      "DBUS_SESSION_BUS_ADDRESS",
+      "NODE_ENV",
+    ];
+    const keys =
+      service === "kernel"
+        ? [...common, "DATABASE_URL", "KERNEL_SOCKET", "KERNEL_BRIDGE_SOCKET"]
+        : service === "runner"
+          ? [
+              ...common,
+              "DATA_DIR",
+              "HOST",
+              "RUNNER_PORT",
+              "RUNNER_TOKEN",
+              "SANDBOX_BACKEND",
+              "SANDBOX_RUNSC",
+              "SANDBOX_IMAGE",
+              "COMPUTE_RUNTIME_DIR",
+            ]
+          : [
+              ...common,
+              "DATABASE_URL",
+              "DATA_DIR",
+              "HOST",
+              "BROWSER_ENABLED",
+              "BROWSER_PORT",
+              "BROWSER_TOKEN",
+              "BROWSER_PROFILE_DIR",
+              "BROWSER_RUNTIME_KIND",
+              "BROWSER_RUNTIME_DIR",
+              "BROWSER_PROXY",
+              "BROWSER_CONTAINER",
+              "BROWSER_EXECUTABLE",
+            ];
+    return Object.fromEntries(
+      keys
+        .filter((key) => env[key] !== undefined)
+        .map((key) => [key, env[key]]),
+    );
+  };
+  for (const service of services) {
     const child = spawn(
-      process.execPath,
-      [`backend/apps/${service}/dist/index.js`],
-      { env, stdio: ["ignore", "inherit", "inherit"] },
+      service === "kernel"
+        ? "backend/kernel/target/debug/hyperagents-kernel"
+        : process.execPath,
+      service === "kernel"
+        ? []
+        : [
+            service === "browser"
+              ? "backend/browser-service/index.mjs"
+              : `backend/apps/${service}/dist/index.js`,
+          ],
+      { env: internalEnv(service), stdio: ["ignore", "inherit", "inherit"] },
     );
     children.push(child);
     child.once("error", () => void close(1));
@@ -165,6 +269,10 @@ try {
   process.env.VITE_BACKEND_V1 = "true";
   vite = await createServer({
     configFile: false,
+    optimizeDeps: {
+      entries: ["index.html"],
+      esbuildOptions: { target: "es2022" },
+    },
     plugins: [privateDataPlugin(), react()],
     server: {
       host: "127.0.0.1",
@@ -178,6 +286,9 @@ try {
         ignored: [
           "**/.data/**",
           "**/backend/.data-v1/**",
+          "**/backend/kernel/target/**",
+          "**/backend/kernel/vendor/**",
+          "**/infinity/**",
           "**/OpenMausBot/**",
           "**/browser/**",
           "**/macro/**",
@@ -188,7 +299,11 @@ try {
         "Content-Security-Policy": "frame-ancestors 'none'",
       },
       proxy: {
-        "/api/v1": { target: "http://127.0.0.1:8081", changeOrigin: false },
+        "/api/v1": {
+          target: "http://127.0.0.1:8081",
+          changeOrigin: false,
+          ws: true,
+        },
       },
     },
   });

@@ -1,0 +1,63 @@
+# Opt in: docker compose -f compose.yml -f compose.browser.yml up --build -d
+services:
+  api:
+    environment: &browser-env
+      BROWSER_ENABLED: "true"
+      BROWSER_URL: http://browser:8083
+      BROWSER_TOKEN: ${BROWSER_TOKEN:?Set a random BROWSER_TOKEN of at least 32 characters}
+    networks: [private, outbound, browser-control]
+  worker:
+    environment: *browser-env
+    networks: [private, outbound, browser-control]
+  postgres:
+    networks: [private, browser-control]
+  browser:
+    build: { context: .., dockerfile: deploy/Dockerfile.browser }
+    image: hyperagents-browser:1
+    init: true
+    environment:
+      DATABASE_URL: postgres://hyper:${POSTGRES_PASSWORD}@postgres:5432/hyper_v1
+      DATA_DIR: /data
+      BROWSER_ENABLED: "true"
+      BROWSER_TOKEN: ${BROWSER_TOKEN}
+      BROWSER_PROFILE_DIR: /profiles
+      BROWSER_RUNTIME_KIND: docker
+      HOST: 0.0.0.0
+      BROWSER_PROXY: http://browser-egress:3128
+      NODE_ENV: production
+    volumes: ["browser-profiles:/profiles", "files:/data"]
+    networks: [browser-control]
+    depends_on: { migrate: { condition: service_completed_successfully }, browser-egress: { condition: service_started } }
+    # Non-root Chromium retains its sandbox; allow unprivileged user namespaces on the host.
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true", "seccomp:./browser-seccomp.json"]
+    read_only: true
+    tmpfs: ["/tmp:rw,nosuid,nodev,size=512m", "/home/node:rw,nosuid,nodev,size=32m,uid=1000,gid=1000"]
+    stop_grace_period: 60s
+    shm_size: 512mb
+    mem_limit: 3g
+    cpus: 2
+    pids_limit: 512
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8083/health',{headers:{authorization:'Bearer '+process.env.BROWSER_TOKEN}}).then(async r=>process.exit(r.ok&&(await r.json()).ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    # No published CDP, VNC, WebSocket or service ports.
+  browser-egress:
+    image: hyperagents-browser:1
+    build: { context: .., dockerfile: deploy/Dockerfile.browser }
+    command: ["node", "browser-service/egress.mjs"]
+    networks: [browser-control, outbound]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 32
+    restart: unless-stopped
+networks:
+  browser-control: { internal: true }
+volumes:
+  browser-profiles: {}

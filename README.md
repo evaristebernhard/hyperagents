@@ -93,6 +93,10 @@ requirements, startup, supported features and browser verification.
 The previous `.mjs` task API remains available to existing clients; its historical
 runtime documentation is in [TASK-RUNTIME.md](docs/TASK-RUNTIME.md).
 
+## Rust kernel and Docker-free sandboxes
+
+The optional Rust kernel uses durable PostgreSQL execution slices and the pinned Infinity core. New-task allocation remains off by default. Browser identities use bubblewrap and compute operations use direct runsc; neither requires Docker. See [kernel setup and rollback](backend/kernel/README.md), [runtime bundle installation](backend/sandbox/README.md), and [verification results and remaining manual acceptance](docs/verification-rust-sandbox/REPORT.md). Existing accounts, files and localhost:5173 remain in place.
+
 ## Real account integrations
 
 Settings > Integrations now tests real API access before enabling a workspace binding.

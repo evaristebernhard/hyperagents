@@ -1,5 +1,9 @@
 # 部署与恢复
 
+## 用户目录轻量部署
+
+新部署使用 [无 Docker 沙箱](../sandbox/README.md) 和 [Rust kernel](../kernel/README.md)。原有 Docker 部署显式设置 `SANDBOX_BACKEND=docker` 和 `BROWSER_RUNTIME_KIND=docker`，继续使用以下流程。
+
 ## Docker + gVisor
 
 在有权限管理 Docker 的 Linux 主机，按 [gVisor 官方说明](https://gvisor.dev/docs/user_guide/quick_start/docker/) 安装 runsc 并注册 Docker runtime。先验证 `docker run --runtime=runsc --rm hello-world`，然后构建镜像：
@@ -46,7 +50,7 @@ python3 backend/deploy/backup-legacy.py \
 
 ## 运行限制与监控
 
-默认每用户 1 / 全局 2 顶层运行任务；每父任务最多 2 子任务、一层深度。20 分钟期限包含等待时间；超过期限的任务在重新调度时失败。每任务树 32 模型尝试、64 工具调用、200K 累计输入输出 token、单次输出最多 32768 token；重试也计数。研究工具最多 12 次，或累计 10 次模型调用 / 60K tokens 后转入交付阶段；停止继续搜索与分工，为生成和校验保留预算。模型流单次 8 MiB、整个任务树 64 MiB、单文件 20 MiB、产物总计 100 MiB，代码输入/输出各合计 20 MiB。
+默认每用户 1 / 全局 2 顶层运行任务；每父任务最多 2 子任务、一层深度。20 分钟是整个任务树的累计活动执行预算；排队、工具、人工和事件等待不消耗模型执行片段的时间预算。每任务树 32 模型尝试、64 工具调用、200K 累计输入输出 token、单次输出最多 32768 token；重试也计数。研究工具最多 12 次，或累计 10 次模型调用 / 60K tokens 后转入交付阶段；停止继续搜索与分工，为生成和校验保留预算。模型流单次 8 MiB、整个任务树 64 MiB、单文件 20 MiB、产物总计 100 MiB，代码输入/输出各合计 20 MiB。
 
 当前预算预留采用保守输入字节上界，并在拿到真实 usage 后结算。HTTP 402 单独报告 MODEL_QUOTA，不重试；已知 HTTP 拒绝不计 token 消耗。未知流中断或 Worker 崩溃按预留上限计费到任务预算；此数字不是供应商账单，报告应区分实际 usage 与保守预留扣减。pg-boss 的队列递送不是任务事实来源，可重建唤醒队列。
 

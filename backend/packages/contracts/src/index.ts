@@ -4,6 +4,8 @@ export const State = z.enum([
   "queued",
   "running",
   "waiting_children",
+  "waiting_tool",
+  "waiting_browser",
   "waiting_user",
   "waiting_approval",
   "uncertain",
@@ -41,6 +43,7 @@ export const Format = z.enum([
   "pdf",
   "py",
   "js",
+  "bin",
 ]);
 export type Format = z.infer<typeof Format>;
 export const mime: Record<Format, string> = {
@@ -53,6 +56,7 @@ export const mime: Record<Format, string> = {
   pdf: "application/pdf",
   py: "text/x-python",
   js: "text/javascript",
+  bin: "application/octet-stream",
 };
 export const Acceptance = z
   .object({
@@ -82,6 +86,7 @@ export const CreateTask = z
   .object({
     prompt: z.string().min(1).max(30000),
     conversationId: Id.optional(),
+    browserProfileId: Id.optional(),
     inputFileIds: z.array(Id).max(20).default([]),
     context: TaskContext.optional(),
     acceptance: Acceptance.default({
@@ -107,7 +112,77 @@ export const Register = Credentials.extend({
 export const Followup = z
   .object({ message: z.string().min(1).max(30000) })
   .strict();
+export const BrowserAction = z
+  .object({
+    action: z.enum([
+      "navigate",
+      "observe",
+      "click",
+      "fill",
+      "select",
+      "scroll",
+      "tabs",
+      "new_tab",
+      "close_tab",
+      "switch_tab",
+      "dialog",
+      "upload",
+      "download",
+      "screenshot",
+      "request_human",
+    ]),
+    tabId: z.string().max(100).optional(),
+    url: z
+      .url()
+      .max(2000)
+      .refine((value) => {
+        const u = new URL(value);
+        return (
+          ["http:", "https:"].includes(u.protocol) && !u.username && !u.password
+        );
+      }, "Use a public HTTP(S) URL without embedded credentials")
+      .optional(),
+    ref: z.string().max(100).optional(),
+    text: z.string().max(10000).optional(),
+    values: z.array(z.string().max(1000)).max(30).optional(),
+    deltaX: z.number().min(-10000).max(10000).optional(),
+    deltaY: z.number().min(-10000).max(10000).optional(),
+    accept: z.boolean().optional(),
+    fileId: Id.optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    const required: Record<string, (keyof typeof value)[]> = {
+      navigate: ["url"],
+      click: ["ref"],
+      fill: ["ref", "text"],
+      select: ["ref", "values"],
+      upload: ["ref", "fileId"],
+      switch_tab: ["tabId"],
+    };
+    for (const key of required[value.action] || [])
+      if (value[key] === undefined)
+        ctx.addIssue({
+          code: "custom",
+          path: [key],
+          message: `${key} is required for ${value.action}`,
+        });
+  });
+export type BrowserAction = z.infer<typeof BrowserAction>;
+export const BrowserControl = z.enum([
+  "agent",
+  "transferring",
+  "human",
+  "paused",
+]);
+export const BrowserTransition = z
+  .object({
+    expectedEpoch: z.number().int().min(0),
+    note: z.string().max(2000).default(""),
+  })
+  .strict();
 export const ToolSchemas = {
+  browser: BrowserAction,
   image_search: z
     .object({
       query: z.string().min(1).max(300),
@@ -152,7 +227,7 @@ export const ToolSchemas = {
         .min(1)
         .max(160)
         .regex(/^[^/\\\x00-\x1f]+$/),
-      format: Format.exclude(["pdf", "png"]),
+      format: Format.exclude(["pdf", "png", "bin"]),
       content: z.string().max(2_000_000),
       artifactId: Id.optional(),
       sourceIds: z.array(Id).max(30).default([]),
@@ -234,6 +309,7 @@ export type ModelEvent =
 export interface ModelInput {
   messages: Message[];
   tools: ToolName[];
+  definitions?: { name: string; description: string; parameters: unknown }[];
   maxTokens: number;
   signal: AbortSignal;
   onEvent?: (event: ModelEvent) => void;
@@ -244,6 +320,13 @@ export interface ModelAdapter {
 }
 export const Event = z.discriminatedUnion("type", [
   z.object({ type: z.literal("state"), state: State }),
+  z.object({
+    type: z.literal("browser"),
+    sessionId: Id,
+    control: BrowserControl,
+    controlEpoch: z.number(),
+    reason: z.string().optional(),
+  }),
   z.object({
     type: z.literal("model"),
     step: z.number(),
@@ -281,6 +364,8 @@ export type TaskEvent = z.infer<typeof Event>;
 export const TaskResponse = z.object({
   id: Id,
   conversationId: Id,
+  browserProfileId: Id.nullable().optional(),
+  waitReason: z.string().nullable().optional(),
   state: State,
   prompt: z.string(),
   result: z.unknown().nullable(),

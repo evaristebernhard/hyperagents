@@ -1,0 +1,27 @@
+{
+  "URLBlocklist": [
+    "file://*",
+    "filesystem:*",
+    "devtools://*",
+    "chrome://*",
+    "view-source:*"
+  ],
+  "URLAllowlist": [
+    "chrome://newtab/",
+    "chrome://sandbox/"
+  ],
+  "DeveloperToolsAvailability": 2,
+  "ExtensionInstallBlocklist": [
+    "*"
+  ],
+  "PasswordManagerEnabled": false,
+  "BrowserSignin": 0,
+  "BrowserAddPersonEnabled": false,
+  "BrowserGuestModeEnabled": false,
+  "DefaultFileSystemReadGuardSetting": 2,
+  "DefaultFileSystemWriteGuardSetting": 2,
+  "PrintingEnabled": false,
+  "DefaultPopupsSetting": 1,
+  "DownloadDirectory": "/tmp/browser-downloads",
+  "PromptForDownloadLocation": false
+}

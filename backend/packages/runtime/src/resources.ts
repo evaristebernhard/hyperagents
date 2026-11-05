@@ -348,6 +348,7 @@ export function allowedTools(context: {
   let allowed = Object.keys(ToolSchemas) as ToolName[];
   if (agent?.value.tools) {
     const map: Record<string, ToolName[]> = {
+      Browser: ["browser"],
       Search: ["web_search", "web_read", "source_read", "image_search"],
       "Thread Search": ["thread_search", "knowledge_search"],
       Files: ["file_read"],

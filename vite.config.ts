@@ -6,12 +6,14 @@ const apiPort = process.env.APP_PORT || "8787";
 const publicHost = process.env.APP_PUBLIC_ORIGIN ? new URL(process.env.APP_PUBLIC_ORIGIN).hostname : "";
 // These independent reference checkouts are not application sources. Watching
 // their very large trees exhausts inotify and repeatedly crashes the dev server.
-const referenceRoots = ["OpenMausBot", "browser", "macro", ".data", "backend/.data-v1", ".runtime-v1-backup-20261029"].map(
+const referenceRoots = ["OpenMausBot", "browser", "macro", "infinity", "backend/kernel/target", "backend/kernel/vendor", ".data", "backend/.data-v1", ".runtime-v1-backup-20261029"].map(
   name => normalizePath(fileURLToPath(new URL(`./${name}`, import.meta.url))),
 );
 export default defineConfig({
   plugins: [privateDataPlugin(), react()],
   base: "/",
+  build: { target: "es2022" },
+  optimizeDeps: { entries: ["index.html"], esbuildOptions: { target: "es2022" } },
   server: {
     host: "127.0.0.1",
     fs: { strict: true, deny: privateFsDeny },

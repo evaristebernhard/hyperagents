@@ -1,3 +1,6 @@
+import websocket from "@fastify/websocket";
+import { browserRoutes } from "./browser-routes.js";
+import { BrowserClient } from "@hyper/runtime";
 import { workspaceRoutes } from "./workspace-routes.js";
 import Fastify, { type FastifyRequest } from "fastify";
 import cookie from "@fastify/cookie";
@@ -38,6 +41,7 @@ import {
   getTask,
   Storage,
   RunnerClient,
+  kernelHealth,
   tx,
   event,
   type Db,
@@ -54,6 +58,7 @@ export async function buildApp(db: Db, config: Config) {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
   await app.register(cookie);
+  await app.register(websocket, { options: { maxPayload: 1024 * 1024 } });
   await app.register(multipart, {
     limits: { fileSize: Limits.fileBytes, files: 1, fields: 2, parts: 3 },
   });
@@ -100,7 +105,7 @@ export async function buildApp(db: Db, config: Config) {
               : 500;
     void reply.code(status).send({
       error:
-        status >= 500
+        status >= 500 && !(err instanceof DomainError)
           ? "INTERNAL_ERROR"
           : e.code === "23505"
             ? "CONFLICT"
@@ -282,6 +287,8 @@ export async function buildApp(db: Db, config: Config) {
             who(req).workspaceId,
             req.body,
             req.headers["idempotency-key"],
+            who(req).userId,
+            config.RUST_NEW_TASKS === "true" ? "rust" : "typescript",
           ),
         ),
   );
@@ -560,12 +567,18 @@ export async function buildApp(db: Db, config: Config) {
       degraded: false,
       paidApi: false,
     },
+    kernel: {
+      ...(await kernelHealth(config.KERNEL_SOCKET)),
+      newTasks: config.RUST_NEW_TASKS === "true",
+    },
     sandbox: await runner.health(),
+    browser: await new BrowserClient(config).health(),
     formats: Format.options,
     externalActions: false,
     limits: Limits,
   }));
   workspaceRoutes(app, db, who);
+  browserRoutes(app, db, config, who);
   app.get("/api/v1/openapi.json", async () => app.swagger());
   return app;
 }

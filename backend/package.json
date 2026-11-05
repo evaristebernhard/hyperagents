@@ -17,7 +17,7 @@
   "scripts": {
     "build": "npm run build --workspaces",
     "typecheck": "npm run build && tsc -p tsconfig.verify.json",
-    "test": "npm run typecheck && tsx --test --test-concurrency=1 tests/*.test.ts",
+    "test": "npm run typecheck && npm run kernel:build && tsx --test --test-concurrency=1 tests/*.test.ts",
     "api": "node apps/api/dist/index.js",
     "worker": "node apps/worker/dist/index.js",
     "runner": "node apps/runner/dist/index.js",
@@ -26,13 +26,21 @@
     "eval": "tsx evals/run.ts",
     "doctor": "node apps/cli/dist/index.js doctor",
     "test:sandbox": "npm run build && tsx tests/sandbox.integration.ts",
-    "audit:eval": "tsx evals/audit.ts"
+    "audit:eval": "tsx evals/audit.ts",
+    "browser": "node browser-service/index.mjs",
+    "test:browser": "npm run typecheck && tsx --test tests/browser.test.ts",
+    "test:browser-container": "node browser-service/acceptance.mjs",
+    "kernel:build": "cargo build --locked --manifest-path kernel/Cargo.toml",
+    "test:kernel": "npm run build && npm run kernel:build && tsx --test --test-concurrency=1 tests/kernel.test.ts",
+    "test:lightweight-browser": "npm run build && node sandbox/acceptance-browser.mjs",
+    "test:single-machine": "npm run build && npm run kernel:build && node sandbox/acceptance-flow.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",
     "@fastify/multipart": "^10.1.7",
     "@fastify/rate-limit": "^11.2.2",
     "@fastify/swagger": "^9.9.3",
+    "@fastify/websocket": "^11.3.6",
     "argon2": "^0.45.2",
     "cheerio": "^1.2.0",
     "csv-parse": "^7.0.3",
@@ -42,14 +50,17 @@
     "pdf-lib": "^1.17.1",
     "pg": "^8.23.1",
     "pg-boss": "^12.38.0",
+    "playwright": "^1.64.1",
     "pngjs": "^7.0.0",
     "undici": "^8.12.3",
+    "ws": "^8.22.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
     "@types/pngjs": "^6.0.5",
+    "@types/ws": "^8.18.2",
     "embedded-postgres": "^18.6.0-beta.19",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"

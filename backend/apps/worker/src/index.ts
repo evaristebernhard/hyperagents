@@ -1,9 +1,33 @@
 import { PgBoss } from "pg-boss";
-import { config, pool, Engine, runSchedules } from "@hyper/runtime";
+import {
+  config,
+  pool,
+  Engine,
+  runSchedules,
+  BrowserClient,
+  dispatchBrowser,
+  createKernelBridge,
+  listenPrivate,
+} from "@hyper/runtime";
 const c = config(),
   db = pool(c.DATABASE_URL),
   engine = new Engine(db, c),
   boss = new PgBoss(c.DATABASE_URL);
+const bridge = c.KERNEL_BRIDGE_SOCKET
+  ? await createKernelBridge(db, c)
+  : undefined;
+if (bridge) await listenPrivate(bridge, c.KERNEL_BRIDGE_SOCKET!);
+const browser = new BrowserClient(c);
+let browserBusy = false;
+const browserTimer = setInterval(() => {
+  if (browserBusy || stopping) return;
+  browserBusy = true;
+  void dispatchBrowser(db, browser)
+    .catch(() => {})
+    .finally(() => {
+      browserBusy = false;
+    });
+}, 1000);
 let stopping = false,
   scanning = false;
 boss.on("error", () =>
@@ -16,7 +40,11 @@ async function drain() {
   if (scanning || stopping) return;
   scanning = true;
   try {
-    await runSchedules(db);
+    await runSchedules(
+      db,
+      new Date(),
+      c.RUST_NEW_TASKS === "true" ? "rust" : "typescript",
+    );
     while (running.size < 6) {
       const { claim, wakeParents } = await import("@hyper/runtime");
       await wakeParents(db);
@@ -51,9 +79,11 @@ for (const signal of ["SIGTERM", "SIGINT"])
   process.once(signal, () => {
     stopping = true;
     clearInterval(timer);
+    clearInterval(browserTimer);
     void boss
       .stop({ graceful: true, timeout: 5000 })
       .then(() => Promise.allSettled([...running]))
+      .then(() => bridge?.close())
       .then(() => db.end())
       .then(() => process.exit(0));
   });

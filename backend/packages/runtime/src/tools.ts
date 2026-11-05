@@ -1,3 +1,4 @@
+import { prepareBrowser } from "./browser.js";
 import { searchKnowledge, allowedTools } from "./resources.js";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -20,12 +21,14 @@ export interface Operation {
   call_id: string;
   name: string;
   args: unknown;
-  status: "prepared" | "running" | "completed" | "failed" | "obsolete";
+  status:
+    "prepared" | "running" | "dispatched" | "completed" | "failed" | "obsolete";
   replay: "safe" | "uncertain";
   result: unknown;
 }
 export interface ToolResult {
   data: unknown;
+  deferred?: boolean;
   pause?: "waiting_children" | "waiting_user" | "waiting_approval";
   finish?: { summary: string; artifactIds: string[] };
 }
@@ -51,6 +54,12 @@ export class ToolExecutor {
     if (!allowedTools(task.context || {}).includes(op.name as ToolName))
       throw new DomainError("TOOL_DISABLED_FOR_AGENT", 403);
     switch (op.name as ToolName) {
+      case "browser": {
+        if (this.config.BROWSER_ENABLED !== "true")
+          throw new DomainError("BROWSER_UNAVAILABLE");
+        await prepareBrowser(this.db, task, op);
+        return { data: null, deferred: true };
+      }
       case "image_search": {
         const a = ToolSchemas.image_search.parse(op.args),
           r = await searchImages(a.query, a.limit, signal);
@@ -220,6 +229,10 @@ export class ToolExecutor {
         }
         const r = await this.runner.run(
           {
+            protocol: 1,
+            threadId: task.id,
+            eventId: op.call_id,
+            leaseEpoch: task.lease_epoch,
             operationId: op.id,
             taskId: task.id,
             language: a.language,
@@ -282,7 +295,7 @@ export class ToolExecutor {
         return tx(this.db, async (c) => {
           await fenced(c, task.id, owner);
           const old = await c.query<{ id: string }>(
-            "SELECT id FROM tasks WHERE parent_id=$1",
+            "SELECT id FROM tasks WHERE parent_id=$1 AND NOT kernel_internal",
             [task.id],
           );
           if (old.rows.length)

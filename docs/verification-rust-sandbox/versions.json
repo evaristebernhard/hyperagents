@@ -1,0 +1,13 @@
+{
+  "verifiedAt": "2026-11-03",
+  "kernel": "6.18.33.2-microsoft-standard-WSL2",
+  "systemd": "255 (255.4-1ubuntu8.18)",
+  "bubblewrap": "0.9.0",
+  "runsc": "release-20261102.0",
+  "node": "v24.18.0",
+  "cargo": "1.96.0 (30a34c682 2026-05-25)",
+  "hostPython": "3.11.17",
+  "infinity": "1abc6fcff1f186124f924b56aa92c3a3684c90c5",
+  "computeManifestSha256": "4a88ed15ca2f7d87b5a3d638f1e824adccede73b3bd03bd2f855407109678643",
+  "browserManifestSha256": "d6c7f1c55d9043e66e10a1862d2cd63b8b12bb39777cc943e601caa49dcd5026"
+}

@@ -57,6 +57,10 @@ export interface Checkpoint {
 }
 export interface Task {
   id: string;
+  runtime_kind: "typescript" | "rust";
+  runtime_version: string;
+  runtime_phase: "model" | "tools";
+  lease_epoch: string;
   workspace_id: string;
   conversation_id: string;
   parent_id: string | null;
@@ -82,6 +86,11 @@ export interface Task {
   lease_owner: string | null;
   lease_until: Date | null;
   deadline: Date | null;
+  active_ms: string;
+  active_since: Date | null;
+  browser_profile_id: string | null;
+  requested_by: string | null;
+  wait_reason: string | null;
   created_at: Date;
   updated_at: Date;
   model_calls: number;
@@ -111,7 +120,7 @@ export async function event(db: Queryable, id: string, payload: TaskEvent) {
 }
 export async function fenced(c: Queryable, id: string, owner: string) {
   const r = await c.query(
-    "SELECT 1 FROM tasks WHERE id=$1 AND lease_owner=$2 AND lease_until>now() AND state='running' FOR UPDATE",
+    "SELECT 1 FROM tasks WHERE id=$1 AND lease_owner=$2 AND lease_until>now() AND state='running' AND EXISTS(SELECT 1 FROM tasks root WHERE root.id=tasks.root_id AND root.state NOT IN ('cancelled','failed','succeeded','uncertain')) FOR UPDATE",
     [id, owner],
   );
   if (!r.rowCount) throw new DomainError("LEASE_LOST", 409);
@@ -158,7 +167,7 @@ export async function claim(db: Db): Promise<Task | undefined> {
     await c.query("SELECT pg_advisory_xact_lock(730102)");
     // A crashed operation whose effects cannot be established is never automatically replayed.
     const expired = await c.query<Task>(
-      "SELECT * FROM tasks WHERE state='running' AND lease_until<now() FOR UPDATE",
+      "SELECT * FROM tasks WHERE state='running' AND lease_until<now() AND (runtime_kind='typescript' OR runtime_phase='tools') FOR UPDATE",
     );
     for (const t of expired.rows) {
       const abandoned = await c.query<{ reserved: string }>(
@@ -186,7 +195,7 @@ export async function claim(db: Db): Promise<Task | undefined> {
       await event(c, t.id, { type: "state", state });
     }
     const r =
-      await c.query<Task>(`SELECT t.* FROM tasks t WHERE t.state='queued' AND (t.parent_id IS NOT NULL OR (
+      await c.query<Task>(`SELECT t.* FROM tasks t WHERE t.state='queued' AND (t.runtime_kind='typescript' OR t.runtime_phase='tools') AND (t.runtime_kind='rust' OR t.parent_id IS NOT NULL OR (
  (SELECT count(*) FROM tasks WHERE parent_id IS NULL AND state IN ('running','waiting_children'))<2
  AND NOT EXISTS(SELECT 1 FROM tasks x WHERE x.workspace_id=t.workspace_id AND x.parent_id IS NULL AND x.state IN ('running','waiting_children'))
  )) AND (t.parent_id IS NULL OR EXISTS(SELECT 1 FROM tasks p WHERE p.id=t.parent_id AND p.state IN ('running','waiting_children')))
@@ -194,7 +203,11 @@ export async function claim(db: Db): Promise<Task | undefined> {
     const t = r.rows[0];
     if (!t) return;
     const root = await getTask(c, t.root_id);
-    if (root.deadline && root.deadline.getTime() < Date.now()) {
+    const used = await c.query<{ ms: string }>(
+      "SELECT COALESCE(sum(active_ms + CASE WHEN state='running' AND active_since IS NOT NULL THEN GREATEST(0,extract(epoch from (LEAST(now(),lease_until)-active_since))*1000)::bigint ELSE 0 END),0) AS ms FROM tasks WHERE root_id=$1",
+      [root.id],
+    );
+    if (Number(used.rows[0]!.ms) >= 1_200_000) {
       await c.query(
         "UPDATE tasks SET state='failed',error_code='TIME_BUDGET' WHERE id=$1",
         [t.id],
@@ -204,11 +217,11 @@ export async function claim(db: Db): Promise<Task | undefined> {
     }
     const owner = randomUUID();
     await c.query(
-      "UPDATE tasks SET deadline=COALESCE(deadline,now()+interval '20 minutes') WHERE id=$1",
-      [t.root_id],
+      "UPDATE tasks SET deadline=now()+($2::bigint * interval '1 millisecond') WHERE id=$1",
+      [t.root_id, Math.max(1, 1_200_000 - Number(used.rows[0]!.ms))],
     );
     await c.query(
-      "UPDATE tasks SET state='running',lease_owner=$2,lease_until=now()+interval '30 seconds',deadline=(SELECT deadline FROM tasks WHERE id=$3),updated_at=now() WHERE id=$1",
+      "UPDATE tasks SET state='running',lease_epoch=lease_epoch+1,lease_owner=$2,lease_until=now()+interval '30 seconds',deadline=(SELECT deadline FROM tasks WHERE id=$3),updated_at=now() WHERE id=$1",
       [t.id, owner, t.root_id],
     );
     await event(c, t.id, { type: "state", state: "running" });
@@ -216,15 +229,33 @@ export async function claim(db: Db): Promise<Task | undefined> {
   });
 }
 export async function heartbeat(db: Db, id: string, owner: string) {
-  const r = await db.query(
-    "UPDATE tasks SET lease_until=now()+interval '30 seconds' WHERE id=$1 AND lease_owner=$2 AND state='running' AND lease_until>now() RETURNING id",
+  const r = await db.query<{ root_id: string }>(
+    "UPDATE tasks SET lease_until=now()+interval '30 seconds' WHERE id=$1 AND lease_owner=$2 AND state='running' AND lease_until>now() RETURNING root_id",
     [id, owner],
   );
-  return !!r.rowCount;
+  if (!r.rowCount) return false;
+  const used = await db.query<{ ms: string }>(
+    "SELECT sum(active_ms + CASE WHEN state='running' AND active_since IS NOT NULL THEN GREATEST(0,extract(epoch from (LEAST(now(),lease_until)-active_since))*1000)::bigint ELSE 0 END) AS ms FROM tasks WHERE root_id=$1",
+    [r.rows[0]!.root_id],
+  );
+  if (Number(used.rows[0]!.ms) >= 1_200_000) {
+    await tx(db, async (c) => {
+      const expired = await c.query<{ id: string }>(
+        "UPDATE tasks SET state='failed',error_code='TIME_BUDGET',lease_owner=NULL,lease_until=NULL WHERE root_id=$1 AND state NOT IN ('succeeded','failed','cancelled','uncertain') RETURNING id",
+        [r.rows[0]!.root_id],
+      );
+      for (const t of expired.rows)
+        await event(c, t.id, { type: "state", state: "failed" });
+    });
+    return false;
+  }
+  return true;
 }
 export const publicTask = (t: Task) => ({
   id: t.id,
   conversationId: t.conversation_id,
+  browserProfileId: t.browser_profile_id,
+  waitReason: t.wait_reason,
   state: t.state,
   prompt: t.prompt,
   result: t.result,

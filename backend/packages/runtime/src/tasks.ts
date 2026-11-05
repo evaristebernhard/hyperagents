@@ -1,3 +1,4 @@
+import { browserAccess } from "./browser.js";
 import { taskContext } from "./resources.js";
 import { randomUUID } from "node:crypto";
 import {
@@ -13,6 +14,8 @@ export async function createTask(
   workspace: string,
   raw: unknown,
   key: string,
+  userId?: string,
+  runtimeKind: "typescript" | "rust" = "typescript",
 ) {
   const input = CreateTask.parse(raw);
   if (!key || key.length > 200)
@@ -29,6 +32,8 @@ export async function createTask(
         throw new DomainError("IDEMPOTENCY_CONFLICT", 409);
       return { taskId: old.rows[0].id };
     }
+    if (input.browserProfileId)
+      await browserAccess(c, input.browserProfileId, workspace, userId);
     for (const id of input.inputFileIds) {
       if (
         !(
@@ -104,7 +109,7 @@ export async function createTask(
       formats.push("md");
     const id = randomUUID();
     await c.query(
-      "INSERT INTO tasks(id,workspace_id,conversation_id,root_id,prompt,acceptance,input_file_ids,state,idempotency_key,request_hash,context) VALUES($1,$2,$3,$1,$4,$5,$6,'queued',$7,$8,$9)",
+      "INSERT INTO tasks(id,workspace_id,conversation_id,root_id,prompt,acceptance,input_file_ids,state,idempotency_key,request_hash,context,runtime_kind,runtime_version) VALUES($1,$2,$3,$1,$4,$5,$6,'queued',$7,$8,$9,$10,$11)",
       [
         id,
         workspace,
@@ -115,7 +120,13 @@ export async function createTask(
         key,
         digest,
         JSON.stringify(context),
+        runtimeKind,
+        runtimeKind === "rust" ? "infinity-1abc6fc-v1" : "ts-1.5.0",
       ],
+    );
+    await c.query(
+      "UPDATE tasks SET browser_profile_id=$2,requested_by=$3 WHERE id=$1",
+      [id, input.browserProfileId ?? null, userId ?? null],
     );
     await c.query(
       "INSERT INTO messages(conversation_id,role,content) VALUES($1,'user',$2)",
@@ -127,10 +138,23 @@ export async function createTask(
 }
 export async function cancelTask(db: Db, id: string, workspace: string) {
   await tx(db, async (c) => {
+    await c.query("SELECT pg_advisory_xact_lock(730110)");
     const t = await getTask(c, id, workspace);
     if (terminal.has(t.state)) return;
+    await c.query(
+      "INSERT INTO task_inputs(id,task_id,kind,payload,consumed_at) VALUES($1,$2,'cancel','{}',now()) ON CONFLICT DO NOTHING",
+      ["cancel:" + id, id],
+    );
+    await c.query(
+      "UPDATE browser_sessions SET control='paused',control_epoch=control_epoch+1,controller_id=NULL WHERE task_id IN (WITH RECURSIVE subtree AS (SELECT id FROM tasks WHERE id=$1 UNION ALL SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id=s.id) SELECT id FROM subtree)",
+      [id],
+    );
+    await c.query(
+      "UPDATE browser_outbox SET status='obsolete' WHERE task_id IN (WITH RECURSIVE subtree AS (SELECT id FROM tasks WHERE id=$1 UNION ALL SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id=s.id) SELECT id FROM subtree) AND status='pending'",
+      [id],
+    );
     const r = await c.query<{ id: string }>(
-      "UPDATE tasks SET state='cancelled',lease_owner=NULL,lease_until=NULL,updated_at=now() WHERE (id=$1 OR parent_id=$1) AND state NOT IN ('succeeded','failed','cancelled') RETURNING id",
+      "UPDATE tasks SET state='cancelled',lease_owner=NULL,lease_until=NULL,updated_at=now() WHERE id IN (WITH RECURSIVE subtree AS (SELECT id FROM tasks WHERE id=$1 UNION ALL SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id=s.id) SELECT id FROM subtree) AND state NOT IN ('succeeded','failed','cancelled') RETURNING id",
       [id],
     );
     for (const row of r.rows)

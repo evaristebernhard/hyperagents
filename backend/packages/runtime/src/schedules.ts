@@ -2,7 +2,11 @@ import { type Db } from "./db.js";
 import { createTask } from "./tasks.js";
 import { codeOf } from "@hyper/contracts";
 import { resourceSchemas } from "./resources.js";
-export async function runSchedules(db: Db, now = new Date()) {
+export async function runSchedules(
+  db: Db,
+  now = new Date(),
+  runtimeKind: "typescript" | "rust" = "typescript",
+) {
   const minute = new Date(Math.floor(now.getTime() / 60000) * 60000);
   const rows = (
     await db.query(
@@ -46,6 +50,8 @@ export async function runSchedules(db: Db, now = new Date()) {
           run.schedule_id +
           ":" +
           new Date(run.occurrence).toISOString(),
+        undefined,
+        runtimeKind,
       );
       await db.query(
         "UPDATE schedule_runs SET task_id=$4 WHERE workspace_id=$1 AND schedule_id=$2 AND occurrence=$3",

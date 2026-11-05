@@ -10,3 +10,11 @@ export * from "./engine.js";
 export * from "./runner-client.js";
 export * from "./resources.js";
 export * from "./schedules.js";
+
+export * from "./browser.js";
+
+export * from "./sandbox.js";
+
+export * from "./kernel-bridge.js";
+
+export * from "./private-socket.js";

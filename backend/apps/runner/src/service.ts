@@ -20,6 +20,7 @@ import {
   hash,
   type Config,
 } from "@hyper/runtime";
+import { createDirectRunner } from "./direct.js";
 const exec = promisify(execFile);
 export function containerArgs(name: string, inputDir: string, image: string) {
   return [
@@ -62,6 +63,7 @@ export function containerArgs(name: string, inputDir: string, image: string) {
   ];
 }
 export async function createRunner(config: Config) {
+  if (config.SANDBOX_BACKEND === "runsc") return createDirectRunner(config);
   if (!config.RUNNER_TOKEN) throw new DomainError("RUNNER_TOKEN_REQUIRED");
   const root = join(config.DATA_DIR, "runner");
   await mkdir(root, { recursive: true, mode: 0o700 });
@@ -159,7 +161,7 @@ export async function createRunner(config: Config) {
       .code(e instanceof DomainError ? e.status : 400)
       .send({ error: e instanceof DomainError ? e.code : "RUNNER_ERROR" });
   });
-  app.get("/health", probe);
+  app.get("/health", async () => ({ ...(await probe()), protocol: 1 }));
   app.post("/operations/:id/cancel", async (req) => {
     const id = Id.parse((req.params as { id: string }).id);
     active.get(id)?.abort();
@@ -212,6 +214,16 @@ export async function createRunner(config: Config) {
           { mode: 0o444 },
         );
       }
+      for (const [path, content] of Object.entries(input.skillFiles || {})) {
+        const parts = path.split("/");
+        await mkdir(join(join(dir, "inputs"), "skill", ...parts.slice(0, -1)), {
+          recursive: true,
+          mode: 0o755,
+        });
+        await writeFile(join(join(dir, "inputs"), "skill", path), content, {
+          mode: 0o444,
+        });
+      }
       const script = input.language === "python" ? "program.py" : "program.mjs";
       await writeFile(join(dir, "inputs", script), input.code, { mode: 0o444 });
       const args = containerArgs(
@@ -238,15 +250,26 @@ export async function createRunner(config: Config) {
       let executionTimedOut = false;
       const executionDeadline = setTimeout(() => {
         executionTimedOut = true;
-        void exec("docker", ["rm", "-f", name], { timeout: 5000, maxBuffer: 10000 }).catch(() => {});
+        void exec("docker", ["rm", "-f", name], {
+          timeout: 5000,
+          maxBuffer: 10000,
+        }).catch(() => {});
       }, Limits.codeMs);
       try {
-        const out = await exec("docker", ["exec", name,
-          input.language === "python" ? "python3" : "node", "/inputs/" + script], {
-          timeout: Limits.codeMs,
-          maxBuffer: 200000,
-          signal: controller.signal,
-        });
+        const out = await exec(
+          "docker",
+          [
+            "exec",
+            name,
+            input.language === "python" ? "python3" : "node",
+            "/inputs/" + script,
+          ],
+          {
+            timeout: Limits.codeMs,
+            maxBuffer: 200000,
+            signal: controller.signal,
+          },
+        );
         stdout = out.stdout.slice(0, 100000);
         stderr = out.stderr.slice(0, 100000);
       } catch (e) {
@@ -295,15 +318,30 @@ export async function createRunner(config: Config) {
             "assert len(data)<=limit",
             "sys.stdout.write(base64.b64encode(data).decode('ascii'))",
           ].join("\n");
-          const exported = await exec("docker", ["exec", name, "python3", "-I", "-c", exporter,
-            "/work/" + output, String(Limits.fileBytes - outputBytes)], {
-            timeout: 10000,
-            maxBuffer: Math.ceil(Limits.fileBytes * 4 / 3) + 10000,
-            signal: controller.signal,
-          }).catch(() => { throw new DomainError("UNSAFE_OUTPUT"); });
+          const exported = await exec(
+            "docker",
+            [
+              "exec",
+              name,
+              "python3",
+              "-I",
+              "-c",
+              exporter,
+              "/work/" + output,
+              String(Limits.fileBytes - outputBytes),
+            ],
+            {
+              timeout: 10000,
+              maxBuffer: Math.ceil((Limits.fileBytes * 4) / 3) + 10000,
+              signal: controller.signal,
+            },
+          ).catch(() => {
+            throw new DomainError("UNSAFE_OUTPUT");
+          });
           const bytes = Buffer.from(exported.stdout, "base64");
           outputBytes += bytes.length;
-          if (outputBytes > Limits.fileBytes) throw new DomainError("UNSAFE_OUTPUT");
+          if (outputBytes > Limits.fileBytes)
+            throw new DomainError("UNSAFE_OUTPUT");
           outputs.push({ path: output, data: bytes.toString("base64") });
         }
       }
