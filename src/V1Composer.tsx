@@ -24,6 +24,20 @@ export default function V1Composer({
 }: ComposerProps) {
   const w = useWorkspace(),
     capabilities = w.capabilities;
+  const [browserProfiles, setBrowserProfiles] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [browserProfileId, setBrowserProfileId] = useState("");
+  useEffect(() => {
+    const abort = new AbortController();
+    if (capabilities?.browser?.available)
+      void v1<{ id: string; name: string }[]>("/browser/profiles", {
+        signal: abort.signal,
+      })
+        .then(setBrowserProfiles)
+        .catch(() => {});
+    return () => abort.abort();
+  }, [capabilities?.browser?.available]);
   const [text, setText] = useState("");
   const [files, setFiles] = useState<FileMeta[]>([]);
   const [formats, setFormats] = useState<string[]>([]);
@@ -98,6 +112,7 @@ export default function V1Composer({
     setError("");
     const signature = JSON.stringify([
       text.trim(),
+      browserProfileId,
       files.map((f) => f.id),
       formats,
       skillIds,
@@ -115,6 +130,7 @@ export default function V1Composer({
       await onSend(
         text.trim(),
         {
+          browserProfileId: browserProfileId || undefined,
           settings: {
             ...defaultThreadSettings,
             model: model.model,
@@ -285,6 +301,22 @@ export default function V1Composer({
           </button>
         </div>
       </div>
+      {capabilities?.browser?.available && (
+        <select
+          className="browser-profile-select"
+          aria-label="Browser identity"
+          value={browserProfileId}
+          disabled={disabled || busy}
+          onChange={(e) => setBrowserProfileId(e.target.value)}
+        >
+          <option value="">No browser identity</option>
+          {browserProfiles.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      )}
       <button
         className="integration-strip"
         onClick={() => navigate?.("/integrations")}
@@ -500,7 +532,13 @@ export default function V1Composer({
             Sandbox code / PDF / PNG ·{" "}
             {capabilities?.sandbox.available ? "Available" : "Unavailable"}
           </p>
-          <button disabled>External actions · Unavailable</button>
+          <p>
+            Browser ·{" "}
+            {capabilities?.browser?.available
+              ? "Available · select an identity"
+              : "Unavailable"}
+          </p>
+          <button disabled>External API integrations · Unavailable</button>
           <p>Memory retrieval · Automatic, workspace scoped</p>
           <p>Memory changes · Require your review</p>
         </div>

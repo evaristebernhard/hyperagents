@@ -9,6 +9,7 @@ export type Identity = {
   role: string;
 };
 export type Capabilities = {
+  browser?: { available: boolean; reason?: string; operations: string[] };
   models: { provider: string; model: string; configured: boolean }[];
   search: { provider: string; degraded: boolean };
   sandbox: { available: boolean; reason?: string };
@@ -36,6 +37,8 @@ export type Conversation = {
   artifacts: { id: string; name: string }[];
 };
 export type Task = {
+  browserProfileId?: string | null;
+  waitReason?: string | null;
   id: string;
   conversationId: string;
   prompt: string;
@@ -102,6 +105,8 @@ export const stateLabel: Record<string, string> = {
   queued: "Queued",
   running: "Working",
   waiting_children: "Delegating",
+  waiting_tool: "Waiting for browser",
+  waiting_browser: "Browser needs attention",
   waiting_user: "Needs your input",
   waiting_approval: "Awaiting review",
   uncertain: "Outcome uncertain",
@@ -226,6 +231,9 @@ export async function submitTask(
     key,
     body: {
       prompt,
+      ...(context?.browserProfileId
+        ? { browserProfileId: context.browserProfileId }
+        : {}),
       ...(conversationId ? { conversationId } : {}),
       inputFileIds: context?.attachments.map((f) => f.id) || [],
       acceptance: { formats, requiredText: [], requireSources: false },

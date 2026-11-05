@@ -24,6 +24,7 @@ export type FileMeta = {
   workspaceId: string;
 };
 export type MessageContext = {
+  browserProfileId?: string;
   settings: ThreadSettings;
   skillIds: string[];
   memoryIds: string[];

@@ -1,3 +1,4 @@
+import BrowserProfiles from "./BrowserProfiles";
 import { useEffect, useState } from "react";
 import {
   Plus,
@@ -680,6 +681,7 @@ export default function V1Panels({ path, navigate, notify }: PageProps) {
       {section === "workflows" && <Schedules />}
       {section === "integrations" && (
         <>
+          <BrowserProfiles />
           <p className="muted">
             Available capabilities use public websites or your existing sandbox.
             Paid services are not connected.

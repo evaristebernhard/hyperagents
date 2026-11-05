@@ -6,6 +6,10 @@ import assert from "node:assert/strict";
 import privateDataPlugin from "./private-data.mjs";
 const server = await createServer({
   configFile: false,
+  optimizeDeps: {
+    entries: ["index.html"],
+    esbuildOptions: { target: "es2022" },
+  },
   plugins: [privateDataPlugin(), react()],
   define: { "import.meta.env.VITE_BACKEND_V1": '"true"' },
   server: {

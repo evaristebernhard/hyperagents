@@ -1,3 +1,4 @@
+import BrowserPanel from "./BrowserPanel";
 import { TaskActivity } from "./V1Activity";
 import { useEffect, useRef, useState } from "react";
 import { PanelRightClose, PanelRightOpen, Download } from "lucide-react";
@@ -41,6 +42,7 @@ export default function V1Thread({
   const [selected, setSelected] = useState("");
   const [version, setVersion] = useState("");
   const [search, setSearch] = useState("");
+  const [pane, setPane] = useState<"browser" | "artifacts">("artifacts");
   const [collapsed, setCollapsed] = useState(false);
   const [canvas, setCanvas] = useState<CanvasPreferences>({
     layout: "focus",
@@ -58,7 +60,11 @@ export default function V1Thread({
   const signature = useRef("");
   const canvasLoaded = useRef(false);
   const canvasQueue = useRef(Promise.resolve());
-  const canvasClosed = collapsed || artifacts.length === 0;
+  const browserTask = tasks.find((t) => t.browserProfileId);
+  const canvasClosed = collapsed || (artifacts.length === 0 && !browserTask);
+  useEffect(() => {
+    if (browserTask) setPane("browser");
+  }, [browserTask?.id]);
   const saveCanvas = (next: CanvasPreferences) => {
     setCanvas(next);
     if (next.collapsed !== undefined) setCollapsed(next.collapsed);
@@ -163,7 +169,9 @@ export default function V1Thread({
     if (current) {
       if (
         context &&
-        (context.attachments.length ||
+        ((context.browserProfileId &&
+          context.browserProfileId !== current.browserProfileId) ||
+          context.attachments.length ||
           context.settings.agentId ||
           context.projectId ||
           context.skillIds.length ||
@@ -366,6 +374,13 @@ export default function V1Thread({
                 be attached after it ends.
               </p>
             )}
+            {latest?.state === "waiting_browser" && (
+              <p className="rt-notice">
+                {latest.waitReason === "profile_or_capacity"
+                  ? "Waiting for this browser identity or an available browser slot."
+                  : "The browser needs your attention. Open Browser, take over to sign in or continue, then hand back to the agent. Do not send passwords or verification codes in chat."}
+              </p>
+            )}
             <Composer
               compact
               key={id}
@@ -379,122 +394,149 @@ export default function V1Thread({
         </section>
         {!canvasClosed && (
           <section className="rt-artifacts" aria-label="Thread artifacts">
-            <div className="rt-section-heading">
-              <h2>
-                Artifacts <span>{artifacts.length}</span>
-              </h2>
-              <button
-                className="btn small"
-                disabled
-                title="Ask in the conversation to create or edit files"
-              >
-                New document
-              </button>
-            </div>
-            <div className="rt-artifact-filters">
-              <input
-                aria-label="Filter artifacts"
-                placeholder="Filter artifacts…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <ArtifactCanvas
-              artifacts={visible}
-              allArtifacts={canvasArtifacts}
-              selectedId={selected}
-              value={canvas}
-              onSelect={select}
-              onChange={saveCanvas}
-              renderPreview={(artifact) => {
-                const file = artifacts.find((a) => a.id === artifact.id)
-                  ?.versions[0]?.file_id;
-                return file ? (
-                  <ArtifactPreview key={file} fileId={file} />
-                ) : (
-                  <p>No saved file</p>
-                );
-              }}
-              onDownload={(artifact) => {
-                const file = artifacts.find((a) => a.id === artifact.id)
-                  ?.versions[0]?.file_id;
-                if (file) {
-                  const link = document.createElement("a");
-                  link.href = fileUrl(file);
-                  link.download = artifact.title;
-                  link.click();
-                }
-              }}
-            >
-              {!artifacts.length ? (
-                <div className="rt-empty">
-                  <h3>No linked artifacts</h3>
-                  <p>Files generated in this conversation will appear here.</p>
+            {browserTask && (
+              <nav className="browser-pane-tabs" aria-label="Thread panel">
+                <button
+                  className={`btn small ${pane === "browser" ? "primary" : ""}`}
+                  onClick={() => setPane("browser")}
+                >
+                  Browser
+                </button>
+                <button
+                  className={`btn small ${pane === "artifacts" ? "primary" : ""}`}
+                  onClick={() => setPane("artifacts")}
+                >
+                  Artifacts · {artifacts.length}
+                </button>
+              </nav>
+            )}
+            {pane === "browser" && browserTask ? (
+              <BrowserPanel key={browserTask.id} taskId={browserTask.id} />
+            ) : (
+              <>
+                <div className="rt-section-heading">
+                  <h2>
+                    Artifacts <span>{artifacts.length}</span>
+                  </h2>
+                  <button
+                    className="btn small"
+                    disabled
+                    title="Ask in the conversation to create or edit files"
+                  >
+                    New document
+                  </button>
                 </div>
-              ) : (
-                <nav className="rt-artifact-list" aria-label="Select artifact">
-                  {visible
-                    .filter((a) => !canvas.hidden.includes(a.id))
-                    .map((a) => (
-                      <button
-                        key={a.id}
-                        data-artifact-id={a.id}
-                        className={a.id === selected ? "active" : ""}
-                        onClick={() => select(a.id)}
-                      >
-                        <span>{a.title}</span>
-                        <small>{a.kind}</small>
-                      </button>
-                    ))}
-                </nav>
-              )}
-              {chosen && chosenVersion && (
-                <div className="rt-artifact-editor">
-                  <div className="rt-section-heading">
-                    <h3>{chosen.name}</h3>
-                    <a
-                      className="btn small"
-                      aria-label="Download selected artifact"
-                      href={fileUrl(chosenVersion.file_id)}
-                      download
-                    >
-                      <Download size={14} />
-                      Download
-                    </a>
-                  </div>
-                  <div className="rt-artifact-filters">
-                    <label>
-                      Version{" "}
-                      <select
-                        aria-label="Artifact version"
-                        value={version}
-                        onChange={(e) => setVersion(e.target.value)}
-                      >
-                        <option value="">
-                          Current version · {chosen.versions[0]?.version}
-                        </option>
-                        {chosen.versions.map((v) => (
-                          <option key={v.version} value={v.version}>
-                            Version {v.version} ·{" "}
-                            {new Date(v.created_at).toLocaleString()}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  {version && (
-                    <p className="rt-notice">
-                      Viewing version {chosenVersion.version}. Downloads use
-                      this saved version.
-                    </p>
-                  )}
-                  <ArtifactPreview
-                    key={chosenVersion.file_id}
-                    fileId={chosenVersion.file_id}
+                <div className="rt-artifact-filters">
+                  <input
+                    aria-label="Filter artifacts"
+                    placeholder="Filter artifacts…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
-              )}
-            </ArtifactCanvas>
+                <ArtifactCanvas
+                  artifacts={visible}
+                  allArtifacts={canvasArtifacts}
+                  selectedId={selected}
+                  value={canvas}
+                  onSelect={select}
+                  onChange={saveCanvas}
+                  renderPreview={(artifact) => {
+                    const file = artifacts.find((a) => a.id === artifact.id)
+                      ?.versions[0]?.file_id;
+                    return file ? (
+                      <ArtifactPreview key={file} fileId={file} />
+                    ) : (
+                      <p>No saved file</p>
+                    );
+                  }}
+                  onDownload={(artifact) => {
+                    const file = artifacts.find((a) => a.id === artifact.id)
+                      ?.versions[0]?.file_id;
+                    if (file) {
+                      const link = document.createElement("a");
+                      link.href = fileUrl(file);
+                      link.download = artifact.title;
+                      link.click();
+                    }
+                  }}
+                >
+                  {!artifacts.length ? (
+                    <div className="rt-empty">
+                      <h3>No linked artifacts</h3>
+                      <p>
+                        Files generated in this conversation will appear here.
+                      </p>
+                    </div>
+                  ) : (
+                    <nav
+                      className="rt-artifact-list"
+                      aria-label="Select artifact"
+                    >
+                      {visible
+                        .filter((a) => !canvas.hidden.includes(a.id))
+                        .map((a) => (
+                          <button
+                            key={a.id}
+                            data-artifact-id={a.id}
+                            className={a.id === selected ? "active" : ""}
+                            onClick={() => select(a.id)}
+                          >
+                            <span>{a.title}</span>
+                            <small>{a.kind}</small>
+                          </button>
+                        ))}
+                    </nav>
+                  )}
+                  {chosen && chosenVersion && (
+                    <div className="rt-artifact-editor">
+                      <div className="rt-section-heading">
+                        <h3>{chosen.name}</h3>
+                        <a
+                          className="btn small"
+                          aria-label="Download selected artifact"
+                          href={fileUrl(chosenVersion.file_id)}
+                          download
+                        >
+                          <Download size={14} />
+                          Download
+                        </a>
+                      </div>
+                      <div className="rt-artifact-filters">
+                        <label>
+                          Version{" "}
+                          <select
+                            aria-label="Artifact version"
+                            value={version}
+                            onChange={(e) => setVersion(e.target.value)}
+                          >
+                            <option value="">
+                              Current version · {chosen.versions[0]?.version}
+                            </option>
+                            {chosen.versions.map((v) => (
+                              <option key={v.version} value={v.version}>
+                                Version {v.version} ·{" "}
+                                {new Date(v.created_at).toLocaleString()}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      {version && (
+                        <p className="rt-notice">
+                          Viewing version {chosenVersion.version}. Downloads use
+                          this saved version.
+                        </p>
+                      )}
+                      <ArtifactPreview
+                        key={chosenVersion.file_id}
+                        fileId={chosenVersion.file_id}
+                      />
+                    </div>
+                  )}
+                </ArtifactCanvas>
+              </>
+            )}
           </section>
         )}
       </div>
@@ -566,5 +608,12 @@ export function ArtifactPreview({ fileId }: { fileId: string }) {
     );
   if (preview.type.includes("python") || preview.type.includes("javascript"))
     return <pre className="v1-code-preview">{preview.text}</pre>;
+  if (preview.type.includes("octet-stream"))
+    return (
+      <p>
+        Preview unavailable for this file type. Use Download to save the
+        original file.
+      </p>
+    );
   return <AnswerMarkdown content={preview.text} />;
 }

@@ -22,9 +22,11 @@
     "reset-password": "node scripts/reset-owner-password.mjs",
     "build:v1": "tsc --noEmit && VITE_BACKEND_V1=true vite build",
     "test:v1-ui": "node scripts/smoke-v1-ui.mjs",
-    "test:v1-adapter": "node scripts/test-v1-adapter.mjs"
+    "test:v1-adapter": "node scripts/test-v1-adapter.mjs",
+    "test:browser-ui": "node scripts/test-browser-ui.mjs"
   },
   "dependencies": {
+    "@novnc/novnc": "^1.7.0",
     "dompurify": "^3.4.17",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
