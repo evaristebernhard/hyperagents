@@ -9,6 +9,13 @@ import {
   ResourceKind,
   parseResource,
   acceptLearning,
+  SkillBundle,
+  importBundle,
+  installBundle,
+  uninstallBundle,
+  validateBundle,
+  readSkillZip,
+  githubSkill,
   tx,
   hash,
   token,
@@ -27,6 +34,147 @@ export function workspaceRoutes(
     if (u.role !== "admin") throw new DomainError("FORBIDDEN", 403);
     return u;
   };
+  app.post(
+    "/api/v1/skill-imports",
+    { schema: { body: SkillBundle } },
+    async (req) => importBundle(db, who(req).workspaceId, req.body),
+  );
+  app.post(
+    "/api/v1/skill-imports/archive",
+    {
+      schema: {
+        body: z.object({
+          id: ResourceId,
+          name: z.string().min(1).max(160),
+          description: z.string().max(2000),
+          archive: z.string().max(2_700_000),
+        }),
+      },
+    },
+    async (req) =>
+      importBundle(db, who(req).workspaceId, {
+        id: req.body.id,
+        name: req.body.name,
+        description: req.body.description,
+        files: await readSkillZip(Buffer.from(req.body.archive, "base64")),
+        source: { kind: "zip" },
+      }),
+  );
+  app.post(
+    "/api/v1/skill-imports/github",
+    {
+      schema: {
+        body: z.object({
+          id: ResourceId,
+          name: z.string().min(1).max(160),
+          description: z.string().max(2000),
+          repository: z.string().max(200),
+          ref: z.string().min(1).max(100),
+        }),
+      },
+    },
+    async (req) =>
+      importBundle(db, who(req).workspaceId, {
+        id: req.body.id,
+        name: req.body.name,
+        description: req.body.description,
+        ...(await githubSkill(req.body.repository, req.body.ref)),
+      }),
+  );
+  app.get(
+    "/api/v1/marketplace",
+    async (req) =>
+      (
+        await db.query(
+          `SELECT p.*,i.digest installed_digest,i.revision,i.local,
+    (SELECT jsonb_agg(jsonb_build_object('digest',v.digest,'requirements',v.requirements,'createdAt',v.created_at) ORDER BY v.created_at DESC) FROM skill_versions v WHERE v.workspace_id=p.workspace_id AND v.package_id=p.id) versions
+    FROM skill_packages p LEFT JOIN skill_installations i ON i.workspace_id=p.workspace_id AND i.package_id=p.id WHERE p.workspace_id=$1 ORDER BY p.name`,
+          [who(req).workspaceId],
+        )
+      ).rows,
+  );
+  app.get(
+    "/api/v1/skill-packages/:id/versions/:digest",
+    {
+      schema: {
+        params: z.object({
+          id: ResourceId,
+          digest: z.string().regex(/^[a-f0-9]{64}$/),
+        }),
+      },
+    },
+    async (req) => {
+      const row = (
+        await db.query(
+          `SELECT v.*,i.digest installed_digest,old.files previous_files FROM skill_versions v LEFT JOIN skill_installations i ON i.workspace_id=v.workspace_id AND i.package_id=v.package_id LEFT JOIN skill_versions old ON old.workspace_id=i.workspace_id AND old.package_id=i.package_id AND old.digest=i.digest WHERE v.workspace_id=$1 AND v.package_id=$2 AND v.digest=$3`,
+          [who(req).workspaceId, req.params.id, req.params.digest],
+        )
+      ).rows[0];
+      if (!row) throw new DomainError("NOT_FOUND", 404);
+      const paths = [
+        ...new Set([
+          ...Object.keys(row.files),
+          ...Object.keys(row.previous_files || {}),
+        ]),
+      ];
+      return {
+        ...row,
+        changes: paths
+          .filter((p) => row.files[p] !== row.previous_files?.[p])
+          .map((path) => ({
+            path,
+            before: row.previous_files?.[path] ?? null,
+            after: row.files[path] ?? null,
+          })),
+      };
+    },
+  );
+  app.put(
+    "/api/v1/skill-installations/:id",
+    {
+      schema: {
+        params: z.object({ id: ResourceId }),
+        body: z
+          .object({
+            digest: z.string().regex(/^[a-f0-9]{64}$/),
+            revision: z.number().int().min(0),
+            local: z.boolean().default(false),
+          })
+          .strict(),
+      },
+    },
+    async (req) =>
+      installBundle(
+        db,
+        who(req).workspaceId,
+        req.params.id,
+        req.body.digest,
+        req.body.revision,
+        req.body.local,
+      ),
+  );
+  app.delete(
+    "/api/v1/skill-installations/:id",
+    {
+      schema: {
+        params: z.object({ id: ResourceId }),
+        body: z
+          .object({
+            revision: z.number().int().min(1),
+            unlink: z.boolean().default(false),
+          })
+          .strict(),
+      },
+    },
+    async (req) =>
+      uninstallBundle(
+        db,
+        who(req).workspaceId,
+        req.params.id,
+        req.body.revision,
+        req.body.unlink,
+      ),
+  );
   app.get(
     "/api/v1/workspaces",
     async (req) =>
@@ -212,6 +360,46 @@ export function workspaceRoutes(
               )?.author || u.email,
           }));
         }
+        if (req.params.kind === "skills" && "documentation" in value) {
+          await c.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+            u.workspaceId + ":skill:" + value.id,
+          ]);
+          const installed = (
+            await c.query(
+              "SELECT v.files,v.requirements FROM skill_installations i JOIN skill_versions v USING(workspace_id,package_id,digest) WHERE i.workspace_id=$1 AND i.package_id=$2",
+              [u.workspaceId, value.id],
+            )
+          ).rows[0];
+          const b = validateBundle({
+            id: value.id,
+            name: value.name,
+            description: value.description,
+            files: {
+              ...(installed?.files || {}),
+              "SKILL.md": value.documentation,
+            },
+            requirements: installed?.requirements,
+          });
+          await c.query(
+            "INSERT INTO skill_packages(workspace_id,id,name,description) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING",
+            [u.workspaceId, value.id, value.name, value.description],
+          );
+          await c.query(
+            "INSERT INTO skill_versions(workspace_id,package_id,digest,files,requirements) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING",
+            [
+              u.workspaceId,
+              value.id,
+              b.digest,
+              JSON.stringify(b.files),
+              JSON.stringify(b.requirements),
+            ],
+          );
+          await c.query(
+            "INSERT INTO skill_installations(workspace_id,package_id,digest,local) VALUES($1,$2,$3,true) ON CONFLICT(workspace_id,package_id) DO UPDATE SET digest=EXCLUDED.digest,local=true,revision=skill_installations.revision+1",
+            [u.workspaceId, value.id, b.digest],
+          );
+          value.packageDigest = b.digest;
+        }
         const r = await c.query(
           `INSERT INTO resources(workspace_id,kind,id,value) VALUES($1,$2,$3,$4) ON CONFLICT(workspace_id,kind,id) DO UPDATE SET value=EXCLUDED.value,revision=resources.revision+1,updated_at=now() RETURNING kind,id,value,revision`,
           [
@@ -234,6 +422,16 @@ export function workspaceRoutes(
       },
     },
     async (req) => {
+      if (
+        req.params.kind === "skills" &&
+        (
+          await db.query(
+            "SELECT 1 FROM skill_installations WHERE workspace_id=$1 AND package_id=$2",
+            [who(req).workspaceId, req.params.id],
+          )
+        ).rowCount
+      )
+        throw new DomainError("USE_SKILL_UNINSTALL", 409);
       const r = await db.query(
         "DELETE FROM resources WHERE workspace_id=$1 AND kind=$2 AND id=$3 AND revision=$4 RETURNING id",
         [
@@ -246,6 +444,16 @@ export function workspaceRoutes(
       if (!r.rowCount) throw new DomainError("RESOURCE_CONFLICT", 409);
       return { deleted: true };
     },
+  );
+  app.get(
+    "/api/v1/learning-jobs",
+    async (req) =>
+      (
+        await db.query(
+          "SELECT j.* FROM learning_jobs j JOIN tasks t ON t.id=j.task_id WHERE t.workspace_id=$1 ORDER BY t.created_at DESC LIMIT 200",
+          [who(req).workspaceId],
+        )
+      ).rows,
   );
   app.get(
     "/api/v1/learning",

@@ -411,7 +411,7 @@ export class Engine {
                 call.id,
                 call.name,
                 JSON.stringify(args),
-                call.name === "code_execute" ? "uncertain" : "safe",
+                ["code_execute", "skill_run"].includes(call.name) ? "uncertain" : "safe",
                 ordinal,
               ],
             );

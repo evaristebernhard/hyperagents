@@ -73,6 +73,12 @@ export interface Task {
   context: {
     selection?: import("@hyper/contracts").TaskContext;
     items?: import("./resources.js").ResourceRow[];
+    skills?: {
+      id: string;
+      name: string;
+      description: string;
+      digest: string;
+    }[];
     memoryMode?: string;
     memoryReadScope?: string;
     memorySaveTarget?: string;

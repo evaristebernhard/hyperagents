@@ -87,6 +87,42 @@ export class ToolExecutor {
           },
         };
       }
+      case "skill_search": {
+        const { query } = ToolSchemas.skill_search.parse(op.args);
+        return {
+          data: {
+            skills: (task.context.skills || []).filter((s) =>
+              (s.name + " " + s.description)
+                .toLowerCase()
+                .includes(query.toLowerCase()),
+            ),
+          },
+        };
+      }
+      case "skill_read": {
+        const { id, path, offset, length } = ToolSchemas.skill_read.parse(
+          op.args,
+        );
+        const pinned = task.context.skills?.find((s) => s.id === id);
+        if (!pinned) throw new DomainError("SKILL_NOT_IN_TASK", 404);
+        const version = (
+          await this.db.query(
+            "SELECT files FROM skill_versions WHERE workspace_id=$1 AND package_id=$2 AND digest=$3",
+            [task.workspace_id, id, pinned.digest],
+          )
+        ).rows[0];
+        if (!version || !Object.hasOwn(version.files, path))
+          throw new DomainError("NOT_FOUND", 404);
+        return {
+          data: {
+            id,
+            digest: pinned.digest,
+            path,
+            content: version.files[path].slice(offset, offset + length),
+            total: version.files[path].length,
+          },
+        };
+      }
       case "knowledge_search": {
         if (
           task.context?.memoryMode === "custom" ||
@@ -124,23 +160,68 @@ export class ToolExecutor {
               : "Wiki suggestions";
         if (agent?.value.learning?.[preference] === "Disabled")
           throw new DomainError("LEARNING_DISABLED_FOR_AGENT");
-        const r = await this.db.query(
-          "INSERT INTO learning_suggestions(id,workspace_id,task_id,operation_id,kind,name,content,reason) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(operation_id) DO UPDATE SET operation_id=EXCLUDED.operation_id RETURNING id",
-          [
-            id,
-            task.workspace_id,
-            task.id,
-            op.id,
-            a.kind,
-            a.name,
-            a.content,
-            a.reason,
-          ],
-        );
+        const r = await tx(this.db, async (c) => {
+          await c.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+            task.workspace_id + ":learning",
+          ]);
+          const agentId =
+            task.context.memorySaveTarget === "agent"
+              ? task.context.selection?.agentId
+              : undefined;
+          if (task.context.memorySaveTarget === "agent" && !agentId)
+            throw new DomainError("MEMORY_SCOPE_DENIED", 403);
+          const duplicate = await c.query(
+            `SELECT id FROM learning_suggestions WHERE workspace_id=$1 AND kind=$2 AND content=$3 AND decision IS DISTINCT FROM 'dismissed'
+            AND task_id IN (SELECT id FROM tasks WHERE workspace_id=$1 AND context->>'memorySaveTarget' IS NOT DISTINCT FROM $4 AND context->'selection'->>'agentId' IS NOT DISTINCT FROM $5) LIMIT 1`,
+            [
+              task.workspace_id,
+              a.kind,
+              a.content,
+              task.context.memorySaveTarget || null,
+              task.context.selection?.agentId || null,
+            ],
+          );
+          if (duplicate.rowCount) return duplicate;
+          const saved = await c.query(
+            `SELECT id FROM resources WHERE workspace_id=$1 AND kind=$2 AND COALESCE(value->>'content',value->>'documentation')=$3 AND value->>'agentId' IS NOT DISTINCT FROM $4`,
+            [task.workspace_id, a.kind, a.content, agentId || null],
+          );
+          if (saved.rowCount) return { rows: [{ id: null }] };
+          let before = null;
+          if (a.targetId) {
+            const target = (
+              await c.query(
+                "SELECT value,revision FROM resources WHERE workspace_id=$1 AND kind=$2 AND id=$3",
+                [task.workspace_id, a.kind, a.targetId],
+              )
+            ).rows[0];
+            if (!target || target.revision !== a.targetRevision)
+              throw new DomainError("RESOURCE_CONFLICT", 409);
+            if ((target.value.agentId || null) !== (agentId || null))
+              throw new DomainError("MEMORY_SCOPE_DENIED", 403);
+            before = target.value;
+          } else if (a.targetRevision) throw new DomainError("TARGET_REQUIRED");
+          return c.query(
+            "INSERT INTO learning_suggestions(id,workspace_id,task_id,operation_id,kind,name,content,reason,target_id,target_revision,before_value) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(operation_id) DO UPDATE SET operation_id=EXCLUDED.operation_id RETURNING id",
+            [
+              id,
+              task.workspace_id,
+              task.id,
+              op.id,
+              a.kind,
+              a.name,
+              a.content,
+              a.reason,
+              a.targetId || null,
+              a.targetRevision || null,
+              before,
+            ],
+          );
+        });
         return {
           data: {
             suggestionId: r.rows[0].id,
-            status: "pending_review",
+            status: r.rows[0].id ? "pending_review" : "already_saved",
             savedToKnowledge: false,
           },
         };
@@ -204,10 +285,69 @@ export class ToolExecutor {
           ),
         };
       }
+      case "skill_run":
       case "code_execute": {
-        const a = ToolSchemas.code_execute.parse(
-          normalizeCodeArguments(op.args),
-        );
+        let skillFiles: Record<string, string> | undefined;
+        let args = op.args;
+        if (op.name === "skill_run") {
+          if (!allowedTools(task.context).includes("code_execute"))
+            throw new DomainError("TOOL_DISABLED_FOR_AGENT", 403);
+          const a = ToolSchemas.skill_run.parse(op.args),
+            pinned = task.context.skills?.find((s) => s.id === a.id);
+          if (!pinned) throw new DomainError("SKILL_NOT_IN_TASK", 404);
+          const v = (
+            await this.db.query(
+              "SELECT files,requirements FROM skill_versions WHERE workspace_id=$1 AND package_id=$2 AND digest=$3",
+              [task.workspace_id, a.id, pinned.digest],
+            )
+          ).rows[0];
+          if (!v || !Object.hasOwn(v.files, a.path))
+            throw new DomainError("NOT_FOUND", 404);
+          if (
+            v.requirements.tools.some(
+              (t: string) =>
+                !allowedTools(task.context).includes(t as ToolName),
+            )
+          )
+            throw new DomainError("SKILL_TOOL_REQUIREMENT_DENIED", 403);
+          skillFiles = v.files;
+          const python = a.path.endsWith(".py"),
+            path = "/inputs/skill/" + a.path;
+          const code = python
+            ? "import runpy,sys,importlib.util\n" +
+              v.requirements.python
+                .map(
+                  (m: string) =>
+                    "assert importlib.util.find_spec(" +
+                    JSON.stringify(m) +
+                    ") is not None, " +
+                    JSON.stringify("MISSING_DEPENDENCY: " + m),
+                )
+                .join("\n") +
+              "\nsys.argv=" +
+              JSON.stringify([path, ...a.args]) +
+              '\nsys.path.insert(0,"/inputs/skill/scripts")\nrunpy.run_path(' +
+              JSON.stringify(path) +
+              ',run_name="__main__")'
+            : 'import {createRequire} from "node:module"; const require=createRequire(import.meta.url);' +
+              v.requirements.node
+                .map(
+                  (m: string) => "require.resolve(" + JSON.stringify(m) + ");",
+                )
+                .join("") +
+              "process.argv=" +
+              JSON.stringify(["node", path, ...a.args]) +
+              "; await import(" +
+              JSON.stringify(path) +
+              ");";
+          args = {
+            language: python ? "python" : "node",
+            code,
+            inputFileIds: a.inputFileIds,
+            outputs: a.outputs,
+          };
+        }
+        const a = ToolSchemas.code_execute.parse(normalizeCodeArguments(args));
         if (!(await this.runner.health()).available)
           throw new DomainError("SANDBOX_UNAVAILABLE");
         const inputs = [];
@@ -238,6 +378,7 @@ export class ToolExecutor {
             language: a.language,
             code: a.code,
             inputs,
+            skillFiles,
             outputs: a.outputs.map((o) => o.path),
           },
           signal,

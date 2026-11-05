@@ -18,3 +18,6 @@ export * from "./sandbox.js";
 export * from "./kernel-bridge.js";
 
 export * from "./private-socket.js";
+export * from "./skill-packages.js";
+export * from "./skill-import.js";
+export * from "./learning.js";

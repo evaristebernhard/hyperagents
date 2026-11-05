@@ -190,6 +190,32 @@ export const ToolSchemas = {
     })
     .strict(),
   thread_search: z.object({ query: z.string().min(1).max(500) }).strict(),
+  skill_run: z
+    .object({
+      id: ResourceId,
+      path: z.string().regex(/^scripts\/[a-zA-Z0-9_./-]+\.(py|js|mjs)$/),
+      args: z.array(z.string().max(2000)).max(30).default([]),
+      inputFileIds: z.array(Id).max(20).default([]),
+      outputs: z
+        .array(
+          z.object({
+            path: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,120}$/),
+            format: Format,
+          }),
+        )
+        .max(10)
+        .default([]),
+    })
+    .strict(),
+  skill_search: z.object({ query: z.string().max(500).default("") }).strict(),
+  skill_read: z
+    .object({
+      id: ResourceId,
+      path: z.string().max(200).default("SKILL.md"),
+      offset: z.number().int().min(0).default(0),
+      length: z.number().int().min(1).max(16000).default(12000),
+    })
+    .strict(),
   knowledge_search: z.object({ query: z.string().min(1).max(500) }).strict(),
   learning_propose: z
     .object({
@@ -197,6 +223,8 @@ export const ToolSchemas = {
       name: z.string().min(1).max(160),
       content: z.string().min(1).max(12000),
       reason: z.string().min(1).max(1000),
+      targetId: ResourceId.optional(),
+      targetRevision: z.number().int().min(1).optional(),
     })
     .strict(),
   web_search: z

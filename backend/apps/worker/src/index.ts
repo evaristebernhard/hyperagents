@@ -4,6 +4,7 @@ import {
   pool,
   Engine,
   runSchedules,
+  extractLearning,
   BrowserClient,
   dispatchBrowser,
   createKernelBridge,
@@ -18,6 +19,16 @@ const bridge = c.KERNEL_BRIDGE_SOCKET
   : undefined;
 if (bridge) await listenPrivate(bridge, c.KERNEL_BRIDGE_SOCKET!);
 const browser = new BrowserClient(c);
+let learningBusy = false;
+const learningTimer = setInterval(() => {
+  if (learningBusy || stopping) return;
+  learningBusy = true;
+  void extractLearning(db, c)
+    .catch(() => {})
+    .finally(() => {
+      learningBusy = false;
+    });
+}, 5000);
 let browserBusy = false;
 const browserTimer = setInterval(() => {
   if (browserBusy || stopping) return;
@@ -80,6 +91,7 @@ for (const signal of ["SIGTERM", "SIGINT"])
     stopping = true;
     clearInterval(timer);
     clearInterval(browserTimer);
+    clearInterval(learningTimer);
     void boss
       .stop({ graceful: true, timeout: 5000 })
       .then(() => Promise.allSettled([...running]))

@@ -19,12 +19,28 @@ import AnswerMarkdown from "./AnswerMarkdown";
 import { ArtifactPreview } from "./V1Thread";
 import Schedules from "./Schedules";
 
+type Package = {
+  id: string;
+  name: string;
+  description: string;
+  source: { url?: string };
+  installed_digest: string | null;
+  revision: number | null;
+  local: boolean;
+  versions: {
+    digest: string;
+    requirements: { python?: string[]; node?: string[] };
+    createdAt: string;
+  }[];
+};
 type Suggestion = {
   id: string;
   name: string;
   kind: string;
   content: string;
   reason: string;
+  target_id?: string;
+  before_value?: { content?: string };
   decision: string | null;
   conversation_id: string;
 };
@@ -46,6 +62,15 @@ type Wiki = {
 export default function V1Panels({ path, navigate, notify }: PageProps) {
   const w = useWorkspace(),
     section = path.split("/")[1];
+  const [versionPreview, setVersionPreview] = useState<{
+    digest: string;
+    changes: { path: string; before: string | null; after: string | null }[];
+  } | null>(null);
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [bundleDraft, setBundleDraft] = useState("");
+  const [repository, setRepository] = useState("");
+  const [gitRef, setGitRef] = useState("main");
+  const [unlink, setUnlink] = useState(false);
   const [query, setQuery] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -95,6 +120,8 @@ export default function V1Panels({ path, navigate, notify }: PageProps) {
     const c = new AbortController();
     setLoading(true);
     const load = async () => {
+      if (section === "marketplace")
+        setPackages(await v1<Package[]>("/marketplace", { signal: c.signal }));
       if (section === "learning")
         setSuggestions(
           await v1<Suggestion[]>("/learning", { signal: c.signal }),
@@ -285,6 +312,12 @@ export default function V1Panels({ path, navigate, notify }: PageProps) {
                 <h3>{s.name}</h3>
                 <AnswerMarkdown content={s.content} />
                 <p className="muted">{s.reason}</p>
+                {s.target_id && (
+                  <details>
+                    <summary>Proposed update · previous content</summary>
+                    <p>{s.before_value?.content}</p>
+                  </details>
+                )}
                 <div className="actions">
                   <button
                     className="btn small"
@@ -469,14 +502,243 @@ export default function V1Panels({ path, navigate, notify }: PageProps) {
       )}
       {section === "marketplace" && (
         <>
-          <p className="muted">
-            Ready-to-use workspace instructions. These independently authored
-            skills use your existing agent tools.
-          </p>
           {search}
+          {versionPreview && (
+            <Modal
+              title={"Version " + versionPreview.digest.slice(0, 12)}
+              onClose={() => setVersionPreview(null)}
+            >
+              {versionPreview.changes.map((change) => (
+                <details key={change.path}>
+                  <summary>{change.path}</summary>
+                  <p>Previous</p>
+                  <pre
+                    style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
+                  >
+                    {change.before || "(absent)"}
+                  </pre>
+                  <p>Proposed</p>
+                  <pre
+                    style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
+                  >
+                    {change.after || "(removed)"}
+                  </pre>
+                </details>
+              ))}
+            </Modal>
+          )}
+          <details className="card">
+            <summary>Import a skill package</summary>
+            <p>
+              Import JSON with id, name, description and files, or upload
+              Markdown / ZIP. Review the version before installing.
+            </p>
+            <textarea
+              aria-label="Skill package JSON"
+              value={bundleDraft}
+              onChange={(e) => setBundleDraft(e.target.value)}
+            />
+            <button
+              className="btn"
+              disabled={readonly || busy}
+              onClick={() =>
+                void run(async () => {
+                  await v1("/skill-imports", {
+                    method: "POST",
+                    body: JSON.stringify(JSON.parse(bundleDraft)),
+                  });
+                  setBundleDraft("");
+                  notify("Package imported. Review and install below.");
+                })
+              }
+            >
+              Import JSON
+            </button>
+            <input
+              aria-label="Skill file"
+              type="file"
+              accept=".md,.json,.zip"
+              disabled={readonly || busy}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                void run(async () => {
+                  const id = file.name
+                    .replace(/\.[^.]+$/, "")
+                    .replace(/[^a-zA-Z0-9_-]/g, "-");
+                  const meta = { id, name: id, description: "Imported skill" };
+                  if (file.name.endsWith(".zip")) {
+                    const bytes = new Uint8Array(await file.arrayBuffer());
+                    let binary = "";
+                    for (const byte of bytes)
+                      binary += String.fromCharCode(byte);
+                    await v1("/skill-imports/archive", {
+                      method: "POST",
+                      body: JSON.stringify({ ...meta, archive: btoa(binary) }),
+                    });
+                  } else
+                    await v1("/skill-imports", {
+                      method: "POST",
+                      body: JSON.stringify(
+                        file.name.endsWith(".json")
+                          ? JSON.parse(await file.text())
+                          : {
+                              ...meta,
+                              files: { "SKILL.md": await file.text() },
+                            },
+                      ),
+                    });
+                  notify("Package imported. Review and install below.");
+                });
+              }}
+            />
+            <input
+              aria-label="GitHub repository"
+              placeholder="owner/repository"
+              value={repository}
+              onChange={(e) => setRepository(e.target.value)}
+            />
+            <input
+              aria-label="Git revision"
+              placeholder="Commit, tag or branch"
+              value={gitRef}
+              onChange={(e) => setGitRef(e.target.value)}
+            />
+            <button
+              className="btn"
+              disabled={readonly || busy}
+              onClick={() =>
+                void run(async () => {
+                  await v1("/skill-imports/github", {
+                    method: "POST",
+                    body: JSON.stringify({
+                      id: repository.replace("/", "-"),
+                      name: repository,
+                      description: "GitHub skill",
+                      repository,
+                      ref: gitRef,
+                    }),
+                  });
+                  notify("GitHub version imported.");
+                })
+              }
+            >
+              Import GitHub
+            </button>
+          </details>
+          <label>
+            <input
+              type="checkbox"
+              checked={unlink}
+              onChange={(e) => setUnlink(e.target.checked)}
+            />{" "}
+            Remove Agent links when uninstalling
+          </label>
           <div className="grid2">
+            {packages
+              .filter((p) => match(p.name + " " + p.description))
+              .map((p) => (
+                <article className="card" key={p.id}>
+                  <h3>{p.name}</h3>
+                  <p>{p.description}</p>
+                  {p.source.url && (
+                    <a href={p.source.url} target="_blank" rel="noreferrer">
+                      Source
+                    </a>
+                  )}
+                  <p>
+                    {p.installed_digest
+                      ? "Installed " + p.installed_digest.slice(0, 12)
+                      : "Not installed"}
+                    {p.local ? " · Local version" : ""}
+                  </p>
+                  {p.versions.map((v) => (
+                    <div key={v.digest}>
+                      <code>{v.digest.slice(0, 12)}</code>
+                      <button
+                        className="btn"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () =>
+                            setVersionPreview(
+                              await v1(
+                                "/skill-packages/" +
+                                  p.id +
+                                  "/versions/" +
+                                  v.digest,
+                              ),
+                            ),
+                          )
+                        }
+                      >
+                        Review changes
+                      </button>
+                      <p>
+                        Dependencies:{" "}
+                        {[
+                          ...(v.requirements.python || []),
+                          ...(v.requirements.node || []),
+                        ].join(", ") || "None declared"}
+                      </p>
+                      <button
+                        className="btn"
+                        disabled={
+                          readonly ||
+                          busy ||
+                          p.installed_digest === v.digest ||
+                          p.local
+                        }
+                        onClick={() =>
+                          void run(async () => {
+                            await v1("/skill-installations/" + p.id, {
+                              method: "PUT",
+                              body: JSON.stringify({
+                                digest: v.digest,
+                                revision: p.revision || 0,
+                              }),
+                            });
+                            await w.reload();
+                            notify("Skill version installed.");
+                          })
+                        }
+                      >
+                        {p.installed_digest === v.digest
+                          ? "Installed"
+                          : p.installed_digest
+                            ? "Use this version"
+                            : "Install"}
+                      </button>
+                    </div>
+                  ))}
+                  {p.installed_digest && (
+                    <button
+                      className="btn"
+                      disabled={readonly || busy}
+                      onClick={() =>
+                        void run(async () => {
+                          await v1("/skill-installations/" + p.id, {
+                            method: "DELETE",
+                            body: JSON.stringify({
+                              revision: p.revision,
+                              unlink,
+                            }),
+                          });
+                          await w.reload();
+                          notify("Skill uninstalled.");
+                        })
+                      }
+                    >
+                      Uninstall
+                    </button>
+                  )}
+                </article>
+              ))}
             {communitySkills
-              .filter((s) => match(s.name + " " + s.description))
+              .filter(
+                (s) =>
+                  match(s.name + " " + s.description) &&
+                  !packages.some((p) => p.id === s.id),
+              )
               .map((s) => (
                 <article className="card" key={s.id}>
                   <h3>{s.name}</h3>
@@ -486,25 +748,35 @@ export default function V1Panels({ path, navigate, notify }: PageProps) {
                     <AnswerMarkdown content={s.documentation} />
                   </details>
                   <button
-                    className="btn primary"
-                    disabled={
-                      readonly ||
-                      busy ||
-                      w.data.skills.some((x) => x.sourceId === s.id)
-                    }
+                    className="btn"
+                    disabled={readonly || busy}
                     onClick={() =>
                       void run(async () => {
-                        w.installSkill(s.id);
-                        await w.flush();
-                        notify(
-                          "Skill installed. Select it in the composer to use it.",
+                        const imported = await v1<{ digest: string }>(
+                          "/skill-imports",
+                          {
+                            method: "POST",
+                            body: JSON.stringify({
+                              id: s.id,
+                              name: s.name,
+                              description: s.description,
+                              files: { "SKILL.md": s.documentation },
+                            }),
+                          },
                         );
+                        await v1("/skill-installations/" + s.id, {
+                          method: "PUT",
+                          body: JSON.stringify({
+                            digest: imported.digest,
+                            revision: 0,
+                          }),
+                        });
+                        await w.reload();
+                        notify("Skill installed.");
                       })
                     }
                   >
-                    {w.data.skills.some((x) => x.sourceId === s.id)
-                      ? "Installed"
-                      : "Install skill"}
+                    Install skill
                   </button>
                 </article>
               ))}

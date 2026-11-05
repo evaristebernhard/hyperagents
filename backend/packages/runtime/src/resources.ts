@@ -1,3 +1,4 @@
+import { installedSkills } from "./skill-packages.js";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import {
@@ -58,6 +59,10 @@ export const resourceSchemas = {
     createdAt: z.string().optional(),
     updatedAt: z.string().optional(),
     sourceId: ResourceId.optional(),
+    packageDigest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
   }),
   agents: z.object({
     ...base,
@@ -186,35 +191,25 @@ export async function searchKnowledge(
   agentId?: string,
   separate = false,
 ) {
-  // Local retrieval: Unicode word tokens and CJK bigrams, with pinned/importance
-  // boosts. Bounded output avoids injecting the complete memory store into runs.
-  const terms = [
-    ...new Set(
-      query.toLowerCase().match(/[a-z0-9_]{2,}|[\u3400-\u9fff]{2}/g) || [],
-    ),
-  ].slice(0, 80);
-  const rows = (
+  // Filter and rank in PostgreSQL, across the complete workspace history.
+  return (
     await db.query<ResourceRow>(
-      "SELECT id,kind,value,revision FROM resources WHERE workspace_id=$1 AND kind IN ('memories','skills','wiki') AND COALESCE((value->>'archived')::boolean,false)=false ORDER BY updated_at DESC LIMIT 1000",
-      [workspace],
+      `
+    SELECT id,kind,value,revision FROM resources
+    WHERE workspace_id=$1 AND kind IN ('memories','skills','wiki')
+      AND COALESCE((value->>'archived')::boolean,false)=false
+      AND (value->>'agentId' IS NULL OR value->>'agentId'=$3)
+      AND (NOT $4::boolean OR value->>'agentId'=$3)
+      AND (search_terms && knowledge_terms($2) OR search_document %> lower($2) OR value->>'pinned'='true')
+    ORDER BY
+      (SELECT count(*) FROM unnest(search_terms) t WHERE t=ANY(knowledge_terms($2))) * 2
+      + CASE WHEN value->>'pinned'='true' THEN 10 ELSE 0 END
+      + COALESCE((value->>'importance')::numeric,5)/10 + word_similarity(lower($2),search_document) DESC,
+      updated_at DESC,id
+    LIMIT 12`,
+      [workspace, query, agentId || null, separate],
     )
   ).rows;
-  return rows
-    .filter((row) => !row.value.agentId || row.value.agentId === agentId)
-    .filter((row) => !separate || row.value.agentId === agentId)
-    .map((row) => {
-      const value = JSON.stringify(row.value).toLowerCase();
-      return {
-        row,
-        score:
-          terms.reduce((n, t) => n + (value.includes(t) ? 2 : 0), 0) +
-          (row.value.pinned ? 10 : 0),
-      };
-    })
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 12)
-    .map((x) => x.row);
 }
 export async function taskContext(
   db: Queryable,
@@ -261,6 +256,14 @@ export async function taskContext(
         !items.some((i) => i.kind === row.kind && i.id === row.id)
       )
         items.push(row);
+  for (const item of items) {
+    if (
+      item.kind === "memories" &&
+      ((item.value.agentId && item.value.agentId !== selection.agentId) ||
+        (memoryMode === "separate" && item.value.agentId !== selection.agentId))
+    )
+      throw new DomainError("MEMORY_SCOPE_DENIED", 403);
+  }
   const fileIds: string[] = [];
   for (const id of selection.artifactIds) {
     const r = await db.query<{ file_id: string }>(
@@ -270,9 +273,16 @@ export async function taskContext(
     if (!r.rows[0]) throw new DomainError("NOT_FOUND", 404);
     fileIds.push(r.rows[0].file_id);
   }
+  const skills = await installedSkills(db, workspace);
   const result = {
     selection,
-    items,
+    skills,
+    items: items.map((item) => {
+      if (item.kind !== "skills" || !skills.some((s) => s.id === item.id))
+        return item;
+      const { documentation, ...metadata } = item.value;
+      return { ...item, value: metadata };
+    }),
     fileIds,
     memoryMode,
     memoryReadScope: agent?.value.memoryReadScope || "all",
@@ -301,6 +311,34 @@ export async function acceptLearning(
     await db.query("SELECT context FROM tasks WHERE id=$1", [s.task_id])
   ).rows[0]?.context;
   if (decision === "accepted") {
+    if (
+      context?.memoryMode === "read-only" ||
+      context?.learnsAutomatically === false
+    )
+      throw new DomainError("MEMORY_WRITE_DISABLED", 403);
+    if (s.target_id) {
+      const current = await resource(db, workspace, s.kind, s.target_id);
+      if (current.revision !== s.target_revision)
+        throw new DomainError("RESOURCE_CONFLICT", 409);
+      const value = parseResource(s.kind, {
+        ...current.value,
+        ...(s.kind === "skills"
+          ? { documentation: s.content }
+          : { content: s.content }),
+      });
+      const updated = await db.query(
+        "UPDATE resources SET value=$5,revision=revision+1,updated_at=now() WHERE workspace_id=$1 AND kind=$2 AND id=$3 AND revision=$4 RETURNING id",
+        [
+          workspace,
+          s.kind,
+          s.target_id,
+          s.target_revision,
+          JSON.stringify(value),
+        ],
+      );
+      if (!updated.rowCount) throw new DomainError("RESOURCE_CONFLICT", 409);
+      return { decision };
+    }
     const rid = randomUUID(),
       date = new Date().toISOString();
     const value = parseResource(
@@ -352,7 +390,7 @@ export function allowedTools(context: {
       Search: ["web_search", "web_read", "source_read", "image_search"],
       "Thread Search": ["thread_search", "knowledge_search"],
       Files: ["file_read"],
-      Skills: ["knowledge_search"],
+      Skills: ["skill_search", "skill_read", "skill_run"],
       Delegation: ["delegate"],
       Webpages: ["artifact_write"],
       Tables: ["artifact_write", "code_execute"],
@@ -373,5 +411,7 @@ export function allowedTools(context: {
     context.learnsAutomatically === false
   )
     allowed = allowed.filter((n) => n !== "learning_propose");
+  if (!allowed.includes("code_execute"))
+    allowed = allowed.filter((n) => n !== "skill_run");
   return allowed;
 }

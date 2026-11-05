@@ -1,0 +1,37 @@
+{
+  "status": "partial_implementation_not_ready_for_cutover",
+  "implemented": [
+    "V1 immutable skill versions and workspace installations, legacy document conversion migration",
+    "JSON, Markdown via UI, bounded UTF-8 ZIP and public GitHub commit-pinned imports",
+    "Idempotent install, revision-checked version switch and rollback, local-edit protection, reference-aware uninstall",
+    "Task-pinned skill_search, paged skill_read and Python/Node skill_run using existing Runner operations and read-only inputs",
+    "PostgreSQL GIN English/CJK overlapping bigram and pg_trgm retrieval over full workspace history",
+    "Durable one-call post-success extraction with separate usage and failure records",
+    "Exact proposal deduplication, review-only saving, revision-checked updates and scope checks",
+    "Marketplace server installation state, import controls and version change preview"
+  ],
+  "not_completed": [
+    "SQLite migration CLI, rehearsal, file and relationship reconciliation",
+    "Default startup and public deployment cutover, backup and rollback rehearsal",
+    "Live GitHub and ZIP to sandbox artifact delivery acceptance",
+    "Desktop and narrow-screen browser acceptance for new controls",
+    "Binary assets in ZIP imports; current importer accepts UTF-8 package files only",
+    "Durable asynchronous import jobs and research/document draft workflows",
+    "Full original marketplace catalog/category unification and dependency readiness probes",
+    "Skill-package installation on accepting a learned document skill"
+  ],
+  "tests": {
+    "backend_typecheck": "passed",
+    "frontend_v1_production_build": "passed",
+    "rust_cargo_check": "passed",
+    "knowledge_package_tests": "6 passed; isolated PostgreSQL, extraction model stub",
+    "live_model_and_sandbox": "not verified",
+    "backend_regression": "57 passed (integration, search, knowledge packages)"
+  },
+  "operational_notes": [
+    "Migrations were tested only in temporary PostgreSQL instances; production was not modified.",
+    "Migration 009 requires PostgreSQL pg_trgm extension availability and installation privilege.",
+    "ZIP parsing requires python3 on the API host and never extracts archive paths to disk.",
+    "Existing uncommitted changes were preserved; no git commit was created."
+  ]
+}
