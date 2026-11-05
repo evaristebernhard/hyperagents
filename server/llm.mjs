@@ -1,4 +1,5 @@
 import { summarizeToolResult } from './tool-result-preview.mjs';
+import { fetchProvider, ProviderError, generationFailure, GENERATION_MAX_TOKENS } from './provider-transport.mjs';
 import { ApiError, validFollowUps } from './validation.mjs';
 import { once } from 'node:events';
 import { createWorkspaceTools } from './tools.mjs';
@@ -208,11 +209,11 @@ export function createLlm({apiKey,fetchImpl=globalThis.fetch,publicFetch,openAle
       if(attempts.length>=20)fail(429,'Too many generation requests. Try again later.');
       attempts.push(time);locks.add(key);active++;
       const controller=new AbortController(),signal=controller.signal;
-      let reader,outputBytes=0,usage,totalUsage,finished=false;
+      let reader,outputBytes=0,usage,totalUsage,finished=false,timedOut=false,roundNumber=0;
       let reasoningMs=0, reasoningStarted, reasoningObserved=false;
       const finishReasoning=()=>{if(reasoningStarted===undefined)return false;reasoningMs=Math.min(86400000,reasoningMs+Math.max(0,Math.round(performance.now()-reasoningStarted)));reasoningStarted=undefined;return true;};
       const abort=()=>controller.abort(new Error('cancelled'));
-      const timer=setTimeout(abort,execution.timeoutMs ?? LIMITS.timeoutMs);timer.unref();
+      const timer=setTimeout(()=>{timedOut=true;abort();},execution.timeoutMs ?? LIMITS.timeoutMs);timer.unref();
       req.once('aborted',abort);res.once('close',abort);
       const emit=async event=> {
         if(signal.aborted || res.destroyed)throw Error('cancelled');
@@ -226,9 +227,10 @@ export function createLlm({apiKey,fetchImpl=globalThis.fetch,publicFetch,openAle
         let finalAnswer=false,toolCount=0;
         const generatedFileIds=new Set();
         for(let round=0;round<(execution.maxRounds ?? 8);round++) {
+          roundNumber=round+1;
           finished=false;let turnText='',turnReasoning='',finishReason,contentStarted=false;
           const calls=new Map();
-          const upstream=await abortable(fetchImpl(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`,'Accept':'text/event-stream'},body:JSON.stringify({...conversation,...(definitions.length?{tools:definitions}:{}),stream:true,stream_options:{include_usage:true},max_tokens:8192}),signal}),signal);
+          const upstream=await abortable(fetchProvider(fetchImpl,ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`,'Accept':'text/event-stream'},body:JSON.stringify({...conversation,...(definitions.length?{tools:definitions}:{}),stream:true,stream_options:{include_usage:true},max_tokens:GENERATION_MAX_TOKENS}),signal},{onRetry:retry=>emit({type:'provider_retry',round:roundNumber,...retry})}),signal);
           if(!upstream.ok || !upstream.body || !/^text\/event-stream(?:;|$)/i.test(upstream.headers.get('content-type') || '')) { void upstream.body?.cancel().catch(()=>{});throw Error('provider failure'); }
           reader=upstream.body.getReader();
           for await(const data of parseSSE(reader,signal)) {
@@ -262,6 +264,7 @@ export function createLlm({apiKey,fetchImpl=globalThis.fetch,publicFetch,openAle
           }
           if(usage) { totalUsage=totalUsage || {}; for(const [key,value] of Object.entries(usage)) totalUsage[key]=(totalUsage[key] || 0)+value; usage=undefined; }
           void reader.cancel().catch(()=>{});reader=undefined;
+          if(finishReason==='length')throw new ProviderError('MODEL_OUTPUT_TRUNCATED','The model exhausted its token budget before completing the answer or tool arguments. Partial tool calls were not executed.');
           if(!finished || (finishReason && !['stop','tool_calls'].includes(finishReason)))throw Error('incomplete stream');
           if(!calls.size) {if(finishReasoning())await emit({type:'reasoning_timing',reasoningMs});finalAnswer=true;break;}
           if(calls.size+toolCount>(execution.maxTools ?? 12))throw Error('tool call limit');
@@ -304,11 +307,11 @@ export function createLlm({apiKey,fetchImpl=globalThis.fetch,publicFetch,openAle
         await emit({type:'done',model:conversation.model,...(totalUsage?{usage:totalUsage}:{})});
         completed.add(messageKey);if(completed.size>2000)completed.delete(completed.values().next().value);
         res.end();
-      } catch {
+      } catch (error) {
         // Validation/admission errors use HTTP JSON; provider failures always use the SSE contract.
         if(!res.destroyed) {
           if(!res.headersSent)res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-store, no-transform','X-Accel-Buffering':'no'});
-          res.end('data: '+JSON.stringify({type:'error',message:'Generation failed or was interrupted. Try again.'})+'\n\n');
+          res.end('data: '+JSON.stringify({type:'error',...generationFailure(error,{signal,timedOut}),round:roundNumber,...(totalUsage?{usage:totalUsage}:{})})+'\n\n');
         }
       } finally {
         clearTimeout(timer);controller.abort();await browser.close().catch(()=>{});req.off('aborted',abort);res.off('close',abort);

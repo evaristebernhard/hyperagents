@@ -12,6 +12,7 @@ const {validFollowUps,validReasoningMs,validKnowledgeHints,emptyState,validateSt
 let source=await readFile(new URL('./llm.mjs',import.meta.url),'utf8');
 source=source.replace(/^import .* from '\.\/([^']+)';$/gm,(line,name)=>{
   if(name==='validation.mjs')return line.replace('./'+name,validationUrl);
+  if(name==='provider-transport.mjs')return line.replace('./'+name,new URL('./'+name,import.meta.url).href);
   if(name==='tool-registry.mjs')return line.replace('./'+name,new URL('./'+name,import.meta.url).href);
   if(name==='tool-result-preview.mjs')return 'const summarizeToolResult = result => JSON.stringify(result);';
   if(name==='marketplace.mjs')return 'const requiredSkillTools=()=>[];';

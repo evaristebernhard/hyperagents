@@ -1,6 +1,7 @@
 import { MODELS, parseSSE } from './llm.mjs';
 import { createToolRegistry, validateToolArguments } from './tool-registry.mjs';
 import { ApiError } from './validation.mjs';
+import { fetchProvider, ProviderError, GENERATION_MAX_TOKENS } from './provider-transport.mjs';
 
 const ENDPOINT = 'https://api.deepseek.com/chat/completions';
 export const AGENT_MODEL_LIMITS = Object.freeze({ outputBytes: 256 * 1024, requestBytes: 2 * 1024 * 1024, toolCalls: 8, messages: 256, tools: 128 });
@@ -59,7 +60,7 @@ export function createAgentModel({ apiKey, fetchImpl = globalThis.fetch, model =
       const schemas = new Map(definitions.map(definition => [definition.function.name, definition.function.parameters]));
       let body;
       try {
-        body = JSON.stringify({ model: selected, messages, ...(definitions.length ? { tools: definitions } : {}), thinking: { type: 'enabled' }, reasoning_effort: 'high', stream: true, stream_options: { include_usage: true }, max_tokens: 8192 });
+        body = JSON.stringify({ model: selected, messages, ...(definitions.length ? { tools: definitions } : {}), thinking: { type: 'enabled' }, reasoning_effort: 'high', stream: true, stream_options: { include_usage: true }, max_tokens: GENERATION_MAX_TOKENS });
       } catch { fail(422, 'Agent messages must be serializable.'); }
       if (Buffer.byteLength(body) > AGENT_MODEL_LIMITS.requestBytes) fail(413, 'Agent context exceeds the request byte limit.');
 
@@ -74,7 +75,7 @@ export function createAgentModel({ apiKey, fetchImpl = globalThis.fetch, model =
       };
       try {
         signal.throwIfAborted();
-        upstream = await abortable(fetchImpl(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}`, Accept: 'text/event-stream' }, body, signal }), signal);
+        upstream = await abortable(fetchProvider(fetchImpl,ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}`, Accept: 'text/event-stream' }, body, signal }), signal);
         if (!upstream.ok || !upstream.body || !/^text\/event-stream(?:;|$)/i.test(upstream.headers.get('content-type') || '')) fail(502, 'DeepSeek did not return a valid event stream.');
         reader = upstream.body.getReader();
         for await (const data of parseSSE(reader, signal)) {
@@ -110,6 +111,7 @@ export function createAgentModel({ apiKey, fetchImpl = globalThis.fetch, model =
             finishReason = choice.finish_reason;
           }
         }
+        if(finishReason==='length')fail(502,'Provider token budget exhausted before a complete turn.','MODEL_OUTPUT_TRUNCATED');
         if (!finished || !['stop', 'tool_calls'].includes(finishReason) || (calls.size > 0) !== (finishReason === 'tool_calls')) fail(502, 'Provider stream ended before a complete turn.');
         const ordered = [...calls.entries()].sort(([a], [b]) => a - b).map(([, call]) => call);
         if (ordered.some(call => !/^[-_A-Za-z0-9]{1,200}$/.test(call.id) || !schemas.has(call.function.name)) || new Set(ordered.map(call => call.id)).size !== ordered.length) fail(502, 'Provider returned an unknown tool or invalid call identity.');
@@ -126,6 +128,7 @@ export function createAgentModel({ apiKey, fetchImpl = globalThis.fetch, model =
       } catch (error) {
         if (signal.aborted) fail(499, 'Agent generation cancelled.', 'AGENT_CANCELLED');
         if (error instanceof ApiError) throw error;
+        if (error instanceof ProviderError) fail(502,error.message,error.code);
         // Provider error bodies and transport messages can contain credentials.
         fail(502, 'Agent model request failed.', 'AGENT_MODEL_UPSTREAM');
       } finally {

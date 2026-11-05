@@ -88,7 +88,7 @@ test('invalid model, missing credentials and oversized request fail before trans
 
 test('transport failures are sanitized and cancellation interrupts a stalled reader', async () => {
   const bad = createAgentModel({ apiKey: 'super-secret', fetchImpl: async () => { throw Error('super-secret in transport'); } });
-  await assert.rejects(bad.step({ messages }), error => error.code === 'AGENT_MODEL_UPSTREAM' && !error.message.includes('super-secret'));
+  await assert.rejects(bad.step({ messages }), error => error.code === 'PROVIDER_NETWORK' && !error.message.includes('super-secret'));
   let cancelled = false;
   const stream = new ReadableStream({ cancel() { cancelled = true; } });
   const controller = new AbortController();
