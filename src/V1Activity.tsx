@@ -1,3 +1,4 @@
+import { TaskLifecycle } from "./V1TaskLifecycle";
 import { useState } from "react";
 import {
   CheckCircle2,
@@ -10,8 +11,15 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
-import { type Task, type TaskEvent, stateLabel, terminal } from "./v1-client";
+import {
+  type Task,
+  type TaskEvent,
+  type TaskOverview,
+  stateLabel,
+  terminal,
+} from "./v1-client";
 const titles: Record<string, string> = {
+  update_plan: "Updating the task plan",
   image_search: "Finding public images",
   web_search: "Searching the web",
   web_read: "Reading a webpage",
@@ -52,8 +60,12 @@ export function TaskActivity({
   onRetry,
   busy,
   readonly,
+  overview,
+  onAction,
 }: {
   task: Task;
+  overview?: TaskOverview;
+  onAction: (action: "pause" | "resume" | "provide_input" | "new_task") => void;
   events: TaskEvent[];
   onCancel: () => void;
   onRetry: () => void;
@@ -62,6 +74,17 @@ export function TaskActivity({
 }) {
   const [expanded, setExpanded] = useState(false);
   const running = !terminal(task.state) && task.state !== "uncertain";
+  const actions = overview?.availableActions ?? [];
+  const controlLabel =
+    !terminal(task.state) &&
+    task.state !== "uncertain" &&
+    overview?.control !== "normal"
+      ? overview?.control === "paused"
+        ? "Paused"
+        : overview?.control === "pause_requested"
+          ? "Pausing…"
+          : undefined
+      : undefined;
   const operations = new Map<string, TaskEvent["payload"]>();
   for (const e of events) {
     if (e.payload.type !== "tool") continue;
@@ -79,7 +102,10 @@ export function TaskActivity({
   );
   return (
     <article
-      className={"rt-message assistant v1-run " + (running ? "is-running" : "")}
+      className={
+        "rt-message assistant v1-run " +
+        (running && overview?.control !== "paused" ? "is-running" : "")
+      }
       aria-label="Task progress"
       data-run-id={task.id}
     >
@@ -93,7 +119,9 @@ export function TaskActivity({
             <Circle size={16} />
           )}
         </span>
-        <strong role="status">{stateLabel[task.state] || task.state}</strong>
+        <strong role="status">
+          {controlLabel || stateLabel[task.state] || task.state}
+        </strong>
         <button
           className="plain"
           aria-expanded={expanded || running}
@@ -101,7 +129,7 @@ export function TaskActivity({
         >
           {tools.length} activities <ChevronDown size={13} />
         </button>
-        {running && (
+        {actions.includes("cancel") && (
           <button
             className="btn small"
             disabled={busy || readonly}
@@ -111,6 +139,28 @@ export function TaskActivity({
           </button>
         )}
       </div>
+      <div className="v1-task-actions">
+        {(["pause", "resume", "provide_input", "new_task"] as const)
+          .filter((a) => actions.includes(a))
+          .map((action) => (
+            <button
+              key={action}
+              className="btn small"
+              disabled={busy || readonly}
+              onClick={() => onAction(action)}
+            >
+              {
+                {
+                  pause: "Pause task",
+                  resume: "Resume task",
+                  provide_input: "Add information",
+                  new_task: "Start follow-up task",
+                }[action]
+              }
+            </button>
+          ))}
+      </div>
+      {overview && <TaskLifecycle overview={overview} />}
       {!!task.context?.length && (
         <details className="rt-context">
           <summary>Context used · {task.context.length} resources</summary>
@@ -124,25 +174,18 @@ export function TaskActivity({
           ))}
         </details>
       )}
-      {running && !tools.length && (
+      {running && !controlLabel && !tools.length && (
         <p className="muted">Preparing the next step…</p>
       )}
-      {task.state === "failed" &&
-        [
-          "MODEL_TIMEOUT",
-          "MODEL_NETWORK",
-          "MODEL_UNAVAILABLE",
-          "MODEL_STREAM_INTERRUPTED",
-          "MODEL_RATE_LIMIT",
-        ].includes(task.errorCode || "") && (
-          <button
-            className="btn small"
-            disabled={busy || readonly}
-            onClick={onRetry}
-          >
-            Resume saved run
-          </button>
-        )}
+      {actions.includes("retry") && (
+        <button
+          className="btn small"
+          disabled={busy || readonly}
+          onClick={onRetry}
+        >
+          Retry saved run
+        </button>
+      )}
       {task.errorCode && (
         <p className="rt-error" role="alert">
           {problems[task.errorCode] || "This run could not finish."} Saved files
@@ -205,7 +248,12 @@ export function TaskActivity({
                         ? "Done"
                         : terminal(task.state)
                           ? "Stopped"
-                          : "In progress"}
+                          : overview &&
+                              !overview.currentOperations.some(
+                                (op) => op.id === id,
+                              )
+                            ? "Queued"
+                            : "In progress"}
                   </em>
                   <ChevronRight className="v1-activity-chevron" size={14} />
                 </summary>

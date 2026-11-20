@@ -15,6 +15,9 @@ import {
   claim,
   getTask,
   cancelTask,
+  controlTask,
+  settlePauses,
+  taskOverview,
   prepareBrowser,
   consumeBrowserInputs,
   enqueueBrowserResult,
@@ -120,7 +123,10 @@ async function profile() {
   assert.equal(r.statusCode, 200, r.body);
   return r.json().id as string;
 }
-async function pending(profileId?: string) {
+async function pending(
+  profileId?: string,
+  runtime: "typescript" | "rust" = "typescript",
+) {
   const pid = profileId || (await profile()),
     { taskId } = await createTask(
       db,
@@ -128,7 +134,12 @@ async function pending(profileId?: string) {
       { prompt: "Use browser", browserProfileId: pid },
       randomUUID(),
       u.userId,
+      runtime,
     );
+  if (runtime === "rust")
+    await db.query("UPDATE tasks SET runtime_phase='tools' WHERE id=$1", [
+      taskId,
+    ]);
   assert.equal((await claim(db))?.id, taskId);
   const id = randomUUID(),
     callId = randomUUID();
@@ -741,3 +752,49 @@ test("handoff never resumes a non-replayable computation interrupted by takeover
   await consumeBrowserInputs(db);
   assert.equal((await getTask(db, taskId)).state, "uncertain");
 });
+
+for (const runtime of ["typescript", "rust"] as const) {
+  test(`${runtime}: browser callback and human handback preserve task pause`, async () => {
+    const { taskId, op, s } = await pending(undefined, runtime);
+    await db.query(
+      "UPDATE browser_outbox SET status='running' WHERE operation_id=$1",
+      [op.id],
+    );
+    await controlTask(db, taskId, u.workspaceId, "pause");
+    assert.equal((await getTask(db, taskId)).control_state, "pause_requested");
+    await enqueueBrowserResult(db, op.id, taskId, { ok: true });
+    await consumeBrowserInputs(db);
+    await settlePauses(db);
+    assert.equal((await getTask(db, taskId)).control_state, "paused");
+    assert.equal(await claim(db), undefined);
+    await transitionBrowser(
+      db,
+      service,
+      u,
+      s.id,
+      "takeover",
+      s.control_epoch,
+      randomUUID(),
+    );
+    const fresh = (
+      await db.query("SELECT * FROM browser_sessions WHERE id=$1", [s.id])
+    ).rows[0];
+    await transitionBrowser(
+      db,
+      service,
+      u,
+      s.id,
+      "handback",
+      fresh.control_epoch,
+      randomUUID(),
+    );
+    await consumeBrowserInputs(db);
+    assert.equal(
+      (await taskOverview(db, taskId, u.workspaceId)).control,
+      "paused",
+    );
+    assert.equal(await claim(db), undefined);
+    await controlTask(db, taskId, u.workspaceId, "resume");
+    assert.equal((await claim(db))?.id, taskId);
+  });
+}

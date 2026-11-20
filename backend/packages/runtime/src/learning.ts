@@ -103,7 +103,11 @@ export async function extractLearning(
         "INSERT INTO operations(id,task_id,step,call_id,name,args,status,replay,ordinal) VALUES($1,$2,$3,$4,$5,$6,'running','safe',0)",
         [op.id, op.task_id, op.step, op.call_id, op.name, JSON.stringify(args)],
       );
-      const result = await new ToolExecutor(db, config).execute(
+      // Completed-task extraction is admitted by its durable learning job, not
+      // an agent execution lease. Keep the normal tool dispatcher fenced.
+      const executor = new ToolExecutor(db, config);
+      const result = await executor.handlers.learning_propose.call(
+        executor,
         task,
         op,
         AbortSignal.timeout(10000),

@@ -6,13 +6,15 @@ import { EventEmitter } from 'node:events';
 // This focused snapshot omits adapter dependencies. Stub only those adapters;
 // exercise the actual LLM loop, registry and validation with synthetic SSE, no network.
 const moduleUrl = source => 'data:text/javascript;base64,'+Buffer.from(source).toString('base64');
-const validationSource=(await readFile(new URL('./validation.mjs',import.meta.url),'utf8')).replace("import { parseSlidesContent } from './slides.mjs';",'const parseSlidesContent=JSON.parse;');
+const validationSource=(await readFile(new URL('./validation.mjs',import.meta.url),'utf8')).replace("import { parseSlidesContent } from './slides.mjs';",'const parseSlidesContent=JSON.parse;').replace("from './companion-memory.mjs'","from '"+new URL('./companion-memory.mjs',import.meta.url).href+"'");
 const validationUrl=moduleUrl(validationSource);
 const {validFollowUps,validReasoningMs,validKnowledgeHints,emptyState,validateState}=await import(validationUrl);
 let source=await readFile(new URL('./llm.mjs',import.meta.url),'utf8');
 source=source.replace(/^import .* from '\.\/([^']+)';$/gm,(line,name)=>{
   if(name==='validation.mjs')return line.replace('./'+name,validationUrl);
   if(name==='provider-transport.mjs')return line.replace('./'+name,new URL('./'+name,import.meta.url).href);
+  if(name==='scnet-agent-model.mjs')return line.replace('./'+name,new URL('./'+name,import.meta.url).href);
+  if(name==='companion-memory.mjs')return line.replace('./'+name,new URL('./'+name,import.meta.url).href);
   if(name==='tool-registry.mjs')return line.replace('./'+name,new URL('./'+name,import.meta.url).href);
   if(name==='tool-result-preview.mjs')return 'const summarizeToolResult = result => JSON.stringify(result);';
   if(name==='marketplace.mjs')return 'const requiredSkillTools=()=>[];';
@@ -103,6 +105,7 @@ test('real run manager persists validated metadata only on success without schem
   managerSource=managerSource.replace(/^import .* from '\.\/([^']+)';$/gm,(line,name)=>{
     if(name==='validation.mjs')return line.replace('./'+name,validationUrl);
     if(name==='llm.mjs')return line.replace('./'+name,moduleUrl(source));
+    if(name==='managed-plan.mjs')return line.replace('./'+name,new URL('./managed-plan.mjs',import.meta.url).href);
     if(name==='managed-actions.mjs')return 'const normalizeManagedAction=x=>x,managedActionSucceeded=()=>true;';
     if(name==='managed-skills.mjs')return 'const createManagedSkillTools=()=>({definitions:[]});';
     if(name==='workspace-file-tools.mjs')return 'const createWorkspaceFileTools=()=>({definitions:[]});';

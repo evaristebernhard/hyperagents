@@ -21,3 +21,8 @@ export * from "./private-socket.js";
 export * from "./skill-packages.js";
 export * from "./skill-import.js";
 export * from "./learning.js";
+
+export * from "./task-control.js";
+export * from "./task-plan.js";
+export * from "./task-overview.js";
+export * from "./delivery.js";

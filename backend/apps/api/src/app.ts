@@ -1,3 +1,5 @@
+import { TaskOverview } from "@hyper/contracts";
+import { controlTask, taskOverview } from "@hyper/runtime";
 import websocket from "@fastify/websocket";
 import { browserRoutes } from "./browser-routes.js";
 import { BrowserClient } from "@hyper/runtime";
@@ -313,6 +315,26 @@ export async function buildApp(db: Db, config: Config) {
     async (req) =>
       publicTask(await getTask(db, req.params.id, who(req).workspaceId)),
   );
+  app.get(
+    "/api/v1/tasks/:id/overview",
+    { schema: { params: Params, response: { 200: TaskOverview } } },
+    async (req) => taskOverview(db, req.params.id, who(req).workspaceId),
+  );
+  for (const action of ["pause", "resume"] as const) {
+    app.post(
+      "/api/v1/tasks/:id/" + action,
+      { schema: { params: Params, response: { 200: TaskOverview } } },
+      async (req) => {
+        const rootId = await controlTask(
+          db,
+          req.params.id,
+          who(req).workspaceId,
+          action,
+        );
+        return taskOverview(db, rootId, who(req).workspaceId);
+      },
+    );
+  }
   app.post(
     "/api/v1/tasks/:id/instructions",
     { schema: { params: Params, body: Followup } },

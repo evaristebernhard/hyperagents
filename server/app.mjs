@@ -1,3 +1,4 @@
+import {createElysProjectProxy} from './elys-project-proxy.mjs';
 import { SLIDES_SCRIPT_HASH } from './slides.mjs';
 import http from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
@@ -19,6 +20,8 @@ import { marketplaceCapabilities, marketplaceCatalog } from './marketplace.mjs';
 import { buildCapabilityManifest } from './capability-authority.mjs';
 import { createIntegrationRegistry } from './integrations.mjs';
 import { createApprovalBroker } from './integration-approvals.mjs';
+import { createPersistentBrowserClient } from '../../server/persistent-browser-client.mjs';
+import { browserNamespace, createPersistentBrowserTools } from './persistent-browser-tools.mjs';
 const scrypt = promisify(scryptCallback);
 const hash = value => createHash('sha256').update(value).digest('hex');
 const random = () => randomBytes(32).toString('base64url');
@@ -89,7 +92,7 @@ export async function createApp(options = {}) {
   const integrationRegistry=createIntegrationRegistry({credentials:options.integrationCredentials,fetchImpl:options.integrationFetch,load});
   const approvalBroker=createApprovalBroker({load,registry:integrationRegistry});
   // Only authenticated chat execution can read saved, workspace-owned UTF-8 text.
-  const probeProvider=createProviderProbe({apiKey:options.deepseekApiKey,fetchImpl:options.llmProbeFetch});
+  const probeProvider=createProviderProbe({apiKey:options.deepseekApiKey,fetchImpl:options.llmProbeFetch,scnetConfig:options.scnetModelConfig});
   const readAttachment=async(f,workspaceId)=> {
     if (!/^file-[a-f0-9-]{36}$/.test(f.id)) return null;
     const stored=findFile(f.id,workspaceId);
@@ -117,7 +120,14 @@ export async function createApp(options = {}) {
     try { handle=await open(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600); await handle.writeFile(bytes); await handle.sync(); await handle.close(); handle=undefined; await rename(temp,target); moved=true; db.prepare('INSERT INTO files VALUES (?,?,?,?,?,?)').run(id,workspaceId,filename,bytes.length,mimeType,createdAt); return {type:'file',id,name:filename,size:bytes.length,mimeType,createdAt,workspaceId}; }
     catch(e){if(handle)await handle.close().catch(()=>{});await unlink(moved?target:temp).catch(()=>{});throw e;}
   };
-  const llm=createLlm({apiKey:options.deepseekApiKey,integrationRegistry,approvalBroker,fetchImpl:options.llmFetch,publicFetch:options.publicFetch,exaFetch:options.exaFetch,openAlexApiKey:options.openAlexApiKey,exaApiKey:options.exaApiKey,publicUserAgent:options.publicUserAgent,moliPath:options.moliPath,browserProvider:options.browserProvider,browserPath:options.browserPath,persistVisual,load,readAttachment});
+  const browserClient=options.persistentBrowserClient||createPersistentBrowserClient(options.persistentBrowserConfig);
+  const persistentBrowserFactory=(options.persistentBrowserEnabled||options.persistentBrowserConfig||options.persistentBrowserClient)?({workspaceId,runId,enabled,persistFile,onHumanWait,humanWaitTimeoutMs})=>{
+    workspace(workspaceId);
+    const client=options.persistentBrowserClientFactory?options.persistentBrowserClientFactory({runId}):options.persistentBrowserClient||createPersistentBrowserClient(options.persistentBrowserConfig?{...options.persistentBrowserConfig,runId}:undefined);
+    return createPersistentBrowserTools({client,workspaceId,enabled,persistFile,onHumanWait,humanWaitTimeoutMs});
+  }:undefined;
+  const persistentBrowserMetadata=persistentBrowserFactory?{implemented:true,configured:browserClient.configured===true,provider:'persistent-chromium',reason:'Workspace-isolated persistent Chromium with explicit human takeover and handback; configuration is not a health test.'}:undefined;
+  const llm=createLlm({apiKey:options.deepseekApiKey,integrationRegistry,approvalBroker,fetchImpl:options.llmFetch,publicFetch:options.publicFetch,exaFetch:options.exaFetch,openAlexApiKey:options.openAlexApiKey,exaApiKey:options.exaApiKey,publicUserAgent:options.publicUserAgent,moliPath:options.moliPath,browserProvider:options.browserProvider,browserPath:options.browserPath,persistVisual,load,readAttachment,scnetConfig:options.scnetModelConfig,persistentBrowserFactory});
   const commit = (state, revision) => {
     if (!Number.isSafeInteger(revision) || revision<0) err(400,'A valid revision is required.');
     const data=JSON.stringify(state); if (Buffer.byteLength(data)>maxStateBytes) err(413,'Workspace is too large.');
@@ -138,13 +148,33 @@ export async function createApp(options = {}) {
       if(existing.archived||existing.messages?.length!==1||first.id!==userMessageId||first.text!==task||settings?.agentId!==agentId||JSON.stringify(settings.tools)!==JSON.stringify(tools))throw Error('Delegated thread conflicts with existing data.');
       return {workspaceId,threadId,userMessageId};
     }
-    const settings={model:MODELS.includes(agent.model)?agent.model:'deepseek-flash',reasoning:agent.reasoning||'Medium',provider:'DeepSeek',mode:'Execute',agentId,tools:[...tools]};
+    const settings={model:llm.config().provider==='SCNet DCU'?llm.config().models[0]:MODELS.includes(agent.model)?agent.model:'deepseek-flash',reasoning:agent.reasoning||'Medium',provider:llm.config().provider||'DeepSeek',mode:'Execute',agentId,tools:[...tools]};
     const timestamp=now();
     w.data.threads.push({id:threadId,title:(agent.name+' · Delegated task').slice(0,512),summary:'Read-only delegated work',time:'Now',createdAt:timestamp,updatedAt:timestamp,config:settings,messages:[{id:userMessageId,role:'user',text:task,createdAt:timestamp,context:{settings}}]});
     validateState(current.state,findFile);commit(current.state,current.revision);
     return {workspaceId,threadId,userMessageId};
   };
-  const runs=createRunManager({dataDir,llm,load,readAttachment,createDelegatedThread,skillCatalog:options.skillCatalog||[],skillRoot:options.skillRoot||options.shellRoot||process.cwd(),skillCredentialProvider:options.skillCredentialProvider,persistGeneratedFile:persistVisual,validateAdmission:(state,request)=>{try{integrationRegistry.bind(state,request,approvalBroker);}catch(e){throw new ApiError(422,e.message,'INTEGRATION_SETUP');}},shellRoot:options.shellRoot ?? process.cwd(),maxConcurrent:options.runConcurrency ?? 2,timeoutMs:options.runTimeoutMs ?? 20*60*1000,persist:run=> {
+  const createContinuationMessage=async({workspaceId,threadId,sourceRunId,sourceMessageId,sourceHash,userMessageId,text})=>{
+    const current=load(),w=current.state.workspaces.find(w=>w.id===workspaceId),thread=w?.data.threads.find(thread=>thread.id===threadId&&!thread.archived);
+    const source=thread?.messages?.find(message=>message.id===sourceMessageId);
+    if(!thread || !source || hash(source.text)!==sourceHash)throw new ApiError(409,'The original request changed before continuation.');
+    const existing=thread.messages.find(message=>message.id===userMessageId);
+    if(existing){
+      if(existing.role!=='user'||existing.text!==text||existing.runContinuation?.sourceRunId!==sourceRunId)throw new ApiError(409,'Saved continuation conflicts with this request.');
+      return {workspaceId,threadId,userMessageId};
+    }
+    if(thread.messages.findLast(message=>message.role==='user')?.id!==sourceMessageId)throw new ApiError(409,'This thread has a newer message. Review it before continuing.');
+    const settings=structuredClone(thread.config||source.context?.settings||w.data.preferences?.defaultThreadSettings||{model:'',reasoning:'Medium',provider:'Any',mode:'Execute',tools:[]});
+    const timestamp=now();
+    const context={settings};
+    for(const [field,collection] of [['skillIds','skills'],['memoryIds','memories'],['artifactIds','artifacts'],['integrationIds','connections']])
+      context[field]=(source.context?.[field]||[]).filter(id=>w.data[collection].some(item=>item.id===id&&!item.archived&&(collection!=='connections'||item.enabled)));
+    if(thread.projectId)context.projectId=thread.projectId;
+    thread.messages.push({id:userMessageId,role:'user',text,createdAt:timestamp,runContinuation:{sourceRunId},context});thread.updatedAt=timestamp;
+    validateState(current.state,findFile);commit(current.state,current.revision);
+    return {workspaceId,threadId,userMessageId};
+  };
+  const runs=createRunManager({dataDir,llm,load,readAttachment,createDelegatedThread,createContinuationMessage,skillCatalog:options.skillCatalog||[],skillRoot:options.skillRoot||options.shellRoot||process.cwd(),skillCredentialProvider:options.skillCredentialProvider,persistGeneratedFile:persistVisual,validateAdmission:(state,request)=>{try{integrationRegistry.bind(state,request,approvalBroker);}catch(e){throw new ApiError(422,e.message,'INTEGRATION_SETUP');}},shellRoot:options.shellRoot ?? process.cwd(),maxConcurrent:options.runConcurrency ?? 2,timeoutMs:options.runTimeoutMs ?? 20*60*1000,persist:run=> {
     const current=load(),w=current.state.workspaces.find(w=>w.id===run.request.workspaceId),thread=w?.data.threads.find(t=>t.id===run.request.threadId && !t.archived);
     const index=thread?.messages?.findIndex(m=>m.id===run.request.userMessageId) ?? -1;
     if(!thread || index<0 || hash(thread.messages[index].text)!==run.sourceHash)throw Error('Run source changed.');
@@ -179,7 +209,7 @@ export async function createApp(options = {}) {
     thread.messages.splice(index+1,0,{id:answerId,role:'assistant',text,createdAt:now(),...(generatedContext?{context:generatedContext}:{}),...(run.status==='succeeded'?{...(run.followUps?{followUps:run.followUps}:{}),...(run.reasoningMs!==undefined?{reasoningMs:run.reasoningMs}:{}),...(run.knowledgeHints?{knowledgeHints:run.knowledgeHints}:{})}:{}),...(tools.length?{toolRuns:tools}:{}),...(run.approvals.length?{actionRequests:run.approvals.slice(0,12)}:{})});thread.updatedAt=now();
     validateState(current.state,findFile);commit(current.state,current.revision);return true;
   }});
-  const taskModel = options.taskModel ?? createAgentModel({apiKey:options.deepseekApiKey,fetchImpl:options.llmFetch});
+  const taskModel = options.taskModel ?? createAgentModel({apiKey:options.deepseekApiKey,fetchImpl:options.llmFetch,scnetConfig:options.scnetModelConfig});
   const taskPlugins = options.taskPlugins ?? createAgentPlugins({load,readAttachment,publicFetch:options.publicFetch,exaApiKey:options.exaApiKey,exaFetch:options.exaFetch,openAlexApiKey:options.openAlexApiKey,publicUserAgent:options.publicUserAgent,freeSearchDisabled:options.freeSearchDisabled,plugins:options.agentPlugins ?? [],persistArtifact:async({workspaceId,taskId,effectId,title,content})=>{
     const current=load(),w=current.state.workspaces.find(w=>w.id===workspaceId);
     if(!w)throw new ApiError(404,'Task workspace is unavailable.');
@@ -191,6 +221,7 @@ export async function createApp(options = {}) {
     validateState(current.state,findFile);commit(current.state,current.revision);
     return {id,title,kind:'Document',workspaceId,taskId};
   }});
+  const elysProjectProxy=createElysProjectProxy({load,...(options.elysTargets?{targets:options.elysTargets}:{})});
   const tasks=createTaskRuntime({dataDir,model:taskModel,plugins:taskPlugins,load,concurrency:options.taskConcurrency ?? 2,stepTimeoutMs:options.taskStepTimeoutMs ?? 120000});
   const limits = new Map();
   const rateWindow = 15*60*1000;
@@ -285,6 +316,7 @@ export async function createApp(options = {}) {
       const session=getSession(req);
       if (!session) err(401,'Sign in required.','UNAUTHENTICATED');
       if (mutation && (typeof req.headers['x-csrf-token']!=='string' || req.headers['x-csrf-token']!==session.csrf)) err(403,'Invalid CSRF token.','CSRF');
+      if(route.startsWith('/api/project-apps/elys/'))return await elysProjectProxy(req,res);
       if (route==='/api/logout' && method==='POST') {
         db.prepare('DELETE FROM sessions WHERE digest=?').run(session.digest);
         res.setHeader('Set-Cookie',`hyperagents_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure?'; Secure':''}`);
@@ -300,22 +332,33 @@ export async function createApp(options = {}) {
         const b=await body(req,70000);exactBody(b,['token','confirmed','workspaceId','threadId']);if(b.confirmed!==true)err(422,'Explicit confirmation is required.','CONFIRMATION');
         rate('integration-writes',60);try{return send(res,200,await approvalBroker.execute(b.token,{workspaceId:b.workspaceId,threadId:b.threadId}));}catch(e){err(422,e.message,'INTEGRATION_ACTION');}
       }
-      if (route==='/api/capabilities' && method==='GET') return send(res,200,buildCapabilityManifest({openAlexApiKey:options.openAlexApiKey,exaApiKey:options.exaApiKey,userAgent:options.publicUserAgent,moliPath:options.moliPath,browserProvider:options.browserProvider,browserPath:options.browserPath,skillsConfigured:Array.isArray(options.skillCatalog)&&options.skillCatalog.length>0}));
+      if (route==='/api/capabilities' && method==='GET') return send(res,200,buildCapabilityManifest({openAlexApiKey:options.openAlexApiKey,exaApiKey:options.exaApiKey,userAgent:options.publicUserAgent,moliPath:options.moliPath,browserProvider:options.browserProvider,browserPath:options.browserPath,persistentBrowser:persistentBrowserMetadata,skillsConfigured:Array.isArray(options.skillCatalog)&&options.skillCatalog.length>0}));
       if (route==='/api/marketplace/capabilities' && method==='GET') {
-        const result=marketplaceCapabilities({browserProvider:options.browserProvider,browserPath:options.browserPath,moliPath:options.moliPath,skillsConfigured:Array.isArray(options.skillCatalog)&&options.skillCatalog.length>0,deepseekConfigured:llm.config().configured,openAlexApiKey:options.openAlexApiKey,exaApiKey:options.exaApiKey,userAgent:options.publicUserAgent});
+        const result=marketplaceCapabilities({browserProvider:options.browserProvider,browserPath:options.browserPath,moliPath:options.moliPath,persistentBrowser:persistentBrowserMetadata,modelProvider:llm.config().provider,skillsConfigured:Array.isArray(options.skillCatalog)&&options.skillCatalog.length>0,deepseekConfigured:llm.config().configured,openAlexApiKey:options.openAlexApiKey,exaApiKey:options.exaApiKey,userAgent:options.publicUserAgent});
         for(const provider of integrationRegistry.statuses().providers)result.capabilities[provider.name]={available:provider.configured,reason:provider.configured?'Server API adapter configured; select a tested workspace connection. Write operations still need per-action confirmation.':'API adapter implemented; configure '+provider.env.join(' / ')+' and test the provider access.'};
         result.capabilities.Email={available:false,reason:'Gmail supports reads and approval-gated drafts, not direct outbound email sending. See the Gmail capability.'};result.capabilities.Calendar=result.capabilities['Google Calendar'];return send(res,200,result);
       }
       if (route==='/api/marketplace/catalog' && method==='GET') return send(res,200,marketplaceCatalog);
       if (route==='/api/diagnostics' && method==='GET') {
         const row=db.prepare('SELECT revision FROM workspace WHERE id=1').get();
-        return send(res,200,{api:{status:'ready'},database:{status:row?'ready':'unavailable',engine:'SQLite',revision:row?.revision ?? null},provider:{name:'DeepSeek',configured:llm.config().configured,models:llm.config().models},runtime:{node:process.versions.node}});
+        return send(res,200,{api:{status:'ready'},database:{status:row?'ready':'unavailable',engine:'SQLite',revision:row?.revision ?? null},provider:{name:llm.config().provider||'DeepSeek',configured:llm.config().configured,models:llm.config().models},runtime:{node:process.versions.node}});
       }
       if (route==='/api/llm/test' && method==='POST') {
         rate('provider-tests',6);
         return send(res,200,await probeProvider(await body(req,4096)));
       }
       if (route==='/api/llm/config' && method==='GET') return send(res,200,llm.config());
+      if(route==='/api/browser'||route.startsWith('/api/browser/')){
+        const value=['GET','HEAD'].includes(method)?undefined:await body(req,16000);
+        const workspaceId=url.searchParams.get('workspaceId')??value?.workspaceId;
+        if(typeof workspaceId!=='string'||!load().state.workspaces.some(item=>item.id===workspaceId&&!item.archived))err(404,'Browser workspace not found.');
+        if(['owner','namespace','actor','runId','token'].some(key=>url.searchParams.has(key)||(value&&Object.hasOwn(value,key))))err(400,'Browser identity is derived by the server.');
+        const data=value?Object.fromEntries(Object.entries(value).filter(([key])=>key!=='workspaceId')):undefined;
+        const previousUrl=req.url;url.searchParams.delete('workspaceId');req.url=url.pathname+url.search;
+        try{if(await browserClient.handle(req,res,{owner:browserNamespace(workspaceId),basePath:'/api/browser',data}))return;}
+        finally{req.url=previousUrl;}
+        err(404,'Browser route not found.');
+      }
       if (route==='/api/llm/chat' && method==='POST') return await llm.chat(req,res,await body(req,4096));
       if(route==='/api/agent-runtime' && method==='GET')return send(res,200,tasks.config({workspaceId:url.searchParams.get('workspaceId')}));
       const promptMatch=route.match(/^\/api\/agent-prompts\/(router|worker)$/);
@@ -330,10 +373,10 @@ export async function createApp(options = {}) {
         if(method==='POST' && ['cancel','retry'].includes(action) && !encodedEffectId){const b=await body(req,4096);exactBody(b,['workspaceId']);return send(res,200,{task:tasks[action](id,b)});}
         if(method==='POST' && action==='approvals' && encodedEffectId){let effectId;try{effectId=decodeURIComponent(encodedEffectId);}catch{err(400,'Invalid action ID.');}const b=await body(req,4096);exactBody(b,['workspaceId','decision']);return send(res,200,{task:tasks.decide(id,effectId,b)});}
       }
-      if(route==='/api/runtime' && method==='GET')return send(res,200,runs.capabilities());
+      if(route==='/api/runtime' && method==='GET')return send(res,200,{...runs.capabilities(),...(persistentBrowserMetadata?{browser:{...persistentBrowserMetadata,persistent:true,takeover:true,handback:true}}:{})});
       if(route==='/api/runs' && method==='POST') { const b=await body(req,4096);return send(res,202,{run:await runs.create(b)}); }
       if(route==='/api/runs' && method==='GET')return send(res,200,{runs:runs.list({workspaceId:url.searchParams.get('workspaceId'),threadId:url.searchParams.get('threadId')})});
-      const runMatch=route.match(/^\/api\/runs\/([a-f0-9-]{36})(?:\/(events|cancel|approvals|tree|children)(?:\/([a-f0-9-]{36}))?)?$/);
+      const runMatch=route.match(/^\/api\/runs\/([a-f0-9-]{36})(?:\/(events|cancel|continue|approvals|tree|children)(?:\/([a-f0-9-]{36}))?)?$/);
       if(runMatch) {
         const [,id,action,approvalId]=runMatch;
         const scope={workspaceId:url.searchParams.get('workspaceId') ?? undefined,threadId:url.searchParams.get('threadId') ?? undefined};
@@ -341,6 +384,7 @@ export async function createApp(options = {}) {
         if(method==='GET' && action==='events'){const after=url.searchParams.get('after') ?? '0';if(!/^\d{1,10}$/.test(after))err(400,'Invalid event cursor.');return send(res,200,runs.events(id,scope,Number(after)));}
         if(method==='GET' && action==='tree')return send(res,200,runs.tree(id,scope));
         if(method==='POST' && action==='children'){const b=await body(req,4096);exactBody(b,['workspaceId','threadId','userMessageId','model']);return send(res,202,{run:await runs.createChild(id,b)});}
+        if(method==='POST' && action==='continue' && !approvalId){const b=await body(req,4096);exactBody(b,['workspaceId','threadId','requestId']);return send(res,202,{run:await runs.continue(id,b)});}
         if(method==='POST' && action==='cancel' && !approvalId){const b=await body(req,4096);exactBody(b,['workspaceId','threadId']);if(!b.workspaceId||!b.threadId)err(400,'Workspace and thread required.');return send(res,200,{run:runs.cancel(id,b)});}
         if(method==='POST' && action==='approvals' && approvalId){const b=await body(req,4096);exactBody(b,['workspaceId','threadId','decision']);if(!b.workspaceId||!b.threadId)err(400,'Workspace and thread required.');return send(res,200,{run:runs.decide(id,approvalId,b)});}
       }

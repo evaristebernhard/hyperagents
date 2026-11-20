@@ -181,7 +181,39 @@ export const BrowserTransition = z
     note: z.string().max(2000).default(""),
   })
   .strict();
+export const TaskControl = z.enum(["normal", "pause_requested", "paused"]);
+export const PlanStep = z
+  .object({
+    id: z.string().min(1).max(100),
+    title: z.string().min(1).max(500),
+    status: z.enum([
+      "pending",
+      "in_progress",
+      "completed",
+      "blocked",
+      "skipped",
+    ]),
+  })
+  .strict();
+export const UpdatePlan = z
+  .object({
+    expectedVersion: z.number().int().min(0),
+    reason: z.string().min(1).max(2000),
+    steps: z.array(PlanStep).min(1).max(100),
+  })
+  .strict()
+  .refine(
+    (p) => new Set(p.steps.map((s) => s.id)).size === p.steps.length,
+    "Step IDs must be unique",
+  );
+export const TaskPlan = z.object({
+  version: z.number().int().positive(),
+  reason: z.string(),
+  steps: z.array(PlanStep),
+  updatedAt: z.string(),
+});
 export const ToolSchemas = {
+  update_plan: UpdatePlan,
   browser: BrowserAction,
   image_search: z
     .object({
@@ -307,6 +339,8 @@ export const ToolSchemas = {
     .strict(),
 };
 export type ToolName = keyof typeof ToolSchemas;
+export const toolReplay = (name: string): "safe" | "uncertain" =>
+  ["code_execute", "skill_run"].includes(name) ? "uncertain" : "safe";
 export const ToolCall = z.object({
   id: z.string().min(1).max(200),
   name: z.string().min(1).max(100),
@@ -347,6 +381,12 @@ export interface ModelAdapter {
   complete(input: ModelInput): Promise<ModelResult>;
 }
 export const Event = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("control"),
+    control: TaskControl,
+    revision: z.number().int(),
+  }),
+  z.object({ type: z.literal("plan"), plan: TaskPlan }),
   z.object({ type: z.literal("state"), state: State }),
   z.object({
     type: z.literal("browser"),
@@ -411,6 +451,112 @@ export const TaskResponse = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+export const TaskAction = z.enum([
+  "pause",
+  "resume",
+  "retry",
+  "provide_input",
+  "cancel",
+  "new_task",
+]);
+export const OperationSummary = z.object({
+  id: Id,
+  taskId: Id,
+  kind: z.enum(["model", "tool"]),
+  name: z.string(),
+  status: z.string(),
+  errorCode: z.string().nullable(),
+  createdAt: z.string(),
+});
+export const BudgetUsage = z.object({
+  activeMs: z.number(),
+  modelCalls: z.number(),
+  toolCalls: z.number(),
+  tokens: z.number(),
+  reservedTokens: z.number(),
+  transferBytes: z.number(),
+  artifactBytes: z.number(),
+  limits: z.object({
+    activeMs: z.number(),
+    modelCalls: z.number(),
+    toolCalls: z.number(),
+    tokens: z.number(),
+  }),
+});
+export const Deliverable = z.object({
+  artifactId: Id,
+  fileId: Id,
+  taskId: Id,
+  version: z.number().int(),
+  name: z.string(),
+  format: Format,
+  bytes: z.number(),
+  sha256: z.string(),
+  downloadUrl: z.string(),
+  sourceIds: z.array(Id),
+  sources: z.array(
+    z.object({ id: Id, url: z.string(), title: z.string(), read: z.boolean() }),
+  ),
+  validation: z.enum(["passed", "failed", "unverified"]),
+  structuralValidation: z.unknown(),
+  createdAt: z.string(),
+});
+export const DeliveryValidation = z.object({
+  id: Id,
+  taskId: Id,
+  operationId: Id,
+  status: z.enum(["passed", "failed", "unverified"]),
+  issues: z.array(z.string()),
+  artifacts: z.array(
+    z.object({ artifactId: Id, fileId: Id, version: z.number().int() }),
+  ),
+  createdAt: z.string(),
+});
+export const TaskOverview = z.object({
+  task: TaskResponse,
+  rootTaskId: Id,
+  runtime: z.enum(["typescript", "rust"]),
+  control: TaskControl,
+  controlRevision: z.number().int(),
+  plan: TaskPlan.nullable(),
+  completedSteps: z.number().int(),
+  totalSteps: z.number().int(),
+  budget: BudgetUsage,
+  currentOperations: z.array(OperationSummary),
+  diagnosis: z
+    .object({
+      category: z.enum([
+        "model",
+        "tool",
+        "capability",
+        "budget",
+        "validation",
+        "uncertain",
+        "runtime",
+      ]),
+      stage: z.string(),
+      code: z.string(),
+      message: z.string(),
+      lastOperation: OperationSummary.nullable(),
+      issues: z.array(z.string()),
+    })
+    .nullable(),
+  availableActions: z.array(TaskAction),
+  deliverables: z.array(Deliverable),
+  validation: z.array(DeliveryValidation),
+  children: z.array(
+    z.object({
+      id: Id,
+      parentId: Id,
+      state: State,
+      prompt: z.string(),
+      errorCode: z.string().nullable(),
+      plan: TaskPlan.nullable(),
+    }),
+  ),
+  eventCursor: z.string(),
+});
+export type TaskOverview = z.infer<typeof TaskOverview>;
 export class DomainError extends Error {
   constructor(
     public readonly code: string,
@@ -517,6 +663,19 @@ export class Client {
   }
   task(id: string) {
     return this.request("/tasks/" + Id.parse(id), TaskResponse);
+  }
+  overview(id: string) {
+    return this.request("/tasks/" + Id.parse(id) + "/overview", TaskOverview);
+  }
+  pause(id: string) {
+    return this.request("/tasks/" + Id.parse(id) + "/pause", TaskOverview, {
+      method: "POST",
+    });
+  }
+  resume(id: string) {
+    return this.request("/tasks/" + Id.parse(id) + "/resume", TaskOverview, {
+      method: "POST",
+    });
   }
   tasks() {
     return this.request("/tasks", z.array(TaskResponse));

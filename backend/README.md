@@ -98,6 +98,10 @@ const { taskId } = await api.createTask(
 const task = await api.task(taskId);
 ```
 
+## 任务闭环与能力模块
+
+新增结构化计划、整个任务树的暂停／继续、失败诊断和绑定实际文件版本的交付清单。接口、运行时支持范围、增量迁移和验收说明见 [能力总览](docs/capabilities/README.md)。
+
 ## 执行与恢复约定
 
 API 不执行模型循环。Worker 以 pg-boss 唤醒并定期扫描数据库；数据库中的状态和租约为准。默认每个工作区一项运行中的顶层任务，全局两项；每个父任务可创建两项独立子任务，子任务禁止再次分工。主子任务共享调用、token、传输和产物预算。

@@ -51,8 +51,18 @@ export type IntegrationApproval = {
   status: "pending" | "completed" | "failed" | "dismissed";
   result?: string;
 };
-export type KnowledgeHints = { skillIds: string[]; memoryIds: string[] };
+export type KnowledgeHints = {
+  skillIds: string[];
+  memoryIds: string[];
+  memorySnapshots?: Array<{
+    id: string;
+    content: string;
+    visibility: "private" | "shared";
+    agentId: string;
+  }>;
+};
 export type DemoMessage = {
+  runContinuation?: { sourceRunId: string };
   id?: string;
   role: "user" | "assistant";
   text: string;
@@ -82,6 +92,7 @@ export type CanvasPreferences = {
   collapsed?: boolean;
 };
 export type DemoThread = {
+  companionAgentId?: string;
   canvas?: CanvasPreferences;
   id: string;
   title: string;
@@ -100,6 +111,7 @@ export type DemoThread = {
   projectId?: string;
 };
 export type DemoProject = {
+  application?: "elys";
   id: string;
   name: string;
   description: string;
@@ -107,6 +119,7 @@ export type DemoProject = {
   archived?: boolean;
 };
 export type DemoAgent = {
+  companion?: boolean;
   id: string;
   name: string;
   description: string;
@@ -135,6 +148,21 @@ export type DemoMemory = {
   whenToUse?: string;
   tags?: string[];
   scope?: string;
+  companion?: {
+    agentId: string;
+    status: "pending" | "active" | "rejected";
+    visibility: "private" | "shared";
+    createdAt: string;
+    updatedAt: string;
+    source?: { threadId: string; messageId: string; quote: string };
+    history?: Array<{
+      action: string;
+      content: string;
+      status: "pending" | "active" | "rejected";
+      visibility: "private" | "shared";
+      at: string;
+    }>;
+  };
 };
 export type PageProps = {
   path: string;
@@ -149,7 +177,7 @@ export type ResourceProps = PageProps & {
   memories: DemoMemory[];
   setMemories: (items: DemoMemory[]) => void;
   openThread: (id: string) => void;
-  onCreateThread: (text: string, project?: string) => void;
+  onCreateThread: (text: string, project?: string, context?: MessageContext, clientRequestId?: string) => void | Promise<void>;
 };
 export type SettingsProps = {
   section: string;

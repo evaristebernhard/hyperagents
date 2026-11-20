@@ -7,6 +7,7 @@ import {createHash} from 'node:crypto';
 import {setTimeout as delay} from 'node:timers/promises';
 import {createRunManager} from './agent-runs.mjs';
 import {emptyState} from './validation.mjs';
+import {validateToolArguments} from './tool-registry.mjs';
 const request={workspaceId:'personal',threadId:'root',userMessageId:'brief'};
 const finish=(res,text)=>{res.write(`data: ${JSON.stringify({type:'delta',text})}\n\n`);res.write(`data: ${JSON.stringify({type:'done',model:'deepseek-flash'})}\n\n`);res.end();};
 async function until(fn){for(let i=0;i<300;i++){const value=fn();if(value)return value;await delay(5);}throw Error('Test wait timed out');}
@@ -29,6 +30,50 @@ async function fixture(t,model,{tools=['Delegation','Thread Search','Shell','Ski
 }
 const names=e=>e.tools.definitions.map(d=>d.function.name);
 const tool=(e,name,args={})=>e.tools.execute(name,args);
+
+test('delegation schema enumerates only saved non-archived agents in this workspace', {timeout:5000},async t=>{
+  let checked=false;
+  const h=await fixture(t,async({res,execution})=>{
+    const schema=execution.tools.definitions.find(d=>d.function.name==='delegate_agent').function.parameters;
+    assert.deepEqual(schema.properties.agentId.enum,['reader','reviewer']);
+    validateToolArguments(schema,{agentId:'reader',task:'A real assignment'});
+    for(const agentId of ['invented','archived','foreign-reader','Real Reader'])
+      assert.throws(()=>validateToolArguments(schema,{agentId,task:'Forged target'}));
+    assert.ok(names(execution).includes('list_agents'));
+    const listed=await tool(execution,'list_agents');assert.deepEqual(listed.agents.map(a=>a.id),['reader','reviewer']);
+    checked=true;finish(res,'Exact saved identities only');
+  });
+  h.data.agents.push({id:'reviewer',name:'Reviewer',tools:['Documents']});
+  const foreign=emptyState().workspaces[0];foreign.id='foreign';foreign.data.agents.push({id:'foreign-reader',name:'Foreign reader',tools:['Documents']});h.state.workspaces.push(foreign);
+  const root=await h.manager.create(request);await until(()=>checked);await until(()=>h.manager.get(root.id).status==='succeeded');assert.equal(h.hosts.length,0);
+});
+
+test('an empty agent roster retains discovery but does not advertise or admit delegation', {timeout:5000},async t=>{
+  let checked=false;
+  const h=await fixture(t,async({res,execution})=>{
+    assert.ok(names(execution).includes('list_agents'));assert.ok(!names(execution).includes('delegate_agent'));
+    assert.deepEqual((await tool(execution,'list_agents')).agents,[]);
+    await assert.rejects(()=>tool(execution,'delegate_agent',{agentId:'invented',task:'No saved agent'}),/not available/);
+    checked=true;finish(res,'No workers are configured');
+  });
+  h.data.agents=[];
+  const root=await h.manager.create(request);await until(()=>checked);await until(()=>h.manager.get(root.id).status==='succeeded');assert.equal(h.hosts.length,0);assert.equal(h.manager.get(root.id).childCount,0);
+});
+
+test('an agent archived after the enum snapshot is still refused at dispatch', {timeout:5000},async t=>{
+  let checked=false;
+  const h=await fixture(t,async({res,execution,data})=>{
+    const schema=execution.tools.definitions.find(d=>d.function.name==='delegate_agent').function.parameters;
+    assert.deepEqual(schema.properties.agentId.enum,['reader']);
+    data.agents.find(agent=>agent.id==='reader').archived=true;
+    // Old model history/schema cannot authorize a target that is no longer live.
+    validateToolArguments(schema,{agentId:'reader',task:'Stale identity'});
+    assert.deepEqual((await tool(execution,'list_agents')).agents,[]);
+    await assert.rejects(()=>tool(execution,'delegate_agent',{agentId:'reader',task:'Stale identity'}),/not available/);
+    checked=true;finish(res,'Current authorization wins');
+  });
+  const root=await h.manager.create(request);await until(()=>checked);await until(()=>h.manager.get(root.id).status==='succeeded');assert.equal(h.hosts.length,0);assert.equal(h.manager.get(root.id).childCount,0);
+});
 
 test('real isolated child executes while root waits; permission intersection, scoped result and retries', {timeout:5000},async t=>{
   let childRun,rootFinished=false;
@@ -141,4 +186,39 @@ test('delegation tool listing reflects parent and target capability intersection
   },{tools:['Delegation','Documents','Tables']});
   const run=await h.manager.create(request);await until(()=>checked);await until(()=>h.manager.get(run.id).status==='succeeded');
   assert.deepEqual(h.hosts[0].tools,['Documents']);
+});
+
+test('plan evidence uses only saved direct children and gates dependent steps', {timeout:5000},async t=>{
+  let checked=false;
+  const h=await fixture(t,async({execution,res,body,manager})=>{
+    if(body.threadId!=='root'){finish(res,'Verified stock result');return;}
+    const child=await tool(execution,'delegate_agent',{agentId:'reader',task:'Inspect stock'});
+    await tool(execution,'wait_for_delegated_run',{runId:child.runId,timeoutSeconds:2});
+    const completed={id:'stock',title:'核算库存',status:'completed',childRunId:child.runId};
+    const report={id:'report',title:'汇总报告',status:'in_progress',dependsOn:['stock']};
+    await assert.rejects(()=>tool(execution,'update_plan',{steps:[{...completed,childRunId:execution.runId}]}),/direct child/);
+    await assert.rejects(()=>tool(execution,'update_plan',{steps:[{...completed,status:'pending'},report]}),/prerequisite/);
+    const result=await tool(execution,'update_plan',{steps:[completed,report]});
+    assert.equal(result.recorded,true);assert.deepEqual(manager.get(execution.runId).plan,[completed,report]);
+    checked=true;finish(res,'Saved child evidence and dependent synthesis');
+  });
+  const root=await h.manager.create(request);await until(()=>checked);await until(()=>h.manager.get(root.id).status==='succeeded');
+  assert.equal(h.manager.get(h.manager.get(root.id).plan[0].childRunId).parentRunId,root.id);
+  assert.ok(h.manager.events(root.id,request).events.some(e=>e.event.type==='plan'&&e.event.steps[1].dependsOn[0]==='stock'));
+});
+
+test('an early parent answer cannot succeed or orphan unfinished children', {timeout:5000},async t=>{
+  let childId;
+  const h=await fixture(t,async({req,res,body,execution})=>{
+    if(body.threadId==='root'){
+      childId=(await tool(execution,'delegate_agent',{agentId:'reader',task:'Still working'})).runId;
+      finish(res,'Premature synthesis');
+    }else await new Promise(resolve=>req.once('aborted',resolve));
+  });
+  const root=await h.manager.create(request);
+  await until(()=>h.manager.get(root.id).status==='failed');
+  assert.match(h.manager.get(root.id).error,/before its delegated children finished/);
+  await until(()=>h.manager.get(childId).status==='cancelled');
+  assert.equal(h.saved.find(s=>s.id===root.id).status,'failed');
+  assert.deepEqual(h.saved.find(s=>s.id===root.id).patches,[]);
 });

@@ -46,6 +46,7 @@ pub struct PgStores {
     pub outbox: Arc<Mutex<Vec<Intent>>>,
     pub delayed: Arc<Mutex<Vec<(InputMessage, String, i64)>>>,
     pub compacting: Arc<AtomicBool>,
+    pub paused: Arc<AtomicBool>,
     pub fail_processed: Arc<AtomicBool>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -54,6 +55,7 @@ pub struct Intent {
     pub call_id: String,
     pub name: String,
     pub args: Value,
+    pub replay: String,
 }
 impl PgStores {
     pub async fn load(pool: &PgPool, root: uuid::Uuid) -> Result<Self, Error> {
@@ -380,6 +382,7 @@ impl DeferQueue for PgStores {
     }
 }
 pub struct OutboxTool {
+    pub replay: String,
     pub definition: infinity_provider_protocol::ToolDefinition,
     pub store: PgStores,
 }
@@ -409,6 +412,7 @@ impl infinity_agent_core::tools::Tool<PgStores> for OutboxTool {
                 id: uuid::Uuid::new_v4().to_string(),
                 call_id: id.as_str().to_owned(),
                 name: self.definition.name.clone(),
+                replay: self.replay.clone(),
                 args,
             });
         Ok(())

@@ -951,6 +951,11 @@ export async function createBrowserService(db, cfg, options = {}) {
           )
         ).rows[0];
         if (!r || r.status !== "pending") return;
+        const allowed = await c.query(
+          "SELECT task_dispatch_allowed($1) AS allowed",
+          [r.task_id],
+        );
+        if (!allowed.rows[0].allowed) return;
         const s = await session(r.session_id),
           t = await getTask(c, r.task_id);
         if (

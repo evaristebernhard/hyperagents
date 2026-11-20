@@ -2,6 +2,7 @@ import { MODELS, parseSSE } from './llm.mjs';
 import { createToolRegistry, validateToolArguments } from './tool-registry.mjs';
 import { ApiError } from './validation.mjs';
 import { fetchProvider, ProviderError, GENERATION_MAX_TOKENS } from './provider-transport.mjs';
+import { createScnetProviderFetch, scnetProviderMetadata } from './scnet-agent-model.mjs';
 
 const ENDPOINT = 'https://api.deepseek.com/chat/completions';
 export const AGENT_MODEL_LIMITS = Object.freeze({ outputBytes: 256 * 1024, requestBytes: 2 * 1024 * 1024, toolCalls: 8, messages: 256, tools: 128 });
@@ -42,15 +43,20 @@ async function abortable(promise, signal) {
  * retain its reasoning_content for subsequent tool turns; never publish it to UI/events.
  * This adapter does not execute tools or retry malformed provider responses.
  */
-export function createAgentModel({ apiKey, fetchImpl = globalThis.fetch, model = 'deepseek-flash' } = {}) {
-  if (!MODELS.includes(model)) fail(422, 'Unsupported model.');
+export function createAgentModel({ apiKey, fetchImpl = globalThis.fetch, model = 'deepseek-flash', scnetConfig } = {}) {
+  const metadata = scnetConfig ? scnetProviderMetadata(scnetConfig) : { provider: 'DeepSeek', models: [...MODELS] };
+  if(scnetConfig){fetchImpl=createScnetProviderFetch({config:scnetConfig,fetchImpl});apiKey=scnetConfig.apiKey;model=scnetConfig.model;}
+  const accepted = value => metadata.models.includes(value) || Boolean(scnetConfig && MODELS.includes(value));
+  if (!accepted(model)) fail(422, 'Unsupported model.');
   const configured = typeof apiKey === 'string' && !!apiKey.trim() && typeof fetchImpl === 'function';
   return {
     configured,
-    models: [...MODELS],
+    models: [...metadata.models],
+    provider: metadata.provider,
     async step({ model: selected = model, messages, tools = [], signal: callerSignal, onDelta } = {}) {
-      if (!configured) fail(503, 'DeepSeek is not configured.', 'LLM_NOT_CONFIGURED');
-      if (!MODELS.includes(selected)) fail(422, 'Unsupported model.');
+      if (!configured) fail(503, 'The model provider is not configured.', 'LLM_NOT_CONFIGURED');
+      if (!accepted(selected)) fail(422, 'Unsupported model.');
+      if(scnetConfig)selected=scnetConfig.model;
       if (!Array.isArray(messages) || !messages.length || messages.length > AGENT_MODEL_LIMITS.messages || messages.some(message => !plain(message) || !['system', 'user', 'assistant', 'tool'].includes(message.role))) fail(422, 'Invalid agent messages.');
       if (!Array.isArray(tools) || tools.length > AGENT_MODEL_LIMITS.tools) fail(422, 'Invalid agent tool definitions.');
       if (onDelta !== undefined && typeof onDelta !== 'function') fail(422, 'Invalid text callback.');

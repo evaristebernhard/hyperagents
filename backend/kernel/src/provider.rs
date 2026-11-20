@@ -7,7 +7,10 @@ use infinity_provider_protocol::{
 };
 use serde_json::{Value, json};
 use sqlx::{PgPool, Row};
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -17,6 +20,7 @@ pub struct BridgeProvider {
     pub lease: Lease,
     pub model: String,
     pub context: Arc<Value>,
+    pub paused: Arc<AtomicBool>,
 }
 impl BridgeProvider {
     pub async fn context(&self) -> Result<Value, Error> {
@@ -37,7 +41,7 @@ impl BridgeProvider {
     async fn reserve(&self, request: &CompletionRequest) -> Result<(Uuid, i64), Error> {
         let estimated = serde_json::to_vec(request)?.len() as i64;
         let mut tx = self.db.begin().await?;
-        crate::scheduler::fence(&mut tx, &self.lease).await?;
+        crate::scheduler::dispatch(&mut tx, &self.lease).await?;
         let row = sqlx::query(
             "SELECT tokens,reserved_tokens,transfer_bytes FROM tasks WHERE id=$1 FOR UPDATE",
         )
@@ -80,10 +84,12 @@ impl BridgeProvider {
         id: Uuid,
         usage: Option<infinity_provider_protocol::Usage>,
         bytes: i64,
+        error: Option<&str>,
     ) -> Result<(), Error> {
         let mut tx = self.db.begin().await?;
-        let row = sqlx::query("UPDATE model_attempts SET status=$2,usage=$3,finished_at=now() WHERE id=$1 AND status='running' RETURNING reserved")
-            .bind(id).bind(if usage.is_some() {"completed"} else {"failed"}).bind(usage.map(|u| json!(u))).fetch_optional(&mut *tx).await?;
+        crate::scheduler::control_lock(&mut tx).await?;
+        let row = sqlx::query("UPDATE model_attempts SET status=$2,usage=$3,error_code=$4,finished_at=now() WHERE id=$1 AND status='running' RETURNING reserved")
+            .bind(id).bind(if usage.is_some() && error.is_none() {"completed"} else {"failed"}).bind(usage.map(|u| json!(u))).bind(error.map(crate::scheduler::failure_code)).fetch_optional(&mut *tx).await?;
         if let Some(row) = row {
             let reserved: i64 = row.try_get("reserved")?;
             let charge = usage
@@ -116,6 +122,50 @@ impl ModelProvider for BridgeProvider {
         _: &str,
         mut request: CompletionRequest,
     ) -> Result<ModelStream, CompletionError> {
+        if self.paused.load(Ordering::Relaxed) {
+            return Err(CompletionError::provider(ErrorClass::Fatal, "TASK_PAUSED"));
+        }
+        // Budget messages change after settlement; exclude only this advisory text
+        // from the cache key. User inputs, tool definitions and history still match.
+        let mut cache_request = serde_json::to_value(&request)
+            .map_err(|e| CompletionError::provider(ErrorClass::Fatal, e.to_string()))?;
+        cache_request.as_object_mut().unwrap().remove("max_tokens");
+        if let Some(preamble) = cache_request["preamble"].as_str() {
+            cache_request["preamble"] = json!(
+                preamble
+                    .lines()
+                    .filter(|l| !l.starts_with("EXECUTION_BUDGET:"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            );
+        }
+        let request_key = cache_request.to_string();
+        let mut gate = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| CompletionError::provider(ErrorClass::Fatal, e.to_string()))?;
+        crate::scheduler::dispatch(&mut gate, &self.lease)
+            .await
+            .map_err(|e| CompletionError::provider(ErrorClass::Fatal, e.to_string()))?;
+        gate.commit()
+            .await
+            .map_err(|e| CompletionError::provider(ErrorClass::Fatal, e.to_string()))?;
+        let cached: Option<Value> = sqlx::query_scalar(
+            "SELECT chunks FROM kernel_model_results WHERE task_id=$1 AND request_hash=md5($2)",
+        )
+        .bind(self.lease.id)
+        .bind(&request_key)
+        .fetch_optional(&self.db)
+        .await
+        .map_err(|e| CompletionError::provider(ErrorClass::Fatal, e.to_string()))?;
+        if let Some(cached) = cached {
+            let chunks: Vec<StreamChunk> = serde_json::from_value(cached)
+                .map_err(|e| CompletionError::provider(ErrorClass::Fatal, e.to_string()))?;
+            return Ok(Box::pin(futures_util::stream::iter(
+                chunks.into_iter().map(Ok),
+            )));
+        }
         let (id, max) = self
             .reserve(&request)
             .await
@@ -134,8 +184,26 @@ impl ModelProvider for BridgeProvider {
             .await
         {
             Ok(r) if r.status().is_success() => r,
+            Ok(r) => {
+                let body: Value = r.json().await.unwrap_or(Value::Null);
+                let code = body["error"].as_str().unwrap_or("BRIDGE_REQUEST_FAILED");
+                let usage = if code == "TASK_PAUSED" {
+                    Some(infinity_provider_protocol::Usage {
+                        input_tokens: 0,
+                        output_tokens: 0,
+                        total_tokens: 0,
+                        cached_input_tokens: 0,
+                    })
+                } else {
+                    None
+                };
+                self.settle(id, usage, 0, Some(code))
+                    .await
+                    .map_err(|e| CompletionError::provider(ErrorClass::Fatal, e.to_string()))?;
+                return Err(CompletionError::provider(ErrorClass::Fatal, code));
+            }
             other => {
-                self.settle(id, None, 0)
+                self.settle(id, None, 0, Some("BRIDGE_REQUEST_FAILED"))
                     .await
                     .map_err(|e| CompletionError::provider(ErrorClass::Fatal, e.to_string()))?;
                 return Err(CompletionError::provider(
@@ -147,6 +215,7 @@ impl ModelProvider for BridgeProvider {
         let provider = self.clone();
         Ok(Box::pin(async_stream::stream! {
             let mut stream = response.bytes_stream();
+            let mut chunks: Vec<Value> = Vec::new();
             let mut buffer = Vec::new(); let mut usage = None; let mut total = 0i64; let mut transported=0i64; let mut failure = None;
             'read: while let Some(part) = stream.next().await {
                 let part = match part { Ok(p) => p, Err(e) => { failure=Some(e.to_string()); break; } };
@@ -160,15 +229,27 @@ impl ModelProvider for BridgeProvider {
                     transported=transported.max(value["Final"]["transport_bytes"].as_i64().unwrap_or(0));
                     match serde_json::from_value::<StreamChunk>(value.clone()) {
                         Ok(StreamChunk::Final(final_response)) => { usage=final_response.usage; },
-                        Ok(chunk) => yield Ok(chunk),
+                        Ok(_) => chunks.push(value),
                         Err(e) => { failure=Some(e.to_string()); break 'read; }
                     }
                 }
             }
-            if let Err(e) = provider.settle(id, usage, total.max(transported)).await { failure=Some(e.to_string()); }
+            if let Err(e) = provider.settle(id, usage, total.max(transported), failure.as_deref().or(if usage.is_none() { Some("MODEL_STREAM_INTERRUPTED") } else { None })).await { failure=Some(e.to_string()); }
             if let Some(e) = failure { yield Err(CompletionError::provider(ErrorClass::Fatal,e)); }
             else if usage.is_none() { yield Err(CompletionError::provider(ErrorClass::Fatal,"MODEL_STREAM_INTERRUPTED")); }
-            else { yield Ok(StreamChunk::Final(infinity_provider_protocol::FinalResponse {usage})); }
+            else {
+                chunks.push(json!(StreamChunk::Final(infinity_provider_protocol::FinalResponse {usage})));
+                let saved = async {
+                    let mut tx = provider.db.begin().await?;
+                    crate::scheduler::fence(&mut tx, &provider.lease).await?;
+                    sqlx::query("INSERT INTO kernel_model_results(task_id,request_hash,chunks) VALUES($1,md5($2),$3) ON CONFLICT DO NOTHING")
+                        .bind(provider.lease.id).bind(&request_key).bind(json!(chunks)).execute(&mut *tx).await?;
+                    tx.commit().await?;
+                    Ok::<_,Error>(())
+                }.await;
+                if let Err(e) = saved { yield Err(CompletionError::provider(ErrorClass::Fatal,e.to_string())); }
+                else { for chunk in chunks { yield serde_json::from_value(chunk).map_err(|e| CompletionError::provider(ErrorClass::Fatal,e.to_string())); } }
+            }
         }))
     }
 }

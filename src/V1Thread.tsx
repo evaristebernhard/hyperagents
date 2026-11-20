@@ -20,6 +20,7 @@ import {
   type Conversation,
   type Task,
   type TaskEvent,
+  type TaskOverview,
   type ArtifactDetail,
 } from "./v1-client";
 import "./real-thread.css";
@@ -37,6 +38,7 @@ export default function V1Thread({
   const w = useWorkspace();
   const [conversation, setConversation] = useState<Conversation>();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [overviews, setOverviews] = useState<Record<string, TaskOverview>>({});
   const [events, setEvents] = useState<TaskEvent[]>([]);
   const [artifacts, setArtifacts] = useState<ArtifactDetail[]>([]);
   const [selected, setSelected] = useState("");
@@ -100,12 +102,31 @@ export default function V1Thread({
             setCollapsed(!!detail.metadata.canvas.collapsed);
           }
         }
-        setTasks(own);
+        const snapshots = await Promise.all(
+          own.map((t) =>
+            v1<TaskOverview>(`/tasks/${t.id}/overview`, { signal }),
+          ),
+        );
+        if (signal.aborted) return;
+        setOverviews(Object.fromEntries(snapshots.map((o) => [o.task.id, o])));
+        setTasks(
+          snapshots.map((o) => ({
+            ...own.find((t) => t.id === o.task.id)!,
+            ...o.task,
+            errorCode: o.task.errorCode ?? undefined,
+            result: o.task.result as Task["result"],
+          })),
+        );
         // Drain every page before advancing the cursor. Each reconnect resumes after
         // the last acknowledged event; deduplication also handles repeated responses.
         for (const ownTask of own) {
           const taskId = ownTask.id;
-          if (terminal(ownTask.state) && cursors.current.has(taskId)) continue;
+          if (
+            terminal(ownTask.state) &&
+            cursors.current.get(taskId) ===
+              snapshots.find((o) => o.task.id === taskId)?.eventCursor
+          )
+            continue;
           let cursor = cursors.current.get(taskId) || "0";
           for (;;) {
             const page = await v1<{ events: TaskEvent[]; nextCursor: string }>(
@@ -300,8 +321,37 @@ export default function V1Thread({
                     key={entry.key}
                     task={entry.task}
                     events={events.filter((e) => e.taskId === entry.task!.id)}
-                    busy={busy}
+                    overview={overviews[entry.task.id]}
+                    busy={busy || !ready}
                     readonly={w.role === "viewer"}
+                    onAction={(action) => {
+                      if (action === "provide_input") {
+                        document
+                          .querySelector<HTMLTextAreaElement>(
+                            ".rt-composer textarea",
+                          )
+                          ?.focus();
+                        return;
+                      }
+                      if (action === "new_task") {
+                        setPrefill({
+                          id: crypto.randomUUID(),
+                          text: "继续处理上一项任务，保留已保存的文件：",
+                        });
+                        return;
+                      }
+                      setBusy(true);
+                      void v1<TaskOverview>(
+                        `/tasks/${entry.task!.id}/${action}`,
+                        { method: "POST" },
+                      )
+                        .then((o) => {
+                          setOverviews((prev) => ({ ...prev, [o.task.id]: o }));
+                          setRefresh((n) => n + 1);
+                        })
+                        .catch((e) => setError(e.message))
+                        .finally(() => setBusy(false));
+                    }}
                     onRetry={() => {
                       setBusy(true);
                       void v1("/tasks/" + entry.task!.id + "/retry", {
@@ -370,8 +420,9 @@ export default function V1Thread({
           <div className="rt-composer">
             {active && (
               <p className="rt-notice">
-                Your message adds an instruction to the running task. Files can
-                be attached after it ends.
+                {latest && overviews[latest.id]?.control !== "normal"
+                  ? "Instructions are saved while paused. Use Resume task to continue."
+                  : "Your message adds an instruction to the running task. Files can be attached after it ends."}
               </p>
             )}
             {latest?.state === "waiting_browser" && (

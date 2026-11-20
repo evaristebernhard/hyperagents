@@ -66,6 +66,52 @@ const conversation = {
   metadata: {},
   revision: 1,
 };
+let control = "normal",
+  controlRevision = 0;
+function overview() {
+  return {
+    task,
+    rootTaskId: taskId,
+    runtime: "typescript",
+    control,
+    controlRevision,
+    plan: {
+      version: 1,
+      reason: "Organize the task",
+      updatedAt: date,
+      steps: [
+        { id: "gather", title: "Gather information", status: "completed" },
+        { id: "write", title: "Write result", status: "in_progress" },
+      ],
+    },
+    completedSteps: 1,
+    totalSteps: 2,
+    budget: {
+      activeMs: 1000,
+      modelCalls: 1,
+      toolCalls: 1,
+      tokens: 100,
+      reservedTokens: 0,
+      transferBytes: 0,
+      artifactBytes: 0,
+      limits: {
+        activeMs: 1200000,
+        modelCalls: 32,
+        toolCalls: 64,
+        tokens: 200000,
+      },
+    },
+    diagnosis: null,
+    deliverables: [],
+    validation: [],
+    children: [],
+    currentOperations: [],
+    eventCursor: String(events.length),
+    availableActions: ["succeeded", "cancelled"].includes(task.state)
+      ? ["new_task"]
+      : [control === "normal" ? "pause" : "resume", "provide_input", "cancel"],
+  };
+}
 await context.route("**/api/**", async (route) => {
   const request = route.request(),
     url = new URL(request.url()),
@@ -102,6 +148,17 @@ await context.route("**/api/**", async (route) => {
       return route.abort("failed");
     }
     return reply({ taskId }, 202);
+  }
+  if (path.endsWith("/overview")) return reply(overview());
+  if (path.endsWith("/pause")) {
+    control = "paused";
+    controlRevision++;
+    return reply(overview());
+  }
+  if (path.endsWith("/resume")) {
+    control = "normal";
+    controlRevision++;
+    return reply(overview());
   }
   if (path.endsWith("/instructions")) {
     assert.equal(request.postDataJSON().message, "Use blue");
@@ -157,6 +214,27 @@ try {
     () => document.querySelectorAll("[data-event-id]").length === 105,
   );
   assert.ok(cursors.includes(0) && cursors.includes(100));
+  await page.getByText("Task plan · 1/2 completed", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Pause task", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Resume task", exact: true })
+    .waitFor();
+  const secondTab = await context.newPage();
+  await secondTab.goto(page.url());
+  await secondTab
+    .getByRole("button", { name: "Resume task", exact: true })
+    .waitFor();
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Resume task", exact: true })
+    .waitFor();
+  await secondTab
+    .getByRole("button", { name: "Resume task", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Pause task", exact: true })
+    .waitFor({ timeout: 15000 });
+  await secondTab.close();
   loseEvents = true;
   await page.getByRole("alert").waitFor({ timeout: 20000 });
   await page.getByRole("button", { name: "Retry connection" }).click();
@@ -209,7 +287,7 @@ try {
   assert.equal(await page.locator("[data-conversation-id]").count(), 0);
   assert.deepEqual(errors, []);
   console.log(
-    "PASS unavailable capabilities, lost-response idempotency, 105-event pagination, disconnect cursor recovery, refresh deduplication, waiting-user question and follow-up, bodyless cancellation, session teardown",
+    "PASS unavailable capabilities, lost-response idempotency, 105-event pagination, persisted plan, pause/resume across reload and two tabs, disconnect cursor recovery, refresh deduplication, waiting-user question and follow-up, bodyless cancellation, session teardown",
   );
 } finally {
   await context.close();

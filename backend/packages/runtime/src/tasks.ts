@@ -1,3 +1,5 @@
+import { controlLock } from "./task-control.js";
+import { canRetry } from "./diagnosis.js";
 import { browserAccess } from "./browser.js";
 import { taskContext } from "./resources.js";
 import { randomUUID } from "node:crypto";
@@ -168,6 +170,7 @@ export async function followup(
   message: string,
 ) {
   await tx(db, async (c) => {
+    await controlLock(c);
     await c.query(
       "SELECT 1 FROM tasks WHERE id=$1 AND workspace_id=$2 FOR UPDATE",
       [id, workspace],
@@ -184,7 +187,7 @@ export async function followup(
       [t.conversation_id, message],
     );
     await event(c, id, { type: "instruction", message });
-    if (["waiting_user", "waiting_approval"].includes(t.state)) {
+    if (t.state === "waiting_user") {
       await c.query(
         "UPDATE tasks SET state='queued',updated_at=now() WHERE id=$1",
         [id],
@@ -195,6 +198,7 @@ export async function followup(
 }
 export async function retryTask(db: Db, id: string, workspace: string) {
   await tx(db, async (c) => {
+    await controlLock(c);
     await c.query(
       "SELECT 1 FROM tasks WHERE id=$1 AND workspace_id=$2 FOR UPDATE",
       [id, workspace],
@@ -203,7 +207,7 @@ export async function retryTask(db: Db, id: string, workspace: string) {
     if (t.state === "uncertain")
       throw new DomainError("UNCERTAIN_REQUIRES_NEW_TASK", 409);
     if (t.state !== "failed") throw new DomainError("NOT_RETRYABLE", 409);
-    if (/BUDGET|VALIDATION/.test(t.error_code ?? ""))
+    if (!(await canRetry(c, t)))
       throw new DomainError("BUDGET_REQUIRES_NEW_TASK", 409);
     await c.query(
       "UPDATE tasks SET state='queued',error_code=NULL,updated_at=now() WHERE id=$1",
@@ -215,7 +219,7 @@ export async function retryTask(db: Db, id: string, workspace: string) {
 export async function wakeParents(db: Db) {
   await tx(db, async (c) => {
     const r = await c.query<{ id: string }>(
-      `UPDATE tasks t SET state='queued',updated_at=now() WHERE state='waiting_children' AND NOT EXISTS(SELECT 1 FROM tasks ch WHERE ch.parent_id=t.id AND ch.state NOT IN ('succeeded','failed','cancelled','uncertain','waiting_user','waiting_approval')) RETURNING id`,
+      `UPDATE tasks t SET state='queued',updated_at=now() WHERE state='waiting_children' AND task_dispatch_allowed(t.id) AND NOT EXISTS(SELECT 1 FROM tasks ch WHERE ch.parent_id=t.id AND ch.state NOT IN ('succeeded','failed','cancelled','uncertain','waiting_user','waiting_approval')) RETURNING id`,
     );
     for (const t of r.rows)
       await event(c, t.id, { type: "state", state: "queued" });

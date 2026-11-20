@@ -13,6 +13,9 @@ export async function fetchProvider(fetchImpl, url, init, {onRetry, wait=delay}=
     try { response=await fetchImpl(url,init); }
     catch(error) {
       if(init.signal.aborted)throw init.signal.reason;
+      // A configured local adapter has already classified its own protocol or
+      // schema failure. Preserve that safe error; never retry a bad decision.
+      if(error instanceof ProviderError)throw error;
       // Unknown adapter/programming errors are not transient network failures.
       if(!(error instanceof TypeError) || attempt===2)throw new ProviderError('PROVIDER_NETWORK','The model connection failed before a response was received.');
     }

@@ -172,3 +172,49 @@
   max-height: 340px;
   overflow: auto;
 }
+.v1-task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+.v1-task-lifecycle {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.v1-task-lifecycle summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 6px 0;
+}
+.v1-task-plan ol,
+.v1-deliverables ul {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+.v1-task-plan li {
+  padding: 5px 0;
+}
+.v1-task-plan small {
+  margin-left: 12px;
+  color: var(--text-muted, #666);
+}
+.v1-task-plan [data-step-status="completed"] {
+  color: #26744a;
+}
+.v1-task-diagnosis {
+  padding: 12px;
+  border: 1px solid #d5b28b;
+  border-radius: 8px;
+}
+.v1-deliverables li {
+  padding: 7px 0;
+}
+.v1-deliverables li > * {
+  margin-right: 10px;
+}
+.v1-deliverables small {
+  color: var(--text-muted, #666);
+}

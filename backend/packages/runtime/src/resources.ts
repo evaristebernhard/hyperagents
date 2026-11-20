@@ -398,6 +398,7 @@ export function allowedTools(context: {
       Code: ["code_execute"],
     };
     const selected = new Set<ToolName>([
+      "update_plan",
       "ask_user",
       "finish",
       "learning_propose",

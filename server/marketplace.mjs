@@ -2,10 +2,11 @@ import { buildCapabilityManifest } from './capability-authority.mjs';
 import catalog from '../shared/marketplace-catalog.json' with { type: 'json' };
 import { createPublicTools } from './public-tools.mjs';
 export const marketplaceCatalog = catalog;
-export function marketplaceCapabilities({deepseekConfigured=false,skillsConfigured=false,openAlexApiKey,exaApiKey,userAgent,moliPath,browserProvider,browserPath}={}) {
-  const manifest=buildCapabilityManifest({deepseekConfigured,skillsConfigured,openAlexApiKey,exaApiKey,userAgent,moliPath,browserProvider,browserPath});
+export function marketplaceCapabilities({deepseekConfigured=false,skillsConfigured=false,openAlexApiKey,exaApiKey,userAgent,moliPath,browserProvider,browserPath,persistentBrowser,modelProvider}={}) {
+  const manifest=buildCapabilityManifest({deepseekConfigured,skillsConfigured,openAlexApiKey,exaApiKey,userAgent,moliPath,browserProvider,browserPath,persistentBrowser});
   const capabilities=Object.fromEntries(manifest.capabilities.map(c=>[c.label,{available:c.implemented&&c.configured,reason:c.reason || (c.executable?'Executable tool is available.':'Implemented but not authorized for this run.')} ]));
   capabilities.LLM={available:deepseekConfigured,reason:deepseekConfigured?'Server-side DeepSeek key is present; provider authorization is verified only by a real request.':'Set DEEPSEEK_API_KEY on the server before running a skill.'};
+  if(modelProvider==='SCNet DCU')capabilities.LLM={available:deepseekConfigured,reason:deepseekConfigured?'Dedicated SCNet provider configured; real execution verifies current availability.':'Configure the dedicated SCNet provider on the server.'};
   for(const item of createPublicTools({enabled:["World Bank","Weather","OpenAlex"],openAlexApiKey,userAgent}).capabilities) capabilities[item.service]={available:item.configured,reason:item.reason + " Adapter configuration only; upstream reachability is checked on use."};
   for(const entry of catalog.entries)for(const name of entry.dependencies)if(!capabilities[name])capabilities[name]={available:false,reason:'Not implemented or connected in this replica. No execution is simulated.'};
   return {capabilities,inventory:{skills:catalog.entries.filter(e=>e.kind==='skill').length,agents:catalog.entries.filter(e=>e.kind==='agent').length,categories:catalog.categories.length,implementations:catalog.entries.filter(e=>e.implementation).length},cataloguedAt:'2026-10-28'};

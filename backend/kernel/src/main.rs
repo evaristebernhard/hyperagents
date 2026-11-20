@@ -1,4 +1,5 @@
 mod api;
+mod control;
 mod provider;
 mod scheduler;
 mod store;

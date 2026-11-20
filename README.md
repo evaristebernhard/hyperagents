@@ -1,10 +1,49 @@
 # Hyperagents — local single-owner workspace
 
+新增侧栏 **浏览器**（`/browser`）：持久身份、标签导航、断连重连、人工接管，以及 agent 的点击/填表/按键工具。中断任务支持 **从已保存上下文继续**，并可回看原运行日志。[浏览器与持久化说明](docs/BROWSER-PERSISTENCE.md)。
+
+Elys 个人分身已作为原生功能接入：侧栏 **分身与记忆**（`/companion`）可设置个人分身、进入自聊、从本人原话整理并确认记忆，查看每轮提供给模型的记忆快照。使用与范围见 [分身与记忆说明](docs/ELYS-COMPANION.md)。
+
 Independent recreation of Hyperagent's web UI, now with a real local data service.
 It is not the official application, does not include its private implementation,
 and optionally calls DeepSeek through the authenticated server. Explicitly selected,
 server-configured capabilities read workspace data and real APIs, save artifacts,
 and perform approved external writes.
+
+2026-11-12：新增[能力进度与具体拆分演练](docs/AGENT-PROGRESS.md)，覆盖两个只读子 agent、依赖校验、结果回收、实际文档保存及失败/取消处理。真实模型质量与运行层 fixture 证据分别记录。
+
+## Current integrated runtime and verification (2026-11-08)
+
+The observed `npm run dev` entry is the legacy SQLite application on 5173/8787.
+`dev:v1`, PostgreSQL, Worker and Rust are separate implementations; historical
+v1 reports below do not identify the active deployment. The outer Elys checkout
+now supplies an optional dedicated SCNet adapter and persistent browser
+controller. See [provider and browser setup](docs/SCNET-AGENT-PROVIDER.md).
+The original private `.env`, owner account, SQLite and uploads are retained.
+
+The SCNet adapter translates real schema-validated JSON model decisions; it is
+not native function calling. Real acceptance exposed a limit: the 1.5B model
+first selected local document search and unrelated suggestions. After semantic
+catalog improvements and narrowing authorization to `web_search` and
+`create_artifact`, it performed public searches but repeatedly searched instead
+of saving a report. Neither trial is a successful research-agent acceptance.
+The unedited [initial](../docs/hyperagents-agent-live-before.json) and
+[restricted](../docs/hyperagents-agent-live.json) records remain available.
+A generic consecutive same-tool/canonical-arguments guard now refuses the
+duplicate before execution. It does not choose another tool or invent a report.
+General multi-step reliability remains a product limitation of this model/mode.
+
+Persistent browser takeover is host-enforced: `browser_request_takeover` itself
+waits for explicit human handback and an actual observation before another
+model turn. Missing handback stops the run, retaining browser/human control.
+Viewer disconnection is not handback; finishing releases the run lease without
+deleting login profiles. Enter credentials/codes directly in Browser, never chat.
+Controller/UI fixtures and a user's real account login are separate scopes.
+
+The legacy main `/api/runs` still requires an active run to finish or stop before
+another message. The separate `/api/tasks/:id/inputs` is not yet connected as
+running-follow-up support for that main conversation. Completed-turn follow-ups
+retain bounded history and explicitly selected saved artifacts.
 
 ## Run locally
 

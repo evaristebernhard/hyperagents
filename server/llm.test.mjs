@@ -7,6 +7,8 @@ import path from 'node:path';
 import { createApp } from './app.mjs';
 import { buildConversation, MODELS, parseSSE } from './llm.mjs';
 import { emptyState } from './validation.mjs';
+import { createLlm } from './llm.mjs';
+import { EventEmitter } from 'node:events';
 
 const request = {workspaceId:'personal',threadId:'thread-1',userMessageId:'message-1'};
 const thread = (id='thread-1') => ({id,title:'Test',summary:'',time:'',messages:[{id:'message-1',role:'user',text:'Saved question'}]});
@@ -104,6 +106,50 @@ test('server context includes bounded local agent/skills/pinned and selected mem
   t.messages=Array.from({length:100},(_,i)=>({id:'m-'+i,role:i%2?'user':'assistant',text:'x'.repeat(16000)}));
   const bounded=await buildConversation(s,{...request,userMessageId:'m-99'});assert.ok(bounded.messages.length<=41);assert.ok(JSON.stringify(bounded).length<70000);
   t.messages.at(-1).text='x'.repeat(16001);await assert.rejects(buildConversation(s,{...request,userMessageId:'m-99'}),e=>e.status===413);
+});
+
+test('SCNet project context follows saved project references and re-resolves availability in its workspace',async()=>{
+  const s=snapshot(),d=s.workspaces[0].data,t=d.threads[0],provider={provider:'SCNet DCU',models:['fixture-model']};
+  const project=(id)=>({id,name:id,description:'保存的仓库说明：'+id,goal:'保存的项目目标'});
+  d.projects.push(project('thread-project'),project('message-project'),project('legacy-project'));
+  t.projectId='thread-project';t.project='legacy-project';
+  assert.equal((await buildConversation(s,request,undefined,provider)).scnet_context.projectContext.id,'thread-project');
+  t.messages[0].context={projectId:'message-project'};
+  assert.equal((await buildConversation(s,request,undefined,provider)).scnet_context.projectContext.id,'message-project');
+  delete t.messages[0].context;delete t.projectId;
+  assert.equal((await buildConversation(s,request,undefined,provider)).scnet_context.projectContext.id,'legacy-project');
+  d.projects[2].description='修改后的仓库说明';
+  assert.equal((await buildConversation(s,request,undefined,provider)).scnet_context.projectContext.description,'修改后的仓库说明');
+  d.projects[2].archived=true;
+  await assert.rejects(buildConversation(s,request,undefined,provider),error=>error.status===422);
+  t.projectId='foreign-project';
+  const foreign=emptyState().workspaces[0];foreign.id='foreign';foreign.data.projects.push(project('foreign-project'));s.workspaces.push(foreign);
+  await assert.rejects(buildConversation(s,request,undefined,provider),error=>error.status===422);
+  delete t.projectId;t.project='Legacy display label';delete d.projects;
+  assert.equal((await buildConversation(s,request,undefined,provider)).scnet_context,undefined);
+  t.projectId='missing';
+  await assert.rejects(buildConversation(s,request,undefined,provider),error=>error.status===422);
+});
+
+test('saved companion confirmation and withdrawal change the actual provider request and streamed knowledge snapshots',async t=>{
+  const payloads=[],h=await harness(t,{deepseekApiKey:'test-only-placeholder',llmFetch:async(_url,init)=>{payloads.push(JSON.parse(init.body));return success();}});
+  await h.setup();const s=snapshot(),d=s.workspaces[0].data,chat=d.threads[0],stamp='2026-11-11T12:00:00.000Z';
+  d.agents.push({id:'companion',name:'My companion',description:'Owner companion',prompt:'Use confirmed facts.',companion:true,memoryReadScope:'workspace'});
+  chat.companionAgentId='companion';chat.config={model:'deepseek-flash',reasoning:'Medium',provider:'DeepSeek',mode:'Chat',tools:[],agentId:'companion'};
+  d.memories.push({id:'owner-tea',content:'OWNER-TEA-PREFERENCE 乌龙茶',category:'喜好',importance:3,pinned:true,tags:[],companion:{agentId:'companion',status:'pending',visibility:'private',createdAt:stamp,updatedAt:stamp}});
+  chat.messages[0].text='我想喝茶';chat.messages[0].context={memoryIds:['owner-tea']};
+  await h.save(s);let received=events(await (await h.chat()).text());
+  assert.deepEqual(received.find(item=>item.type==='knowledge_hints').knowledgeHints,{skillIds:[],memoryIds:[]});
+  assert.ok(!payloads[0].messages[0].content.includes('OWNER-TEA-PREFERENCE'));
+  d.memories[0].companion.status='active';chat.messages.push({id:'question-confirmed',role:'user',text:'我想喝茶'});
+  await h.save(s);received=events(await (await h.chat({...request,userMessageId:'question-confirmed'})).text());
+  const hints=received.find(item=>item.type==='knowledge_hints').knowledgeHints;
+  assert.deepEqual(hints.memoryIds,['owner-tea']);assert.equal(hints.memorySnapshots[0].content,d.memories[0].content);
+  assert.ok(payloads[1].messages[0].content.includes(hints.memorySnapshots[0].content));
+  d.memories[0].companion.status='pending';chat.messages.push({id:'question-withdrawn',role:'user',text:'我想喝茶'});
+  await h.save(s);received=events(await (await h.chat({...request,userMessageId:'question-withdrawn'})).text());
+  assert.deepEqual(received.find(item=>item.type==='knowledge_hints').knowledgeHints,{skillIds:[],memoryIds:[]});
+  assert.ok(!payloads[2].messages[0].content.includes('OWNER-TEA-PREFERENCE'));
 });
 
 test('provider errors, malformed/truncated streams and unsupported tool calls are sanitized SSE errors',async t=>{
@@ -230,4 +276,96 @@ test('LLM integration writes produce a sealed approval; only explicit API confir
   assert.equal((await h.call('/api/integrations/execute',{method:'POST',body:{token:approval.token,workspaceId:request.workspaceId,threadId:request.threadId,confirmed:false}})).status,422);assert.equal(writes,0);
   const sent=await(await h.call('/api/integrations/execute',{method:'POST',body:{token:approval.token,workspaceId:request.workspaceId,threadId:request.threadId,confirmed:true}})).json();assert.equal(sent.status,'completed');assert.equal(writes,1);
   assert.equal((await(await h.call('/api/integrations/execute',{method:'POST',body:{token:approval.token,workspaceId:request.workspaceId,threadId:request.threadId,confirmed:true}})).json()).replayed,true);assert.equal(writes,1);
+});
+
+const waitGate=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};};
+function waitForGate(gate,signal){
+  return new Promise((resolve,reject)=>{
+    const abort=()=>{signal.removeEventListener('abort',abort);reject(signal.reason);};
+    signal.addEventListener('abort',abort,{once:true});
+    gate.promise.then(value=>{signal.removeEventListener('abort',abort);resolve(value);},error=>{signal.removeEventListener('abort',abort);reject(error);});
+    if(signal.aborted)abort();
+  });
+}
+
+async function humanWaitHarness(t,{finishAfterHandback=false}={}){
+  t.mock.timers.enable({apis:['setTimeout']});
+  let clock=0;t.mock.method(performance,'now',()=>clock);
+  const beforeWait=waitGate(),startWait=waitGate(),waiting=waitGate(),handback=waitGate(),nextModel=waitGate(),never=waitGate();
+  const state=snapshot();state.workspaces[0].data.threads[0].config={mode:'Execute',tools:['Browser']};
+  const req=new EventEmitter(),res=new EventEmitter();req.aborted=false;res.destroyed=false;res.headersSent=false;
+  let output='',round=0,signal,notify,closed=0,forwardedTimeoutMs;
+  res.writeHead=()=>{res.headersSent=true;};res.write=text=>{output+=text;return true;};res.end=text=>{if(text)output+=text;res.emit('finish');};
+  const llm=createLlm({apiKey:'synthetic-test-key',load:()=>({state}),
+    persistentBrowserFactory:({onHumanWait,humanWaitTimeoutMs})=>{
+      notify=onHumanWait;forwardedTimeoutMs=humanWaitTimeoutMs;
+      return {persistent:true,definitions:[{type:'function',function:{name:'browser_request_takeover',description:'Test confirmed browser handback.',parameters:{type:'object',properties:{},required:[],additionalProperties:false}}}],
+        async execute(_name,_args,callSignal){
+          signal=callSignal;beforeWait.resolve();await waitForGate(startWait,signal);
+          await onHumanWait({status:'waiting',sessionId:'test-session',epoch:1});waiting.resolve();
+          await waitForGate(handback,signal);await onHumanWait({status:'resumed',sessionId:'test-session',epoch:2});
+          return {status:'ok',session:{id:'test-session',control:'agent',epoch:2},observation:{text:'Confirmed handback'}};
+        },async close(){closed++;}};
+    },
+    fetchImpl:async(_url,init)=>{
+      if(++round===1)return new Response(frame({choices:[{delta:{tool_calls:[{index:0,id:'wait-browser',type:'function',function:{name:'browser_request_takeover',arguments:'{}'}}]},finish_reason:'tool_calls'}]})+frame('[DONE]'),{headers:{'content-type':'text/event-stream'}});
+      nextModel.resolve();if(finishAfterHandback)return success();
+      return waitForGate(never,init.signal);
+    }});
+  const done=llm.chat(req,res,request,{timeoutMs:100});
+  t.after(async()=>{req.emit('aborted');await done;});
+  await beforeWait.promise;
+  return {done,req,beforeWait,startWait,waiting,handback,nextModel,
+    advance(ms){clock+=ms;t.mock.timers.tick(ms);},notify:event=>notify(event),
+    get signal(){return signal;},get events(){return events(output);},get closed(){return closed;},get forwardedTimeoutMs(){return forwardedTimeoutMs;}};
+}
+
+test('confirmed human browser waiting can exceed the active budget and resume successfully',async t=>{
+  const h=await humanWaitHarness(t,{finishAfterHandback:true});
+  assert.equal(h.forwardedTimeoutMs,30*60*1000);
+  h.advance(40);h.startWait.resolve();await h.waiting.promise;
+  h.advance(1000);assert.equal(h.signal.aborted,false,'Confirmed human input does not consume active execution time');
+  await h.notify({status:'waiting',sessionId:'test-session',epoch:1});
+  h.advance(1000);assert.equal(h.signal.aborted,false,'Repeated waiting notifications do not change the saved remaining budget');
+  h.handback.resolve();await h.done;
+  assert.equal(h.events.at(-1).type,'done',JSON.stringify(h.events));assert.equal(h.closed,1);
+  h.advance(1000);assert.equal(h.events.filter(event=>event.type==='error').length,0,'Final completion cleared the resumed timer');
+});
+
+test('handback resumes the remaining active budget rather than granting a new run timeout',async t=>{
+  const h=await humanWaitHarness(t);
+  h.advance(40);h.startWait.resolve();await h.waiting.promise;
+  h.advance(1000);assert.equal(h.signal.aborted,false);
+  await h.notify({status:'resumed',sessionId:'unrelated-session',epoch:2});
+  h.advance(1000);assert.equal(h.signal.aborted,false,'An unrelated handback cannot resume the execution clock');
+  h.handback.resolve();await h.nextModel.promise;
+  h.advance(59);assert.equal(h.signal.aborted,false);
+  h.advance(2);await h.done;
+  assert.equal(h.events.at(-1).code,'GENERATION_TIMEOUT');assert.equal(h.events.some(event=>event.type==='done'),false);assert.equal(h.closed,1);
+});
+
+test('cancellation still aborts a confirmed human wait and clears active timers',async t=>{
+  const h=await humanWaitHarness(t);
+  h.startWait.resolve();await h.waiting.promise;h.advance(1000);assert.equal(h.signal.aborted,false);
+  h.req.emit('aborted');await h.done;
+  assert.equal(h.signal.aborted,true);assert.equal(h.events.at(-1).code,'GENERATION_CANCELLED');assert.equal(h.closed,1);
+  h.advance(10000);assert.equal(h.events.filter(event=>event.type==='error').length,1);
+});
+
+test('a slow browser tool still consumes the budget until human control is actually confirmed',async t=>{
+  const h=await humanWaitHarness(t);
+  h.advance(101);await h.done;
+  assert.equal(h.events.at(-1).code,'GENERATION_TIMEOUT');assert.equal(h.events.some(event=>event.type==='browser_handoff'),false);
+});
+
+test('SCNet forwards the finite allocation remainder as the browser human-wait timeout',async t=>{
+  const now=1800000000000;t.mock.method(Date,'now',()=>now);
+  for(const [deadlineUnix,expected] of [[now/1000+120,120000],[now/1000+6*3600,5*3600*1000],[now/1000-1,1]]){
+    const state=snapshot();let forwarded;
+    const llm=createLlm({load:()=>({state}),scnetConfig:{baseUrl:'http://127.0.0.1:18082/v1',apiKey:'synthetic-test-key',model:'Qwen2.5-3B-Instruct',deadlineUnix},
+      persistentBrowserFactory:options=>{forwarded=options.humanWaitTimeoutMs;return {definitions:[],persistent:true,close:async()=>{}};},fetchImpl:async()=>success()});
+    const req=new EventEmitter(),res=new EventEmitter();req.aborted=false;res.destroyed=false;res.headersSent=false;
+    res.writeHead=()=>{res.headersSent=true;};res.write=()=>true;res.end=()=>{};
+    await llm.chat(req,res,request);assert.equal(forwarded,expected);
+  }
 });

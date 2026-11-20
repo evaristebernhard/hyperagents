@@ -32,6 +32,7 @@ pub struct Lease {
     pub instructions: i64,
 }
 pub async fn fence(tx: &mut Transaction<'_, Postgres>, lease: &Lease) -> Result<(), Error> {
+    control_lock(tx).await?;
     let valid = sqlx::query("SELECT 1 FROM tasks WHERE id=$1 AND runtime_kind='rust' AND runtime_version=$4 AND state='running' AND lease_owner=$2 AND lease_epoch=$3 AND lease_until>now() AND EXISTS(SELECT 1 FROM tasks root WHERE root.id=tasks.root_id AND root.state NOT IN ('cancelled','failed','succeeded','uncertain')) FOR UPDATE")
         .bind(lease.id).bind(lease.owner).bind(lease.epoch).bind(VERSION).fetch_optional(&mut **tx).await?;
     if valid.is_none() {
@@ -39,8 +40,61 @@ pub async fn fence(tx: &mut Transaction<'_, Postgres>, lease: &Lease) -> Result<
     }
     Ok(())
 }
+pub fn failure_code(error: &str) -> &'static str {
+    const CODES: &[&str] = &[
+        "TASK_PAUSED",
+        "LEASE_LOST",
+        "TIME_BUDGET",
+        "TOOL_BUDGET",
+        "TRANSFER_BUDGET",
+        "CONTEXT_BUDGET",
+        "MODEL_BUDGET",
+        "MODEL_NOT_CONFIGURED",
+        "MODEL_TIMEOUT",
+        "MODEL_AUTH",
+        "MODEL_QUOTA",
+        "MODEL_RATE_LIMIT",
+        "MODEL_UNAVAILABLE",
+        "MODEL_NETWORK",
+        "MODEL_TRANSPORT_ERROR",
+        "MODEL_STREAM_INTERRUPTED",
+        "MODEL_TRUNCATED",
+        "MODEL_REQUEST",
+        "MODEL_EMPTY",
+        "MODEL_INVALID_JSON",
+        "MODEL_UNKNOWN_TOOL",
+        "INVALID_ARGUMENTS",
+        "BRIDGE_REQUEST_FAILED",
+        "DELEGATION_LIMIT",
+        "SNAPSHOT_CONFLICT",
+        "ATTEMPT_CONFLICT",
+    ];
+    CODES
+        .iter()
+        .copied()
+        .find(|code| error.contains(code))
+        .unwrap_or("KERNEL_SLICE_FAILED")
+}
+pub async fn control_lock(tx: &mut Transaction<'_, Postgres>) -> Result<(), Error> {
+    sqlx::query("SELECT pg_advisory_xact_lock(730110)")
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+pub async fn dispatch(tx: &mut Transaction<'_, Postgres>, lease: &Lease) -> Result<(), Error> {
+    control_lock(tx).await?;
+    let allowed: bool = sqlx::query_scalar("SELECT task_dispatch_allowed($1)")
+        .bind(lease.id)
+        .fetch_one(&mut **tx)
+        .await?;
+    if !allowed {
+        return Err("TASK_PAUSED".into());
+    }
+    fence(tx, lease).await
+}
 pub async fn recover(db: &PgPool) -> Result<(), Error> {
     let mut tx = db.begin().await?;
+    control_lock(&mut tx).await?;
     sqlx::query("SELECT pg_advisory_xact_lock(730120)")
         .execute(&mut *tx)
         .await?;
@@ -60,17 +114,21 @@ pub async fn recover(db: &PgPool) -> Result<(), Error> {
         .await?;
         metric(&mut tx, "lease_lost", 1).await?;
     }
-    sqlx::query("UPDATE tasks t SET state='queued',updated_at=now() WHERE t.runtime_kind='rust' AND t.runtime_phase='model' AND t.state='waiting_tool' AND t.wait_reason='kernel_timer' AND EXISTS(SELECT 1 FROM kernel_inputs i WHERE i.task_id=t.id AND i.consumed_at IS NULL AND NOT i.deferred AND i.available_at<=now())")
+    sqlx::query("UPDATE tasks t SET state='queued',updated_at=now() WHERE t.runtime_kind='rust' AND t.runtime_phase='model' AND t.state='waiting_tool' AND t.wait_reason='kernel_timer' AND task_dispatch_allowed(t.id) AND EXISTS(SELECT 1 FROM kernel_inputs i WHERE i.task_id=t.id AND i.consumed_at IS NULL AND NOT i.deferred AND i.available_at<=now())")
         .execute(&mut *tx).await?;
+    sqlx::query("SELECT settle_task_pauses()")
+        .execute(&mut *tx)
+        .await?;
     tx.commit().await?;
     Ok(())
 }
 pub async fn claim(db: &PgPool) -> Result<Option<Lease>, Error> {
     let mut tx = db.begin().await?;
+    control_lock(&mut tx).await?;
     sqlx::query("SELECT pg_advisory_xact_lock(730120)")
         .execute(&mut *tx)
         .await?;
-    let row = sqlx::query("SELECT t.id,t.root_id,t.workspace_id FROM tasks t WHERE t.runtime_kind='rust' AND t.runtime_version=$1 AND t.runtime_phase='model' AND t.state='queued' AND EXISTS(SELECT 1 FROM kernel_inputs i WHERE i.task_id=t.id AND i.consumed_at IS NULL AND NOT i.deferred AND i.available_at<=now()) AND (SELECT count(*) FROM tasks WHERE runtime_kind='rust' AND runtime_phase='model' AND state='running')<4 AND (SELECT count(*) FROM tasks x WHERE x.runtime_kind='rust' AND x.runtime_phase='model' AND x.state='running' AND x.workspace_id=t.workspace_id)<2 AND (t.parent_id IS NULL OR EXISTS(SELECT 1 FROM tasks p WHERE p.id=t.parent_id AND p.state NOT IN ('failed','cancelled','succeeded','uncertain'))) ORDER BY (SELECT max(x.updated_at) FROM tasks x WHERE x.workspace_id=t.workspace_id AND x.runtime_kind='rust' AND x.lease_epoch>0) NULLS FIRST,t.updated_at,t.id FOR UPDATE OF t SKIP LOCKED LIMIT 1")
+    let row = sqlx::query("SELECT t.id,t.root_id,t.workspace_id FROM tasks t WHERE t.runtime_kind='rust' AND t.runtime_version=$1 AND t.runtime_phase='model' AND t.state='queued' AND task_dispatch_allowed(t.id) AND EXISTS(SELECT 1 FROM kernel_inputs i WHERE i.task_id=t.id AND i.consumed_at IS NULL AND NOT i.deferred AND i.available_at<=now()) AND (SELECT count(*) FROM tasks WHERE runtime_kind='rust' AND runtime_phase='model' AND state='running')<4 AND (SELECT count(*) FROM tasks x WHERE x.runtime_kind='rust' AND x.runtime_phase='model' AND x.state='running' AND x.workspace_id=t.workspace_id)<2 AND (t.parent_id IS NULL OR EXISTS(SELECT 1 FROM tasks p WHERE p.id=t.parent_id AND p.state NOT IN ('failed','cancelled','succeeded','uncertain'))) ORDER BY (SELECT max(x.updated_at) FROM tasks x WHERE x.workspace_id=t.workspace_id AND x.runtime_kind='rust' AND x.lease_epoch>0) NULLS FIRST,t.updated_at,t.id FOR UPDATE OF t SKIP LOCKED LIMIT 1")
         .bind(VERSION).fetch_optional(&mut *tx).await?;
     let Some(row) = row else {
         return Ok(None);
@@ -168,13 +226,24 @@ pub async fn run(db: PgPool, http: reqwest::Client, lease: Lease) -> Result<(), 
         }
         settlement.commit().await?;
 
-        let code = if error.to_string().contains("LEASE_LOST") {
-            "LEASE_LOST"
-        } else if error.to_string().contains("BUDGET") {
-            "MODEL_BUDGET"
-        } else {
-            "KERNEL_SLICE_FAILED"
-        };
+        if error.to_string().contains("TASK_PAUSED") {
+            let mut tx = db.begin().await?;
+            control_lock(&mut tx).await?;
+            fence(&mut tx, &lease).await?;
+            sqlx::query(
+                "UPDATE tasks SET state='queued',lease_owner=NULL,lease_until=NULL WHERE id=$1",
+            )
+            .bind(lease.id)
+            .execute(&mut *tx)
+            .await?;
+            event(&mut tx, lease.id, json!({"type":"state","state":"queued"})).await?;
+            sqlx::query("SELECT settle_task_pauses()")
+                .execute(&mut *tx)
+                .await?;
+            tx.commit().await?;
+            return Ok(());
+        }
+        let code = failure_code(&error.to_string());
         if code != "LEASE_LOST" {
             let mut tx = db.begin().await?;
             if fence(&mut tx, &lease).await.is_ok() {
@@ -182,7 +251,12 @@ pub async fn run(db: PgPool, http: reqwest::Client, lease: Lease) -> Result<(), 
                 let reserved=sqlx::query("UPDATE model_attempts SET status='failed',finished_at=now(),error_code=$2 WHERE task_id=$1 AND status='running' RETURNING reserved").bind(lease.id).bind(code).fetch_all(&mut *tx).await?.iter().map(|r|r.get::<i64,_>("reserved")).sum::<i64>();
                 sqlx::query("UPDATE tasks SET tokens=tokens+$2,reserved_tokens=reserved_tokens-$2 WHERE id=$1").bind(lease.root).bind(reserved).execute(&mut *tx).await?;
                 sqlx::query("UPDATE tasks SET state='failed',error_code=$2,lease_owner=NULL,lease_until=NULL WHERE id=$1").bind(lease.id).bind(code).execute(&mut *tx).await?;
-                event(&mut tx, lease.id, json!({"type":"error","code":code})).await?;
+                event(
+                    &mut tx,
+                    lease.id,
+                    json!({"type":"error","code":code,"step":0}),
+                )
+                .await?;
                 event(&mut tx, lease.id, json!({"type":"state","state":"failed"})).await?;
                 tx.commit().await?;
             }
@@ -202,6 +276,7 @@ async fn run_guarded(db: PgPool, http: reqwest::Client, lease: Lease) -> Result<
         lease: lease.clone(),
         model: String::new(),
         context: Arc::new(Value::Null),
+        paused: store.paused.clone(),
     };
     let context = provider.context().await?;
     let mut provider = provider;
@@ -222,6 +297,10 @@ async fn run_guarded(db: PgPool, http: reqwest::Client, lease: Lease) -> Result<
                     .as_str()
                     .unwrap_or_default()
                     .starts_with("EXECUTION_BUDGET:")
+                || message["content"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .starts_with("TASK_PLAN:")
             {
                 continue;
             }
@@ -312,6 +391,10 @@ async fn run_guarded(db: PgPool, http: reqwest::Client, lease: Lease) -> Result<
                     .as_str()
                     .unwrap_or_default()
                     .starts_with("EXECUTION_BUDGET:")
+                || m["content"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .starts_with("TASK_PLAN:")
         })
         .filter_map(|m| m["content"].as_str())
         .collect::<Vec<_>>()
@@ -331,49 +414,61 @@ async fn run_guarded(db: PgPool, http: reqwest::Client, lease: Lease) -> Result<
         thread::{CloseThreadTool, ReportToParentTool, SendMessageToChildTool, SpawnThreadTool},
     };
     let may_delegate = tools.iter().any(|t| t.name == "delegate");
+    let guard = |tool: Box<dyn infinity_agent_core::tools::Tool<PgStores>>| -> Box<dyn infinity_agent_core::tools::Tool<PgStores>> {
+        Box::new(crate::control::ControlledTool { tool, db: db.clone(), lease: lease.clone(), paused: store.paused.clone() })
+    };
     let mut builder = AgentSystemBuilder::new(store.clone(), store.clone(), model, store.clone())
         .without_builtin_tools()
         .extra_system_prompt(prompt)
-        .tool(Box::new(DurableSleep {
+        .tool(guard(Box::new(DurableSleep {
             store: store.clone(),
-        }))
-        .tool(Box::new(SleepUntilEventOrInputTool))
-        .tool(Box::new(ReportToParentTool {
+        })))
+        .tool(guard(Box::new(SleepUntilEventOrInputTool)))
+        .tool(guard(Box::new(ReportToParentTool {
             conversation_store: store.clone(),
-        }))
-        .tool(Box::new(CloseThreadTool::<
+        })))
+        .tool(guard(Box::new(CloseThreadTool::<
             _,
             infinity_agent_core::system::NoRapHttp,
         > {
             conversation_store: store.clone(),
             rap_notifier: None,
-        }))
-        .tool(Box::new(SendMessageToChildTool {
+        })))
+        .tool(guard(Box::new(SendMessageToChildTool {
             conversation_store: store.clone(),
-        }))
-        .tool(Box::new(CancelSubscriptionTool::<
+        })))
+        .tool(guard(Box::new(CancelSubscriptionTool::<
             _,
             infinity_agent_core::system::NoRapHttp,
         > {
             state_store: store.clone(),
             rap_notifier: None,
-        }))
+        })))
         .tools(tools.into_iter().map(|definition| {
             Box::new(OutboxTool {
+                replay: context["tools"]
+                    .as_array()
+                    .and_then(|ts| ts.iter().find(|t| t["name"] == definition.name))
+                    .and_then(|t| t["replay"].as_str())
+                    .unwrap_or("uncertain")
+                    .to_owned(),
                 definition,
                 store: store.clone(),
             }) as Box<dyn infinity_agent_core::tools::Tool<PgStores>>
         }));
     if may_delegate {
-        builder = builder.tool(Box::new(SpawnThreadTool {
+        builder = builder.tool(guard(Box::new(SpawnThreadTool {
             conversation_store: store.clone(),
-        }));
+        })));
     }
     let mut system = builder.build();
     let events = EventCollector::new();
     let mut defer = store.clone();
     let outcomes = system.step(inputs, &events, &mut defer).await?;
     let events = events.take();
+    if store.paused.load(Ordering::Relaxed) {
+        return Err("TASK_PAUSED".into());
+    }
     if events
         .iter()
         .any(|(_, e)| matches!(e,AgentEvent::Info{text} if text.starts_with("Error:")))
@@ -431,6 +526,7 @@ pub async fn commit(
         .expect("bug: delayed mutex poisoned")
         .clone();
     let mut tx = db.begin().await?;
+    control_lock(&mut tx).await?;
     fence(&mut tx, lease).await?;
     let new_instruction: bool =
         sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM instructions WHERE task_id=$1 AND id>$2)")
@@ -557,7 +653,7 @@ pub async fn commit(
         let id = Uuid::parse_str(&intent.id)?;
         sqlx::query("INSERT INTO operations(id,task_id,step,call_id,name,args,status,replay,ordinal) VALUES($1,$2,$3,$4,$5,$6,'prepared',$7,$8)")
             .bind(id).bind(lease.id).bind(step).bind(&intent.call_id).bind(&intent.name).bind(&intent.args)
-            .bind(if intent.name=="code_execute" || intent.name=="skill_run" {"uncertain"} else {"safe"}).bind(ordinal as i32).execute(&mut *tx).await?;
+            .bind(&intent.replay).bind(ordinal as i32).execute(&mut *tx).await?;
         event(
             &mut tx,
             lease.id,
@@ -612,6 +708,13 @@ pub async fn commit(
             metric(&mut tx, "duplicate_events", 1).await?;
         }
     }
+    sqlx::query("SELECT settle_task_pauses()")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM kernel_model_results WHERE task_id=$1")
+        .bind(lease.id)
+        .execute(&mut *tx)
+        .await?;
     metric(&mut tx, "slices_committed", 1).await?;
     if std::env::var("KERNEL_FAULT").ok().as_deref() == Some("before_commit") {
         std::process::exit(86);

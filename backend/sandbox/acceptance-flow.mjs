@@ -26,9 +26,14 @@ import {
   consumeBrowserInputs,
   transitionBrowser,
   Storage,
+  controlTask,
+  settlePauses,
+  taskOverview,
 } from "@hyper/runtime";
 import { createRunner } from "@hyper/runner";
 import { createBrowserService } from "../browser-service/service.mjs";
+const lifecycle = process.env.LIFECYCLE_ACCEPTANCE === "true";
+const runtime = process.env.LIFECYCLE_RUNTIME || "rust";
 const root = await mkdtemp("/tmp/hyper-complete-flow-");
 const portProbe = createServer();
 await new Promise((resolve, reject) => {
@@ -125,7 +130,7 @@ async function model(input) {
       inputFileIds: [downloaded.artifact.fileId],
       outputs: [{ path: "result.txt", format: "txt" }],
       code:
-        'from pathlib import Path\nimport csv,math\nwith open("/inputs/' +
+        'from pathlib import Path\nimport csv,math,time\ntime.sleep(1)\nwith open("/inputs/' +
         downloaded.artifact.fileId +
         '.csv") as f: product=math.prod(int(r["value"]) for r in csv.DictReader(f))\nPath("result.txt").write_text("6 * 7 = " + str(product))\nprint(product)',
     });
@@ -168,6 +173,16 @@ try {
   runner = await createRunner(cfg);
   console.log(JSON.stringify({ stage: "runner-created" }));
   cfg.RUNNER_URL = await runner.listen({ host: "127.0.0.1", port: 0 });
+  if (lifecycle)
+    assert.equal(
+      (
+        await runner.inject({
+          url: "/health",
+          headers: { authorization: "Bearer " + cfg.RUNNER_TOKEN },
+        })
+      ).json().available,
+      true,
+    );
   const wrappedChromium = {
     async connectOverCDP(...args) {
       const b = await chromium.connectOverCDP(...args);
@@ -176,9 +191,10 @@ try {
       const originalPage = c.newPage.bind(c);
       c.newPage = async () => {
         const page = await originalPage();
-        await page.route("https://example.com/hyper-login", (route) =>
-          route.fulfill({ contentType: "text/html", body: fixture }),
-        );
+        await page.route("https://example.com/hyper-login", async (route) => {
+          if (lifecycle) await new Promise((r) => setTimeout(r, 1000));
+          await route.fulfill({ contentType: "text/html", body: fixture });
+        });
         return page;
       };
       return b;
@@ -227,7 +243,7 @@ try {
       },
       randomUUID(),
       owner.userId,
-      "rust",
+      runtime,
     )
   ).taskId;
   const engine = new Engine(db, cfg, (attempt) => ({
@@ -237,13 +253,70 @@ try {
       return model(input);
     },
   }));
+  let browserPaused = false,
+    computePaused = false,
+    pauseChecks = 0;
+  if (lifecycle) {
+    const run = engine.tools.runner.run.bind(engine.tools.runner);
+    engine.tools.runner.run = async (...args) => {
+      const work = run(...args);
+      let done = false;
+      void work.then(
+        () => {
+          done = true;
+        },
+        () => {
+          done = true;
+        },
+      );
+      for (let i = 0; i < 100 && !done; i++) {
+        if (
+          (
+            await runner.inject({
+              url: "/metrics",
+              headers: { authorization: "Bearer " + cfg.RUNNER_TOKEN },
+            })
+          ).json().active > 0
+        ) {
+          await controlTask(db, taskId, owner.workspaceId, "pause");
+          computePaused = true;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      return work;
+    };
+  }
   console.log(JSON.stringify({ stage: "kernel-and-sandboxes-ready" }));
   const client = new BrowserClient(cfg);
   let handedBack = false;
-  const deadline = Date.now() + 120000;
+  const deadline = Date.now() + (lifecycle ? 240000 : 120000);
   while (Date.now() < deadline) {
     await dispatchBrowser(db, client);
     await consumeBrowserInputs(db);
+    if (
+      lifecycle &&
+      !browserPaused &&
+      (
+        await db.query(
+          "SELECT 1 FROM browser_outbox WHERE task_id=$1 AND status='running'",
+          [taskId],
+        )
+      ).rowCount
+    ) {
+      await controlTask(db, taskId, owner.workspaceId, "pause");
+      browserPaused = true;
+    }
+    await settlePauses(db);
+    if (lifecycle && (await getTask(db, taskId)).control_state === "paused") {
+      const before = await taskOverview(db, taskId, owner.workspaceId);
+      await new Promise((r) => setTimeout(r, 250));
+      const after = await taskOverview(db, taskId, owner.workspaceId);
+      assert.equal(after.budget.activeMs, before.budget.activeMs);
+      assert.equal(after.budget.modelCalls, before.budget.modelCalls);
+      await controlTask(db, taskId, owner.workspaceId, "resume");
+      pauseChecks++;
+    }
     const t = await getTask(db, taskId);
     if (["failed", "uncertain", "cancelled"].includes(t.state))
       throw new Error(
@@ -337,11 +410,19 @@ try {
   }
   assert.ok(completed, logs || "Flow timed out");
   assert.ok(handedBack);
+  if (lifecycle) {
+    assert.ok(browserPaused);
+    assert.ok(computePaused);
+    assert.ok(pauseChecks >= 2);
+    console.log(
+      JSON.stringify({ runtime, browserPaused, computePaused, pauseChecks }),
+    );
+  }
   console.log(
     JSON.stringify({
       status: "passed",
       checks: [
-        "rust-streaming-provider",
+        `${runtime}-provider`,
         "atomic-outbox",
         "real-browser",
         "human-control-transition",

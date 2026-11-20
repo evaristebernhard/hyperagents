@@ -1,3 +1,4 @@
+export type { TaskOverview } from "../backend/packages/contracts/src/index";
 import type { MessageContext } from "./types";
 
 export const backendV1 = import.meta.env.VITE_BACKEND_V1 === "true";

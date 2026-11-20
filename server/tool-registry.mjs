@@ -50,17 +50,20 @@ export function toolResultOutcome(result) {
 const catalogDefinition={type:'function',function:{name:'tool_catalog',description:'Discover tools authorized and bound for THIS run, including their source, effect and optional parameter schemas. Discovery never enables a tool, connects a service, approves an action, or starts a subagent. Do not call this when you already know the needed tool.',parameters:{type:'object',properties:{query:{type:'string',maxLength:200},source:{type:'string',enum:[...sources]},includeSchemas:{type:'boolean'},offset:{type:'integer',minimum:0,maximum:1000},limit:{type:'integer',minimum:1,maximum:20}},required:[],additionalProperties:false}}};
 
 export function createToolRegistry(bindings=[], options={}) {
+  if(options.allowlist!==undefined&&(!Array.isArray(options.allowlist)||options.allowlist.some(name=>typeof name!=='string')||new Set(options.allowlist).size!==options.allowlist.length))fail('Invalid explicit tool allowlist.');
+  const allowed=options.allowlist===undefined?null:new Set(options.allowlist);
   const entries=new Map();
   for(const binding of bindings){
     if(!sources.has(binding.source) || !effects.has(binding.effect) || !Array.isArray(binding.definitions) || (binding.definitions.length && typeof binding.execute!=='function'))fail('Invalid tool adapter registration.');
     for(const definition of binding.definitions){
       const f=definition?.function;
       if(definition.type!=='function' || !f || !/^[_a-z]{1,80}$/.test(f.name) || f.name==='tool_catalog' || typeof f.description!=='string' || f.parameters?.type!=='object')fail('Invalid tool definition.');
+      if(allowed&&!allowed.has(f.name))continue;
       if(entries.has(f.name))fail('Duplicate tool registration: '+f.name);
       entries.set(f.name,{definition:clone(definition),source:binding.source,effect:binding.effect,execute:binding.execute});
     }
   }
-  const hasCatalog=options.catalog!==false && entries.size>0;
+  const hasCatalog=options.catalog!==false && entries.size>0 && (!allowed||allowed.has('tool_catalog'));
   function metadata(name){const e=entries.get(name);return e?{name,source:e.source,effect:e.effect}:name==='tool_catalog'&&hasCatalog?{name,source:'managed',effect:'read-only'}:undefined;}
   function catalog(args){
     validateToolArguments(catalogDefinition.function.parameters,args);

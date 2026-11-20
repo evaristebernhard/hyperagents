@@ -1,6 +1,6 @@
 use crate::{
     Error,
-    scheduler::{Lease, VERSION, fence},
+    scheduler::{Lease, VERSION},
 };
 use axum::{
     Json, Router,
@@ -31,7 +31,9 @@ struct Usage {
     output: i64,
 }
 fn failure(error: Error) -> (StatusCode, Json<Value>) {
-    let code = if error.to_string().contains("LEASE_LOST") {
+    let code = if error.to_string().contains("TASK_PAUSED") {
+        "TASK_PAUSED"
+    } else if error.to_string().contains("LEASE_LOST") {
         "LEASE_LOST"
     } else if error.to_string().contains("BUDGET") {
         "MODEL_BUDGET"
@@ -65,9 +67,10 @@ async fn reserve(
         let amount=input.amount.ok_or("AMOUNT_REQUIRED")?;
         if !(1..=200000).contains(&amount){return Err("MODEL_BUDGET".into());}
         let mut tx=db.begin().await?;
+        crate::scheduler::control_lock(&mut tx).await?;
         let row=sqlx::query("SELECT root_id,workspace_id FROM tasks WHERE id=$1 AND runtime_kind='rust' AND runtime_phase='tools'").bind(input.task_id).fetch_one(&mut *tx).await?;
         let lease=Lease{id:input.task_id,root:row.try_get("root_id")?,workspace:row.try_get("workspace_id")?,owner:input.owner,epoch:input.epoch.parse()?,instructions:0};
-        fence(&mut tx,&lease).await?;
+        crate::scheduler::dispatch(&mut tx,&lease).await?;
         let previous=sqlx::query("SELECT task_id,reserved,status FROM model_attempts WHERE id=$1").bind(input.attempt_id).fetch_optional(&mut *tx).await?;
         if let Some(previous)=previous {
             if previous.get::<Uuid,_>("task_id")!=input.task_id||previous.get::<i64,_>("reserved")!=amount||previous.get::<String,_>("status")!="running" {return Err("ATTEMPT_CONFLICT".into());}
@@ -89,6 +92,7 @@ async fn settle(
         let usage=input.usage.map(|u|json!({"input":u.input,"output":u.output}));
         if usage.as_ref().is_some_and(|u|u["input"].as_i64().unwrap_or(-1)<0||u["output"].as_i64().unwrap_or(-1)<0){return Err("INVALID_USAGE".into());}
         let mut tx=db.begin().await?;
+        crate::scheduler::control_lock(&mut tx).await?;
         let row=sqlx::query("UPDATE model_attempts SET status=$3,usage=$4,error_code=$5,finished_at=now() WHERE id=$1 AND task_id=$2 AND status='running' RETURNING root_id,reserved")
             .bind(input.attempt_id).bind(input.task_id).bind(if usage.is_some()&&input.error_code.is_none(){"completed"}else{"failed"}).bind(&usage).bind(input.error_code).fetch_optional(&mut *tx).await?;
         if let Some(row)=row {

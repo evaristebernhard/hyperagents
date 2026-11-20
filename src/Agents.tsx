@@ -471,6 +471,8 @@ export default function Agents({
               </button>
               <button
                 className="btn small"
+                disabled={!!editing.companion}
+                title={editing.companion ? "个人分身关联自聊与记忆，请使用归档保留这些记录。" : undefined}
                 onClick={() => {
                   if (confirm("Delete this local agent identity?")) {
                     setAgents(agents.filter((a) => a.id !== editing.id));

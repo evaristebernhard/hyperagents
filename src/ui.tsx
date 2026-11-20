@@ -223,7 +223,7 @@ function LegacyComposer({ navigate, onSend, notify, compact = false, agents = []
     try {
       const ensure = (ids: string[], available: { id: string }[], label: string) => { if (ids.some(id => !available.some(item => item.id === id))) throw Error("A selected " + label + " is no longer available. Remove it before sending."); };
       if (server) {
-        ensure(skillIds, w.data.skills.filter(s => !s.archived), "skill"); ensure(memoryIds, w.data.memories, "memory");
+        ensure(skillIds, w.data.skills.filter(s => !s.archived), "skill"); ensure(memoryIds, w.data.memories.filter(m => !m.companion), "memory");
         ensure(artifactIds, w.data.artifacts.filter(a => !a.archived), "artifact"); ensure(integrationIds, w.data.connections.filter(c => c.enabled), "connection");
         if (choices.agentId) ensure([choices.agentId], w.data.agents.filter(a => !a.archived), "agent");
         if (projectId) ensure([projectId], w.data.projects.filter(p => !p.archived), "project");

@@ -1,3 +1,4 @@
+import { controlLock } from "./task-control.js";
 import pg from "pg";
 import { readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -57,6 +58,9 @@ export interface Checkpoint {
 }
 export interface Task {
   id: string;
+  control_state: "normal" | "pause_requested" | "paused";
+  control_revision: number;
+  reserved_tokens: string;
   runtime_kind: "typescript" | "rust";
   runtime_version: string;
   runtime_phase: "model" | "tools";
@@ -125,6 +129,7 @@ export async function event(db: Queryable, id: string, payload: TaskEvent) {
   ]);
 }
 export async function fenced(c: Queryable, id: string, owner: string) {
+  await controlLock(c);
   const r = await c.query(
     "SELECT 1 FROM tasks WHERE id=$1 AND lease_owner=$2 AND lease_until>now() AND state='running' AND EXISTS(SELECT 1 FROM tasks root WHERE root.id=tasks.root_id AND root.state NOT IN ('cancelled','failed','succeeded','uncertain')) FOR UPDATE",
     [id, owner],
@@ -170,6 +175,7 @@ export async function setState(
 }
 export async function claim(db: Db): Promise<Task | undefined> {
   return tx(db, async (c) => {
+    await controlLock(c);
     await c.query("SELECT pg_advisory_xact_lock(730102)");
     // A crashed operation whose effects cannot be established is never automatically replayed.
     const expired = await c.query<Task>(
@@ -200,10 +206,11 @@ export async function claim(db: Db): Promise<Task | undefined> {
       );
       await event(c, t.id, { type: "state", state });
     }
+    await c.query("SELECT settle_task_pauses()");
     const r =
-      await c.query<Task>(`SELECT t.* FROM tasks t WHERE t.state='queued' AND (t.runtime_kind='typescript' OR t.runtime_phase='tools') AND (t.runtime_kind='rust' OR t.parent_id IS NOT NULL OR (
- (SELECT count(*) FROM tasks WHERE parent_id IS NULL AND state IN ('running','waiting_children'))<2
- AND NOT EXISTS(SELECT 1 FROM tasks x WHERE x.workspace_id=t.workspace_id AND x.parent_id IS NULL AND x.state IN ('running','waiting_children'))
+      await c.query<Task>(`SELECT t.* FROM tasks t WHERE t.state='queued' AND task_dispatch_allowed(t.id) AND (t.runtime_kind='typescript' OR t.runtime_phase='tools') AND (t.runtime_kind='rust' OR t.parent_id IS NOT NULL OR (
+ (SELECT count(*) FROM tasks WHERE parent_id IS NULL AND state IN ('running','waiting_children') AND control_state<>'paused')<2
+ AND NOT EXISTS(SELECT 1 FROM tasks x WHERE x.workspace_id=t.workspace_id AND x.parent_id IS NULL AND x.state IN ('running','waiting_children') AND x.control_state<>'paused')
  )) AND (t.parent_id IS NULL OR EXISTS(SELECT 1 FROM tasks p WHERE p.id=t.parent_id AND p.state IN ('running','waiting_children')))
  ORDER BY (t.parent_id IS NOT NULL) DESC,t.created_at FOR UPDATE OF t SKIP LOCKED LIMIT 1`);
     const t = r.rows[0];

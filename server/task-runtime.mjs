@@ -505,7 +505,7 @@ export function createTaskRuntime({ dataDir, model, plugins, load, concurrency =
     },
     config(request) {
       workspace(request?.workspaceId);
-      return { configured: !!model.configured, models: [...model.models], plugins: plugins.list(), prompts: ['router', 'worker'].map(role => prompt(request.workspaceId, role)), limits: { concurrency, maxSteps, maxChildren, maxTools } };
+      return { configured: !!model.configured, ...(model.provider==='SCNet DCU'?{provider:model.provider}:{}), models: [...model.models], plugins: plugins.list(), prompts: ['router', 'worker'].map(role => prompt(request.workspaceId, role)), limits: { concurrency, maxSteps, maxChildren, maxTools } };
     },
     savePrompt(role, request) {
       workspace(request?.workspaceId); const current = prompt(request.workspaceId, role);

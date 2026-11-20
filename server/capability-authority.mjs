@@ -8,9 +8,9 @@ const BASE=[
 ];
 const present=v=>typeof v==='string'&&v.trim().length>0;
 const executable=p=>{try{accessSync(p,constants.X_OK);return true}catch{return false}};
-export function buildCapabilityManifest({enabled=[],skillsConfigured=false,openAlexApiKey,exaApiKey,freeSearchDisabled=false,userAgent,browserProvider,browserPath,moliPath=process.env.MOLI_PATH||'/home/ubuntu/.local/bin/moli'}={}){
+export function buildCapabilityManifest({enabled=[],skillsConfigured=false,openAlexApiKey,exaApiKey,freeSearchDisabled=false,userAgent,browserProvider,browserPath,persistentBrowser,moliPath=process.env.MOLI_PATH||'/home/ubuntu/.local/bin/moli'}={}){
  const chosen=new Set(Array.isArray(enabled)?enabled:[]),moli=executable(moliPath),weather=present(userAgent),openalex=present(openAlexApiKey);
- const browser=browserConfiguration({provider:browserProvider || 'moli',binaryPath:browserPath || moliPath});
+ const browser=persistentBrowser||browserConfiguration({provider:browserProvider || 'moli',binaryPath:browserPath || moliPath});
  const exaConfigured=createExaTools({apiKey:exaApiKey,enabled:['Search','Find Similar']}).capabilities[0].configured;
  const capabilities=BASE.map(([label,category,effect,tool])=>{
   const publicSearch=label==='Search'&&!exaConfigured;

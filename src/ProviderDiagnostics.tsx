@@ -11,11 +11,11 @@ type Diagnostics = {
 };
 type Probe = { status: "verified" | "failed"; code?: string; model: string; checkedAt: string; latencyMs: number; cached: boolean };
 const explanations: Record<string, string> = {
-  AUTH_REJECTED: "DeepSeek rejected the server credential. Check the private DEEPSEEK_API_KEY and restart the app. Do not paste it here.",
-  INSUFFICIENT_BALANCE: "DeepSeek reports insufficient balance. Check the provider account’s billing.",
-  RATE_LIMITED: "DeepSeek is rate-limiting requests. Wait before testing again.",
+  AUTH_REJECTED: "The configured provider rejected the server credential. Check it on the server; do not paste it here.",
+  INSUFFICIENT_BALANCE: "The configured provider reports insufficient balance. Check that provider’s billing.",
+  RATE_LIMITED: "The configured model is busy or rate-limiting requests. Wait before testing again.",
   MODEL_UNAVAILABLE: "The provider rejected this model or request. Try the other supported model and check your provider access.",
-  PROVIDER_ERROR: "DeepSeek returned a service error. Retry later.",
+  PROVIDER_ERROR: "The configured model returned a service error. Retry later.",
   TIMEOUT: "No complete provider response within 15 seconds. Check the server’s outbound network and try again later.",
   CONNECTION_ERROR: "The provider connection failed or returned an invalid response. Check network access and try again later.",
 };
@@ -27,6 +27,7 @@ export default function ProviderDiagnostics() {
   const [error, setError] = useState("");
   const [probe, setProbe] = useState<Probe | null>(null);
   const alive = useRef(true), pending = useRef(false);
+  const scnet = data?.provider.name === "SCNet DCU";
   async function refresh() {
     setLoading(true); setError("");
     try {
@@ -56,11 +57,11 @@ export default function ProviderDiagnostics() {
         <div className="pd-card"><Database size={17} /><strong>{data.database.engine}</strong><span>{data.database.status === "ready" ? "Readable" : "Unavailable"}</span><small>Workspace revision {data.database.revision ?? "unknown"}</small></div>
         <div className="pd-card"><Activity size={17} /><strong>{data.provider.name}</strong><span>{data.provider.configured ? "Key configured" : "Not configured"}</span><small>Configuration is not a connection test</small></div>
       </div>
-      <div className="pd-test"><h4>Verify a model</h4><p>No provider request runs when you open or refresh this panel. The button sends a small paid request (at most 16 output tokens) using the server key. Results are reused for 30 seconds per model.</p>
+      <div className="pd-test"><h4>Verify a model</h4><p>No provider request runs when you open or refresh this panel. {scnet ? "The button sends a real request to the current SCNet job (at most 16 output tokens); it does not call the previous paid API or extend the job." : "The button sends a small paid request (at most 16 output tokens) using the configured provider’s server key."} Results are reused for 30 seconds per model.</p>
         <label>Model<select aria-label="Diagnostic model" value={model} disabled={testing} onChange={e => { setModel(e.target.value); setProbe(null); }}>{data.provider.models.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
-        <button className="btn primary small" disabled={!data.provider.configured || !model || testing || loading} onClick={() => void testProvider()}>{testing ? "Testing provider…" : "Run small paid test"}</button>
-        {!data.provider.configured && <p>Set DEEPSEEK_API_KEY in the server’s private .env and restart. Never use a VITE_ variable or paste a key into this page.</p>}
-        {testing && <p role="status">Waiting for DeepSeek; the test times out after 15 seconds.</p>}
+        <button className="btn primary small" disabled={!data.provider.configured || !model || testing || loading} onClick={() => void testProvider()}>{testing ? "Testing provider…" : scnet ? "Run small SCNet test" : "Run small paid test"}</button>
+        {!data.provider.configured && <p>Configure the model connection on the server and restart the app. Never paste a key into this page.</p>}
+        {testing && <p role="status">Waiting for {data.provider.name}; the test times out after 15 seconds.</p>}
         {probe && <div className={"pd-result " + (probe.status === "verified" ? "is-verified" : "is-failed")} role="status"><strong>{probe.status === "verified" ? "Provider verified" : "Provider test failed"} · {probe.model}</strong><p>{probe.status === "verified" ? "A real completion returned successfully. This verifies this model at the time shown, not all tools or future availability." : explanations[probe.code || ""] || "Provider verification failed. Retry later."}</p><small>{new Date(probe.checkedAt).toLocaleString()} · {probe.latencyMs} ms{probe.cached ? " · Cached result" : ""}</small></div>}
       </div>
       <p className="pd-private"><ShieldCheck size={14} /> Credentials stay on the server. Diagnostics do not expose keys, file paths, conversations or provider response bodies.</p>

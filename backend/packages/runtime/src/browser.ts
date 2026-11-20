@@ -1,3 +1,4 @@
+import { assertDispatch } from "./task-control.js";
 import { randomUUID } from "node:crypto";
 import {
   BrowserAction,
@@ -171,6 +172,7 @@ export async function prepareBrowser(db: Db, task: Task, op: Operation) {
     throw new DomainError("BROWSER_PROFILE_REQUIRED");
   return tx(db, async (c) => {
     await c.query("SELECT pg_advisory_xact_lock(730110)");
+    await assertDispatch(c, task.id);
     await fenced(c, task.id, task.lease_owner!);
     await browserAccess(
       c,
@@ -320,7 +322,7 @@ export async function consumeBrowserInputs(db: Db) {
       ]);
     }
     const waiting = await c.query<Task>(
-      "SELECT * FROM tasks WHERE state='waiting_browser' AND wait_reason='profile_or_capacity' ORDER BY created_at FOR UPDATE",
+      "SELECT * FROM tasks WHERE state='waiting_browser' AND task_dispatch_allowed(id) AND wait_reason='profile_or_capacity' ORDER BY created_at FOR UPDATE",
     );
     for (const t of waiting.rows) {
       if (await reserveSession(c, t.browser_profile_id!, t.id)) {
@@ -337,7 +339,7 @@ export async function dispatchBrowser(db: Db, client: BrowserClient) {
   await consumeBrowserInputs(db);
   if (client.config.BROWSER_ENABLED !== "true") return;
   const rows = await db.query(
-    "SELECT operation_id FROM browser_outbox WHERE status='pending' ORDER BY created_at LIMIT 2",
+    "SELECT operation_id FROM browser_outbox WHERE status='pending' AND task_dispatch_allowed(task_id) ORDER BY created_at LIMIT 2",
   );
   await Promise.allSettled(
     rows.rows.map(async (r) => {

@@ -1,3 +1,4 @@
+import { assertDispatch } from "./task-control.js";
 import Fastify from "fastify";
 import { z } from "zod";
 import {
@@ -5,6 +6,7 @@ import {
   Id,
   Limits,
   ToolSchemas,
+  toolReplay,
   type Message,
   type ModelAdapter,
   type ModelInput,
@@ -133,12 +135,9 @@ export async function createKernelBridge(
   const engine = new Engine(db, cfg);
   const active = new Map<string, AbortController>();
   app.setErrorHandler((error, _req, reply) =>
-    reply
-      .code(error instanceof DomainError ? error.status : 400)
-      .send({
-        error:
-          error instanceof DomainError ? error.code : "KERNEL_BRIDGE_ERROR",
-      }),
+    reply.code(error instanceof DomainError ? error.status : 400).send({
+      error: error instanceof DomainError ? error.code : "KERNEL_BRIDGE_ERROR",
+    }),
   );
   const verify = async (value: z.infer<typeof Fence>) => {
     const task = await getTask(db, value.taskId);
@@ -173,6 +172,7 @@ export async function createKernelBridge(
       tools: context.toolNames.map((name) => ({
         name,
         description: `Workspace tool: ${name}`,
+        replay: toolReplay(name),
         parameters: z.toJSONSchema(ToolSchemas[name], { target: "draft-7" }),
       })),
       corrections: instructions.rows.map((r) => r.message),
@@ -191,10 +191,14 @@ export async function createKernelBridge(
     );
     if (!attempt.rowCount)
       throw new DomainError("ATTEMPT_ALREADY_DISPATCHED", 409);
-    const consumed = await db.query(
-      "UPDATE model_attempts SET bridge_started_at=now() WHERE id=$1 AND bridge_started_at IS NULL AND status='running' RETURNING id",
-      [input.attemptId],
-    );
+    const consumed = await tx(db, async (c) => {
+      await assertDispatch(c, task.id);
+      await fenced(c, task.id, input.owner);
+      return c.query(
+        "UPDATE model_attempts SET bridge_started_at=now() WHERE id=$1 AND bridge_started_at IS NULL AND status='running' RETURNING id",
+        [input.attemptId],
+      );
+    });
     if (!consumed.rowCount)
       throw new DomainError("ATTEMPT_ALREADY_DISPATCHED", 409);
     const controller = new AbortController();

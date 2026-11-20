@@ -44,6 +44,7 @@ import {
   Sparkles,
   Clock,
   Check,
+  Monitor,
 } from "lucide-react";
 import type {
   DemoThread,
@@ -75,6 +76,8 @@ import Rooms from "./Rooms";
 import LibraryManager from "./LibraryManager";
 import LocalWorkspace from "./LocalWorkspace";
 import Marketplace from "./Marketplace";
+import CompanionSpace from "./CompanionSpace";
+import BrowserWorkspacePage from "./browser/BrowserWorkspacePage";
 
 function useSaved<T>(key: string, initial: T) {
   const [v, setV] = useState<T>(() => safeRead(key, initial));
@@ -95,6 +98,8 @@ const gotoItems = [
   ["Workspaces", "/workspaces"],
   ["Skills", "/skills"],
   ["Memories", "/memories"],
+  ...(!backendV1 ? [["分身与记忆", "/companion"]] : []),
+  ...(!backendV1 ? [["浏览器", "/browser"]] : []),
   ["Documents", "/documents"],
   ["Rubrics", "/rubrics"],
   ["HyperApps", "/hyperapps"],
@@ -303,7 +308,7 @@ export default function App() {
       summary: text.slice(0, 150),
       time: "just now",
       project,
-      projectId: context?.projectId,
+      projectId: context?.projectId || project,
       createdAt: timestamp,
       updatedAt: timestamp,
       config:
@@ -354,6 +359,10 @@ export default function App() {
   );
   const recent = threads.filter((t) => !t.archived).slice(0, 6);
   const renderPage = () => {
+    if (path === "/browser" && !backendV1)
+      return <BrowserWorkspacePage key={workspace.state.active} />;
+    if (path === "/companion" && !backendV1)
+      return <CompanionSpace key={workspace.state.active + url} navigate={navigate} notify={notify} />;
     if (backendV1 && settings)
       return (
         <V1Panels
@@ -752,6 +761,8 @@ export default function App() {
             )}
           </button>
           {link("/inbox", "Inbox", Inbox)}
+          {!backendV1 && link("/companion", "分身与记忆", Sparkles)}
+          {!backendV1 && link("/browser", "浏览器", Monitor)}
           <div className="nav-group">
             <button
               className="group-title"
@@ -1380,7 +1391,9 @@ function ThreadList({
                     if (
                       deleting.current ||
                       !confirm(
-                        "Permanently delete this thread? Artifacts are kept unlinked, and public snapshots will be revoked.",
+                        t.companionAgentId
+                          ? "删除自聊及其产物？记忆中的原话快照保留，公开分享将撤销。此操作无法撤销。"
+                          : "Permanently delete this thread? Artifacts are kept unlinked, and public snapshots will be revoked.",
                       )
                     )
                       return;

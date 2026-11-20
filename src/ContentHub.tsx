@@ -50,7 +50,9 @@ export function Markdown({ content }: { content: string }) {
 }
 export default function ContentHub({ path, navigate, notify }: PageProps) {
   const w = useWorkspace(),
-    { skills, memories, rubrics } = w.data;
+    { skills, rubrics } = w.data;
+  const memories = w.data.memories.filter(memory => !memory.companion);
+  const companionMemoryCount = w.data.memories.filter(memory => memory.companion).length;
   const discoverSkills =
     w.mode === "server" && !backendV1
       ? marketplaceCatalog
@@ -661,6 +663,7 @@ export default function ContentHub({ path, navigate, notify }: PageProps) {
               <p className="muted rp-description">
                 Saved context in {w.activeName}.
               </p>
+              {!backendV1 && <button className="btn small" onClick={() => navigate("/companion")}>分身记忆{companionMemoryCount ? ` · ${companionMemoryCount}` : ""}</button>}
             </div>
             <button className="btn primary" onClick={() => newMemory()}>
               <Plus size={14} />

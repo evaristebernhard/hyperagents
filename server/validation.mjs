@@ -1,4 +1,5 @@
 import { parseSlidesContent } from './slides.mjs';
+import { COMPANION_MEMORY_LIMITS } from './companion-memory.mjs';
 export class ApiError extends Error {
   constructor(status, message, code) { super(message); this.status = status; this.code = code; }
 }
@@ -12,7 +13,11 @@ const list = (x, test) => Array.isArray(x) && x.length <= 10000 && x.every(test)
 // Public message metadata contains no raw reasoning or executable instructions.
 export const validFollowUps = value => Array.isArray(value) && value.length>=2 && value.length<=3 && value.every(v=>typeof v==='string' && v===v.trim() && v.length>0 && v.length<=160 && !/[\r\n\x00-\x1f\x7f]/.test(v)) && new Set(value.map(v=>v.toLowerCase())).size===value.length;
 export const validReasoningMs = value => Number.isSafeInteger(value) && value>=0 && value<=86400000;
-export const validKnowledgeHints = value => obj(value) && Object.keys(value).length===2 && ['skillIds','memoryIds'].every(k=>Array.isArray(value[k]) && value[k].length<=10000 && value[k].every(id) && new Set(value[k]).size===value[k].length);
+export const validKnowledgeHints = value => obj(value) && Object.keys(value).every(k=>['skillIds','memoryIds','memorySnapshots'].includes(k)) && ['skillIds','memoryIds'].every(k=>Array.isArray(value[k]) && value[k].length<=10000 && value[k].every(id) && new Set(value[k]).size===value[k].length)
+  && (value.memorySnapshots===undefined || (Array.isArray(value.memorySnapshots) && value.memorySnapshots.length<=COMPANION_MEMORY_LIMITS.items
+    && value.memorySnapshots.every(snapshot=>obj(snapshot) && Object.keys(snapshot).length===4 && Object.keys(snapshot).every(k=>['id','content','visibility','agentId'].includes(k)) && id(snapshot.id) && id(snapshot.agentId)
+      && value.memoryIds.includes(snapshot.id) && str(snapshot.content) && snapshot.content.trim().length>0 && snapshot.content.length<=COMPANION_MEMORY_LIMITS.content && ['private','shared'].includes(snapshot.visibility))
+    && new Set(value.memorySnapshots.map(snapshot=>snapshot.id)).size===value.memorySnapshots.length));
 
 function keys(x, allowed) { if (!obj(x) || Object.keys(x).some(k=>!allowed.includes(k))) fail(); }
 function json(x, depth = 0) {
@@ -23,10 +28,10 @@ function json(x, depth = 0) {
   for (const [k,v] of Object.entries(x)) { if (['__proto__','prototype','constructor'].includes(k)) fail(); json(v,depth+1); }
 }
 const specs = {
-  threads: {required:'title summary time', strings:'project roomId notes createdAt updatedAt projectId', bools:'starred archived excluded', extra:'messages config canvas'},
-  projects: {required:'name description goal', strings:'',bools:'archived'},
-  agents: {required:'name description prompt', strings:'promptHtml memoryReadScope memorySaveTarget model provider reasoning memoryMode',bools:'learnsAutomatically libraryEnabled archived starred',extra:'tools skillIds learning'},
-  memories: {required:'content category',strings:'whenToUse scope',bools:'pinned',extra:'importance tags'},
+  threads: {required:'title summary time', strings:'project roomId notes createdAt updatedAt projectId companionAgentId', bools:'starred archived excluded', extra:'messages config canvas'},
+  projects: {required:'name description goal', strings:'',bools:'archived',extra:'application'},
+  agents: {required:'name description prompt', strings:'promptHtml memoryReadScope memorySaveTarget model provider reasoning memoryMode',bools:'learnsAutomatically libraryEnabled archived starred companion',extra:'tools skillIds learning'},
+  memories: {required:'content category',strings:'whenToUse scope',bools:'pinned',extra:'importance tags companion'},
   skills: {required:'name description documentation whenToUse author createdAt updatedAt',strings:'sourceId',bools:'archived',extra:'tags'},
   rooms: {required:'name topic',strings:'',bools:'archived',extra:'agentIds notes'},
   artifacts: {required:'title kind content createdAt updatedAt',strings:'threadId projectId',bools:'archived',extra:'versions'},
@@ -36,6 +41,23 @@ const specs = {
 };
 const words = s => (s || '').split(' ').filter(Boolean);
 function strings(x) { if (!list(x,str)) fail(); }
+const companionStatus = value => ['pending','active','rejected'].includes(value);
+const companionVisibility = value => ['private','shared'].includes(value);
+const companionDate = value => str(value) && value.length<=64 && /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value));
+function companionMemory(memory) {
+  const c=memory.companion;
+  keys(c,['agentId','status','visibility','createdAt','updatedAt','source','history']);
+  if (!id(c.agentId) || !companionStatus(c.status) || !companionVisibility(c.visibility) || !companionDate(c.createdAt) || !companionDate(c.updatedAt)
+    || !memory.content.trim() || memory.content.length>COMPANION_MEMORY_LIMITS.content) fail('Invalid companion memory.');
+  if (c.source!==undefined) {
+    keys(c.source,['threadId','messageId','quote']);
+    if (!id(c.source.threadId) || !id(c.source.messageId) || !str(c.source.quote) || !c.source.quote.trim() || c.source.quote.length>COMPANION_MEMORY_LIMITS.quote) fail('Invalid companion memory source.');
+  }
+  if (c.history!==undefined && (!Array.isArray(c.history) || c.history.length>COMPANION_MEMORY_LIMITS.history || !c.history.every(entry=>{
+    keys(entry,['action','content','status','visibility','at']);
+    return str(entry.action) && entry.action.trim().length>0 && entry.action.length<=COMPANION_MEMORY_LIMITS.action && str(entry.content) && entry.content.trim().length>0 && entry.content.length<=COMPANION_MEMORY_LIMITS.content && companionStatus(entry.status) && companionVisibility(entry.visibility) && companionDate(entry.at);
+  }))) fail('Invalid companion memory history.');
+}
 function settings(c) {
   keys(c,['model','reasoning','provider','mode','agentId','starterAgentName','tools','outputFormat','visuals']);
   for (const k of ['model','reasoning','provider','mode']) if (!str(c[k])) fail('Invalid thread settings.');
@@ -74,8 +96,10 @@ export function validateState(state, findFile = () => undefined) {
         for (const k of words(s.required)) if (!str(item[k])) fail();
         for (const k of words(s.strings)) if (item[k] !== undefined && !str(item[k])) fail();
         for (const k of words(s.bools)) if (item[k] !== undefined && typeof item[k] !== 'boolean') fail();
+        if (key==='projects' && item.application!==undefined && item.application!=='elys') fail('Unknown project application.');
         if (['schedules','connections'].includes(key) && typeof item.enabled !== 'boolean') fail();
         if (key === 'memories' && (!Number.isInteger(item.importance) || item.importance < 1 || item.importance > 5 || typeof item.pinned !== 'boolean')) fail();
+        if (key === 'memories' && item.companion!==undefined) companionMemory(item);
         if (['skills','memories'].includes(key) && (key === 'skills' || item.tags !== undefined)) strings(item.tags);
         if (key === 'agents') {
           if (item.tools !== undefined) strings(item.tools);
@@ -108,7 +132,8 @@ export function validateState(state, findFile = () => undefined) {
             for (const field of ['hidden','order']) if (!list(c[field],id) || new Set(c[field]).size!==c[field].length) fail('Invalid canvas artifact IDs.');
           }
           if (item.messages !== undefined && !list(item.messages,m=> {
-            keys(m,['id','role','text','createdAt','context','toolRuns','actionRequests','followUps','reasoningMs','knowledgeHints']);
+            keys(m,['id','role','text','createdAt','context','toolRuns','actionRequests','followUps','reasoningMs','knowledgeHints','runContinuation']);
+            if(m.runContinuation!==undefined){keys(m.runContinuation,['sourceRunId']);if(m.role!=='user'||!id(m.runContinuation.sourceRunId))fail('Invalid continuation source.');}
             if (m.followUps!==undefined && (m.role!=='assistant' || !validFollowUps(m.followUps))) fail('Invalid follow-up suggestions.');
             if (m.reasoningMs!==undefined && (m.role!=='assistant' || !validReasoningMs(m.reasoningMs))) fail('Invalid reasoning timing.');
             if (m.knowledgeHints!==undefined && (m.role!=='assistant' || !validKnowledgeHints(m.knowledgeHints))) fail('Invalid knowledge hints.');
@@ -133,6 +158,12 @@ export function validateState(state, findFile = () => undefined) {
     ref('agents',w.data.preferences?.defaultThreadSettings?.agentId);
     for (const t of w.data.threads) {
       ref('projects',t.projectId); ref('rooms',t.roomId); ref('agents',t.config?.agentId);
+      if (t.companionAgentId!==undefined) {
+        ref('agents',t.companionAgentId);
+        const agent=w.data.agents.find(agent=>agent.id===t.companionAgentId);
+        if (!agent?.companion || t.roomId!==undefined || t.config?.agentId!==agent.id) fail('Companion self-chat must select its own companion agent without a room.');
+        for (const message of t.messages || []) if (message.context?.settings?.agentId!==undefined && message.context.settings.agentId!==agent.id) fail('A companion self-chat cannot switch agents.');
+      }
       // Message context is an immutable historical reference, not a live permission.
       // Deleted resources remain identifiable without blocking later edits/deletions.
       // New execution services must re-resolve and authorize resources before use.
@@ -145,6 +176,21 @@ export function validateState(state, findFile = () => undefined) {
     for (const r of w.data.rooms) for (const a of r.agentIds) ref('agents',a);
     for (const s of w.data.schedules) { ref('agents',s.agentId); ref('rooms',s.roomId); }
     for (const a of w.data.agents) for (const s of a.skillIds || []) ref('skills',s);
+    for (const memory of w.data.memories) if (memory.companion) {
+      const c=memory.companion; ref('agents',c.agentId);
+      if (!w.data.agents.find(agent=>agent.id===c.agentId)?.companion) fail('Companion memory must belong to a companion agent.');
+      if (c.source) {
+        const source=w.data.threads.find(thread=>thread.id===c.source.threadId);
+        const message=source?.messages?.find(message=>message.id===c.source.messageId);
+        if (source && (source.companionAgentId!==c.agentId || source.config?.agentId!==c.agentId || source.roomId!==undefined)) fail('Companion memory source must be its own self-chat.');
+        if (message && (message.role!=='user' || message.runContinuation || !message.text.includes(c.source.quote))) fail('Companion memory quote must match its human source.');
+        // Source quotes remain historical evidence after local deletion. A live
+        // foreign reference never becomes permission to copy another workspace.
+        const foreignThreads=state.workspaces.filter(other=>other.id!==w.id && Array.isArray(other.data?.threads)).flatMap(other=>other.data.threads);
+        if ((!source && foreignThreads.some(thread=>thread?.id===c.source.threadId))
+          || (!message && foreignThreads.some(thread=>Array.isArray(thread?.messages) && thread.messages.some(message=>message?.id===c.source.messageId)))) fail('Companion memory source belongs to another workspace.');
+      }
+    }
   }
   if (!wsIds.has(state.active)) fail('Active workspace does not exist.');
   return state;
