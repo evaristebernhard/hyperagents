@@ -8,7 +8,7 @@ POST /api/runs creates a durable run for the final saved user message. Repeating
 
 Default limits: two active runs, a bounded queue (20 admitted active/queued requests total), 20 minutes per run, 24 model rounds, 64 tool calls, existing output/context byte budgets. These application limits are separate from the WSL V2 gateway's concurrency of four. Server restarts mark unfinished runs interrupted and do not replay commands or model requests. This is viewing reconnection and durable history, not automatic execution resumption after a crash.
 
-POST /api/runs/:id/cancel explicitly aborts generation and managed shell children. Plan/Ask modes do not expose execution tools; update_plan records a structured task plan without doing external work.
+POST /api/runs/:id/cancel explicitly aborts generation and managed shell children. Plan/Ask modes do not expose execution tools; update_plan records a structured task plan without doing external work. Steps may use dependsOn to declare prerequisite IDs and childRunId to link a direct delegated run. Cycles and premature dependent progress are rejected; a linked step can complete only after its child succeeds and its result is saved. Previously recorded prerequisite and child evidence links must be retained; revised delegated work uses a new step. Unlinked plan completion still describes progress and is not proof of execution.
 
 ## LLM-controlled local shell
 
@@ -18,9 +18,17 @@ The shell executes on the same WSL host as this Node server. No V2 gateway/Cloud
 
 IMPORTANT: This is full authority of the Linux user, NOT a security sandbox. Cwd and environment controls do not prevent an approved command from reading/modifying other paths or accessing the network. Do not approve commands you do not understand, credentials in command text, destructive actions, or detached/background services. Login, Host/Origin checks and CSRF protections remain enabled.
 
-## Not implemented in this phase
+## Read-only delegation
 
-No browser automation, image/video generation, new external credentials, webhook/live/schedule executor, multi-agent delegation, cross-server worker recovery, or unrestricted autonomous shell access. A read-only Web Fetch tool can use a local Moli binary when explicitly enabled. Tool calls remain sequential. Token counts and elapsed time are recorded; no dollar cost is invented.
+Enable Delegation and the needed read capabilities in the thread configuration. list_agents lists actual saved agents; delegate_agent starts an isolated child thread with a self-contained task. Its tools are the intersection of the parent's selection, the target agent's capabilities, and the runtime's read-only allowlist. Children cannot execute shell/skills, mutate artifacts, or delegate recursively. get_delegated_run and wait_for_delegated_run return actual status, resultSaved, and bounded output. Duplicate agent/task requests reuse the child. Two child slots are separate from the parent slots; up to eight direct children are allowed per parent.
+
+A parent must wait for all children before its final answer. An early final answer fails and cancels unfinished descendants, rather than leaving orphaned work. Cancellation or parent failure also cancels outstanding children. Child completion alone does not verify the content of its answer; the coordinator must reconcile its actual evidence. The [warehouse acceptance case](verification-decomposition/README.md) exercises this path with two agents, linked plan steps, real document persistence, request deduplication, cancellation, and server reopen. Fixture and real-model evidence are recorded separately.
+
+## Other capabilities and limits
+
+Persistent browser control and saved-context continuation now have separate implementations; see [browser persistence](BROWSER-PERSISTENCE.md) and [run continuation](RUN-CONTINUATION.md). This document describes the current legacy SQLite /api/runs runtime used by npm run dev. The v1/PostgreSQL/Rust implementation is a separate entry and its historical checks are not evidence about the active deployment.
+
+Image/video generation, new external credentials, webhook/live/schedule execution, cross-server worker recovery, and unrestricted autonomous shell access are outside this runtime. A read-only Web Fetch tool can use a local Moli binary when explicitly enabled. Tool calls within a run remain sequential, while independent child runs have separate slots. Token counts and elapsed time are recorded; no dollar cost is invented.
 
 ## Validation
 

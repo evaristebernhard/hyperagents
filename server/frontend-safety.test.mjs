@@ -13,9 +13,13 @@ test('development filesystem guard denies private data, raw imports, database si
   await mkdir(path.join(root,'public'),{recursive:true});await mkdir(path.join(dataDir,'uploads'),{recursive:true});
   await writeFile(path.join(dataDir,'workspace.sqlite'),'private db');await writeFile(path.join(dataDir,'uploads','file-1'),'private bytes');
   await symlink(path.join(dataDir,'uploads','file-1'),path.join(root,'public','innocent.txt'));
+  await mkdir(path.join(root,'backend/.data-v1'),{recursive:true});
+  await writeFile(path.join(root,'backend/.data-v1','access.json'),'private credentials');
+  await symlink(path.join(root,'backend/.data-v1','access.json'),path.join(root,'public','alias.json'));
   const options={root,dataDir};
   for(const url of [
     '/.data/workspace.sqlite','/.data/uploads/file-1','/%2edata/uploads/file-1?raw',
+    '/alias.json','/backend/.data-v1/interactive/access.json','/backend/%2edata-v1/runner.env?raw',
     '/@fs'+path.join(dataDir,'workspace.sqlite')+'?raw','/@fs'+path.join(dataDir,'uploads','file-1'),
     '/@fs'+path.join(root,'.data','workspace.sqlite-wal'),'/some.db-shm?url','/innocent.txt',
   ]) assert.equal(isPrivateDataRequest(url,options),true,url);

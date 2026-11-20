@@ -4,8 +4,8 @@ import {
   Check, Search, PencilLine, Sparkles, Bot, Zap, Link, BookOpen, Grid3X3, History, Monitor, Table, FileText, Globe, Presentation, Image, Video, Volume2, Mic, User, MapPin, Folder, Users, Code, CloudSun, Landmark, GraduationCap, Camera,
 } from "lucide-react";
 import type { Navigate, ThreadSettings } from "./types";
-import { currentModels } from "./llm-client";
-import { api } from "./backend-client";
+import type { LlmConfig } from "./llm-client";
+import { api, fixtureMode } from "./backend-client";
 
 const toolNames = [
   "Search", "Find Similar", "Exa Research", "Exa Websets", "Thread Search",
@@ -64,7 +64,26 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
   const [localTools, setLocalTools] = useState<string[]>(toolNames);
   const [capabilities, setCapabilities] = useState<Capability[] | null>(null);
   const [capabilitiesFailed, setCapabilitiesFailed] = useState(false);
-  useEffect(() => { let alive = true; void api<{ capabilities?: Capability[] }>("/api/capabilities").then(result => { if (alive) setCapabilities(result.capabilities || []); }).catch(() => { if (alive) setCapabilitiesFailed(true); }); return () => { alive = false; }; }, []);
+  const [llm, setLlm] = useState<LlmConfig | null>(null);
+  const [llmFailed, setLlmFailed] = useState(false);
+  useEffect(() => {
+    if (fixtureMode()) return;
+    let alive = true;
+    void Promise.allSettled([
+      api<{ capabilities?: Capability[] }>("/api/capabilities"),
+      api<LlmConfig>("/api/llm/config"),
+    ]).then(([capabilityResult, modelResult]) => {
+      if (!alive) return;
+      if (capabilityResult.status === "fulfilled") setCapabilities(capabilityResult.value.capabilities || []);
+      else setCapabilitiesFailed(true);
+      if (modelResult.status === "fulfilled") setLlm(modelResult.value);
+      else setLlmFailed(true);
+    });
+    return () => { alive = false; };
+  }, []);
+  const connectedProvider = llm?.provider || "DeepSeek";
+  const modelChoices = llm?.models || [];
+  const defaultModel = modelChoices[0];
   const effort = controlled?.reasoning ?? localEffort;
   const provider = controlled?.provider ?? localProvider;
   const tools = controlled?.tools ?? localTools;
@@ -183,7 +202,7 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
         go(location.pathname + (location.pathname.startsWith("/thread/") ? "?panel=settings" : "?settings=thread-defaults"));
       }}><ArrowUpRight size={16} />Open full settings</button>
       {sub && <div className={"popover composer-submenu" + (sub === "tools" ? " tool-picker" : "")} role="menu" aria-label={sub + " options"}>
-        {sub === "model" && dataOnly && <><small className="menu-local-note">DeepSeek · requires a server-side API key</small>{["", ...currentModels].map(value => <button type="button" role="menuitemradio" aria-checked={(controlled?.model || "") === value} key={value} onClick={() => { if (controlled) onSettingsChange?.({ ...controlled, model: value, provider: "DeepSeek" }); closeSub("model"); }}><span>{value || "Default · DeepSeek Flash"}</span>{(controlled?.model || "") === value && <Check size={14} />}</button>)}</>}
+        {sub === "model" && dataOnly && <><small className="menu-local-note">{llmFailed ? "Could not check model configuration" : !llm ? "Checking model configuration…" : connectedProvider + (llm.configured ? " · configured" : " · not configured")}</small>{defaultModel && ["", ...modelChoices].map(value => <button type="button" role="menuitemradio" aria-checked={(controlled?.model || "") === value} disabled={!llm?.configured} key={value} onClick={() => { if (controlled) onSettingsChange?.({ ...controlled, model: value, provider: connectedProvider }); closeSub("model"); }}><span>{value || "Default · " + defaultModel}</span>{(controlled?.model || "") === value && <Check size={14} />}</button>)}</>}
         {sub === "model" && !dataOnly && <button type="button" role="menuitem" className="model-unlock" onClick={() => settings("billing")}>
           <span className="unlock-icon"><Sparkles size={18} /></span>
           <span><strong>Unlock every model</strong><small>Subscribe to a plan to pick more powerful models</small></span><ChevronRight size={14} />
@@ -192,8 +211,8 @@ export default function ComposerMenus({ menu, close, navigate, mode, setMode, mo
           <span>{value}</span>{effort === value && <Check size={14} />}
         </button>)}
         {sub === "provider" && <>
-          <small className="menu-local-note">{dataOnly ? "Only DeepSeek is connected in this build" : "Local preview choices"}</small>
-          {(dataOnly ? ["DeepSeek"] : ["Any", "OpenAI", "Anthropic", "Google"]).map(value => <button type="button" role="menuitemradio" aria-checked={provider === value} key={value} onClick={() => { setProvider(value); closeSub("provider"); }}>
+          <small className="menu-local-note">{dataOnly ? llmFailed ? "Could not check provider" : llm ? "Connected provider: " + connectedProvider : "Checking provider…" : "Local preview choices"}</small>
+          {(dataOnly ? llm ? [connectedProvider] : [] : ["Any", "OpenAI", "Anthropic", "Google"]).map(value => <button type="button" role="menuitemradio" aria-checked={provider === value} disabled={dataOnly && !llm?.configured} key={value} onClick={() => { setProvider(value); closeSub("provider"); }}>
             <span>{value}</span>{provider === value && <Check size={14} />}
           </button>)}
         </>}

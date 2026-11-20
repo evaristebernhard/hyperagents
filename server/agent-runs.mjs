@@ -1,3 +1,4 @@
+import { planDefinition, validateManagedPlan } from './managed-plan.mjs';
 import { normalizeManagedAction, managedActionSucceeded } from './managed-actions.mjs';
 import { createManagedSkillTools } from './managed-skills.mjs';
 import { createWorkspaceFileTools } from './workspace-file-tools.mjs';
@@ -19,24 +20,30 @@ const delegatedTools=(agent,parentTools)=>[...new Set((agent.tools||[]).filter(t
 const chatRequest=request=>Object.fromEntries(['workspaceId','threadId','userMessageId','model'].filter(k=>request[k]!==undefined).map(k=>[k,request[k]]));
 const managedDefinition=(name,description,properties,required=[])=>({type:'function',function:{name,description,parameters:{type:'object',additionalProperties:false,properties,required}}});
 const runIdSchema={type:'string',minLength:1,maxLength:200};
-const delegationDefinitions=[
-  managedDefinition('list_agents','List real, available agents in this workspace. No agent is created.',{}),
-  managedDefinition('delegate_agent','Start one real read-only child agent in a separate thread with a self-contained task. Retrying the same agent and exact task reuses its run.',{agentId:runIdSchema,task:{type:'string',minLength:1,maxLength:16000}},['agentId','task']),
-  managedDefinition('get_delegated_run','Read bounded real output and status of a direct child run.',{runId:runIdSchema},['runId']),
-  managedDefinition('wait_for_delegated_run','Wait once, at most 30 seconds, for a direct child. Returns current status on timeout.',{runId:runIdSchema,timeoutSeconds:{type:'number',minimum:0,maximum:30}},['runId'])
-];
+function delegationDefinitions(agents){
+  // Advertise only actual identities in this run's workspace snapshot. The
+  // executor still checks the current workspace and permissions at dispatch;
+  // an enum is model guidance/schema validation, never an authorization grant.
+  const agentIds=[...new Set(agents.filter(agent=>!agent.archived).map(agent=>agent.id))];
+  return [
+    managedDefinition('list_agents','List real, available agents in this workspace. No agent is created.',{}),
+    ...(agentIds.length?[managedDefinition('delegate_agent','Start one real read-only child agent using an exact saved agent ID returned by list_agents. Include a self-contained task. Retrying the same agent and exact task reuses its run.',{agentId:{...runIdSchema,enum:agentIds},task:{type:'string',minLength:1,maxLength:16000}},['agentId','task'])]:[]),
+    managedDefinition('get_delegated_run','Read bounded real output and status of a direct child run.',{runId:runIdSchema},['runId']),
+    managedDefinition('wait_for_delegated_run','Wait once, at most 30 seconds, for a direct child. Returns current status on timeout.',{runId:runIdSchema,timeoutSeconds:{type:'number',minimum:0,maximum:30}},['runId'])
+  ];
+}
 const active=new Set(['queued','running','waiting_approval']);
 const stamp=()=>new Date().toISOString();
 const fail=(status,message)=>{throw new ApiError(status,message,'AGENT_RUN');};
 const digest=text=>createHash('sha256').update(text).digest('hex');
 const definition={type:'function',function:{name:'shell_execute',description:'Propose one exact local shell command and wait for explicit human approval. No command runs before approval. Full local user authority, not a sandbox. Never include credentials or start detached/background processes.',parameters:{type:'object',additionalProperties:false,required:['command'],properties:{command:{type:'string',description:'Exact bash command visible to the user; maximum 8192 characters.'},cwd:{type:'string',description:'Directory within the configured project root. Default is the project root.'},timeoutSeconds:{type:'integer',minimum:1,maximum:300,description:'Bounded command deadline, default 30 seconds.'}}}}};
 
-const planDefinition={"type":"function","function":{"name":"update_plan","description":"Record or update a short task plan. This records progress only; it does not execute steps.","parameters":{"type":"object","additionalProperties":false,"required":["steps"],"properties":{"steps":{"type":"array","maxItems":12,"items":{"type":"object","additionalProperties":false,"required":["id","title","status"],"properties":{"id":{"type":"string"},"title":{"type":"string"},"status":{"type":"string","enum":["pending","in_progress","completed"]}}}}}}}};
+
 
 /** Durable event log and managed runs. Disconnecting a viewer never cancels a run.
  * On process restart active rows are interrupted, never automatically replayed.
  * Shell execution is local on this WSL host; no gateway credentials are copied. */
-export function createRunManager({dataDir,llm,load,persist,readAttachment,validateAdmission,createDelegatedThread,skillCatalog=[],skillRoot,skillCredentialProvider,persistGeneratedFile,shellRoot,maxConcurrent=2,timeoutMs=20*60*1000}) {
+export function createRunManager({dataDir,llm,load,persist,readAttachment,validateAdmission,createDelegatedThread,createContinuationMessage,skillCatalog=[],skillRoot,skillCredentialProvider,persistGeneratedFile,shellRoot,maxConcurrent=2,timeoutMs=20*60*1000}) {
   const file=path.join(dataDir,'agent-runs.sqlite');
   try {if(lstatSync(file).isSymbolicLink())throw Error('Run database cannot be a symbolic link.');}catch(e){if(e.code!=='ENOENT')throw e;}
   const db=new DatabaseSync(file);chmodSync(file,0o600);
@@ -53,7 +60,7 @@ export function createRunManager({dataDir,llm,load,persist,readAttachment,valida
   db.exec('CREATE INDEX IF NOT EXISTS runs_parent ON agent_runs(parent_run_id,created);');
   if(!db.prepare('PRAGMA table_info(agent_runs)').all().some(c=>c.name==='plan'))db.exec('ALTER TABLE agent_runs ADD COLUMN plan TEXT');
   const raw=id=>db.prepare('SELECT * FROM agent_runs WHERE id=?').get(id);
-  const controls=new Map(),eventBudgets=new Map(),delegating=new Map(),changes=new EventEmitter();changes.setMaxListeners(0);let closed=false,pumping=false;
+  const controls=new Map(),eventBudgets=new Map(),delegating=new Map(),continuing=new Map(),changes=new EventEmitter();changes.setMaxListeners(0);let closed=false,pumping=false;
   const shell=createShellRuntime({root:shellRoot,maxConcurrent});
   function append(id,event){
     const row=eventBudgets.get(id) || db.prepare('SELECT COALESCE(MAX(seq),0) AS seq, COALESCE(SUM(length(event)),0) AS bytes FROM run_events WHERE run_id=?').get(id); eventBudgets.set(id,row);
@@ -69,7 +76,7 @@ export function createRunManager({dataDir,llm,load,persist,readAttachment,valida
     const w=load().state.workspaces.find(w=>w.id===row.workspace_id),t=w?.data.threads.find(t=>t.id===row.thread_id&&!t.archived);
     if(!t)fail(404,'Run thread is unavailable.');return t;
   }
-  function info(row){return {id:row.id,workspaceId:row.workspace_id,threadId:row.thread_id,userMessageId:row.message_id,status:row.status,createdAt:row.created,...(row.started?{startedAt:row.started}:{}),...(row.finished?{finishedAt:row.finished}:{}),...(row.model?{model:row.model}:{}),...(row.error?{error:row.error}:{}),toolCount:row.tool_count,...(row.usage?{usage:JSON.parse(row.usage)}:{}),resultSaved:!!row.result_saved,...(row.plan?{plan:JSON.parse(row.plan)}:{}),...(row.parent_run_id?{parentRunId:row.parent_run_id}:{}),...(row.root_run_id?{rootRunId:row.root_run_id}:{}),depth:row.depth ?? 0,childCount:row.child_count ?? 0,approvals:db.prepare('SELECT id,args,status FROM shell_actions WHERE run_id=? ORDER BY created').all(row.id).map(a=>({id:a.id,status:a.status,...JSON.parse(a.args)}))};}
+  function info(row){const continuedFromRunId=JSON.parse(row.request)._continuation?.sourceRunId;return {id:row.id,workspaceId:row.workspace_id,threadId:row.thread_id,userMessageId:row.message_id,status:row.status,createdAt:row.created,...(continuedFromRunId?{continuedFromRunId}:{}),...(row.started?{startedAt:row.started}:{}),...(row.finished?{finishedAt:row.finished}:{}),...(row.model?{model:row.model}:{}),...(row.error?{error:row.error}:{}),toolCount:row.tool_count,...(row.usage?{usage:JSON.parse(row.usage)}:{}),resultSaved:!!row.result_saved,...(row.plan?{plan:JSON.parse(row.plan)}:{}),...(row.parent_run_id?{parentRunId:row.parent_run_id}:{}),...(row.root_run_id?{rootRunId:row.root_run_id}:{}),depth:row.depth ?? 0,childCount:row.child_count ?? 0,approvals:db.prepare('SELECT id,args,status FROM shell_actions WHERE run_id=? ORDER BY created').all(row.id).map(a=>({id:a.id,status:a.status,...JSON.parse(a.args)}))};}
   function setStatus(id,status){db.prepare('UPDATE agent_runs SET status=? WHERE id=?').run(status,id);append(id,{type:'run_status',status});}
   async function propose(id,args,signal,executeAction){
     scope(raw(id));const normalized=executeAction?normalizeManagedAction(args):shell.normalize(args),actionId=randomUUID();
@@ -218,17 +225,21 @@ export function createRunManager({dataDir,llm,load,persist,readAttachment,valida
       const files=createWorkspaceFileTools({enabled:readonly?[]:stored._runTools||[],root:path.resolve(dataDir,'agent-files',row.workspace_id),approveAndRun,persistFile:typeof persistGeneratedFile==='function'?input=>persistGeneratedFile({...input,mimeType:input.mimeType.split(';')[0],workspaceId:row.workspace_id}):undefined});
       const thread=scope(row),source=thread.messages?.find(m=>m.id===row.message_id);
       if(!source || digest(source.text)!==row.source_hash)throw new ApiError(409,'The source message changed before execution.');
-      await llm.chat(req,res,chatRequest(stored),{timeoutMs,maxRounds:24,maxTools:64,maxConcurrent:maxConcurrent+CHILD_SLOTS,
+      await llm.chat(req,res,chatRequest(stored),{runId:id,timeoutMs,maxRounds:24,maxTools:64,maxConcurrent:maxConcurrent+CHILD_SLOTS,
         ...(readonly?{readOnly:true,allowedTools:[...stored._delegation.allowedTools]}:{}),
         skills:{...skills,execute:(name,args,signal)=>skills.execute(name,args,{signal})},files,
-        tools:{definitions:[planDefinition,...(!readonly&&stored._runTools?.includes('Delegation')?delegationDefinitions:[])],execute:async(_name,args)=>{
+        tools:{definitions:[planDefinition,...(!readonly&&stored._runTools?.includes('Delegation')?delegationDefinitions(load().state.workspaces.find(workspace=>workspace.id===row.workspace_id).data.agents):[])],execute:async(_name,args)=>{
         if(_name!=='update_plan')return delegationTool(id,_name,args,controller.signal);
-        if(!args || typeof args!=='object' || Object.keys(args).some(k=>k!=='steps') || !Array.isArray(args.steps) || !args.steps.length || args.steps.length>12 || args.steps.some(s=>!s || typeof s!=='object' || Object.keys(s).some(k=>!['id','title','status'].includes(k)) || typeof s.id!=='string' || !/^[A-Za-z0-9_-]{1,60}$/.test(s.id) || typeof s.title!=='string' || !s.title.trim() || s.title.length>200 || !['pending','in_progress','completed'].includes(s.status)) || new Set(args.steps.map(s=>s.id)).size!==args.steps.length || args.steps.filter(s=>s.status==='in_progress').length>1)throw Error('Invalid plan: use 1..12 unique short steps and at most one in-progress step.');
+        validateManagedPlan(args,{previousSteps:raw(id).plan?JSON.parse(raw(id).plan):[],childRun:childId=>{const child=raw(childId);return child?.parent_run_id===id && child.workspace_id===row.workspace_id?{status:child.status,resultSaved:!!child.result_saved}:undefined;}});
         scope(raw(id));db.prepare('UPDATE agent_runs SET plan=? WHERE id=?').run(JSON.stringify(args.steps),id);append(id,{type:'plan',steps:args.steps});return {recorded:true,steps:args.steps};
       }},...(!readonly?{shell:{definitions:[definition],execute:(_name,args,signal)=>propose(id,args,signal)}}:{})});
     } catch(e){error=e instanceof ApiError?e.message:'The managed run could not complete. No automatic replay was attempted.';append(id,{type:'error',message:error});}
     finally {
       controller.signal.removeEventListener('abort',onAbort);
+      // Finishing the parent's text stream is not evidence that delegated work
+      // finished. Prevent an early answer from leaving active, orphaned children.
+      if(done && !error && !controller.signal.aborted && !closed && db.prepare("SELECT 1 FROM agent_runs WHERE parent_run_id=? AND status IN ('queued','running','waiting_approval') LIMIT 1").get(id))
+        error='The run ended before its delegated children finished. Review child results before continuing.';
       const status=closed?'interrupted':controller.signal.aborted?'cancelled':done&&!error?'succeeded':'failed';
       if(!error && status!=='succeeded')error=status==='cancelled'?'Run cancelled by the user.':'Generation did not complete.';
       if(status!=='succeeded'){
@@ -255,17 +266,17 @@ export function createRunManager({dataDir,llm,load,persist,readAttachment,valida
     }}
     finally{pumping=false;}
   }
-  async function admit(request,delegation){
+  async function admit(request,delegation,continuation){
       if(closed)fail(503,'Run service is closing.');
       // Validate fields and workspace resources before looking up or queuing work.
-      if(!llm.config().configured)fail(503,'DeepSeek is not configured.');
+      if(!llm.config().configured)fail(503,'The model provider is not configured.');
       if(!request || typeof request!=='object' || Array.isArray(request) || Object.keys(request).some(k=>!['workspaceId','threadId','userMessageId','model'].includes(k)) || !['workspaceId','threadId','userMessageId'].every(k=>typeof request[k]==='string' && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(request[k])))fail(400,'Invalid run request.');
-      if(Object.hasOwn(request,'model') && !MODELS.includes(request.model))fail(422,'Unsupported model.');
+      if(Object.hasOwn(request,'model') && !MODELS.includes(request.model) && !llm.config().models.includes(request.model))fail(422,'Unsupported model.');
       let parent=null, depth=0, rootRunId=null;
       if(delegation){parent=authorizedParent(delegation.parentId);budget(parent);depth=parent.depth+1;rootRunId=parent.root_run_id||parent.id;}
       const existing=db.prepare('SELECT * FROM agent_runs WHERE workspace_id=? AND thread_id=? AND message_id=? ORDER BY created DESC,rowid DESC LIMIT 1').get(request.workspaceId,request.threadId,request.userMessageId);
       if(existing){scope(existing);if(delegation&&JSON.parse(existing.request)._delegation?.key!==delegation.key)fail(409,'Child thread already has unrelated work.');return info(existing);}
-      const conversation=await buildConversation(load().state,request,readAttachment);
+      const conversation=await buildConversation(load().state,request,readAttachment,llm.config());
       if(validateAdmission)validateAdmission(load().state,request);
       const raced=db.prepare('SELECT * FROM agent_runs WHERE workspace_id=? AND thread_id=? AND message_id=? ORDER BY created DESC,rowid DESC LIMIT 1').get(request.workspaceId,request.threadId,request.userMessageId);
       if(raced){scope(raced);if(delegation&&JSON.parse(raced.request)._delegation?.key!==delegation.key)fail(409,'Child thread already has unrelated work.');return info(raced);}
@@ -273,13 +284,74 @@ export function createRunManager({dataDir,llm,load,persist,readAttachment,valida
       if(db.prepare("SELECT count(*) AS n FROM agent_runs WHERE status IN ('queued','running','waiting_approval')").get().n>=20)fail(429,'Run queue is full.');
       const snapshot=load().state,thread=snapshot.workspaces.find(w=>w.id===request.workspaceId).data.threads.find(t=>t.id===request.threadId);
       const source=thread.messages.find(m=>m.id===request.userMessageId),settings=source.context?.settings||thread.config||snapshot.workspaces.find(w=>w.id===request.workspaceId).data.preferences?.defaultThreadSettings||{};
-      const stored={...request,_runTools:[...(settings.tools||[])],...(delegation?{_delegation:delegation}:{})};
+      const stored={...request,_runTools:[...(settings.tools||[])],...(delegation?{_delegation:delegation}:{}),...(continuation?{_continuation:continuation}:{})};
       if(parent){parent=authorizedParent(parent.id);budget(parent);}
       const id=randomUUID();const tx=db;try{tx.exec('BEGIN IMMEDIATE');if(parent){const live=tx.prepare('SELECT child_count,depth,status FROM agent_runs WHERE id=?').get(parent.id);if(!live||terminal.has(live.status)||live.depth>=MAX_DEPTH||live.child_count>=MAX_CHILDREN)throw new ApiError(429,'Child admission budget exhausted.');tx.prepare('UPDATE agent_runs SET child_count=child_count+1 WHERE id=?').run(parent.id);}tx.prepare('INSERT INTO agent_runs (id,workspace_id,thread_id,message_id,source_hash,request,status,created,model,parent_run_id,root_run_id,depth) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(id,request.workspaceId,request.threadId,request.userMessageId,digest(source.text),JSON.stringify(stored),'queued',stamp(),conversation.model,parent?.id||null,rootRunId,depth);tx.exec('COMMIT');}catch(e){try{tx.exec('ROLLBACK')}catch{};throw e;}finally{}
       append(id,{type:'run_status',status:'queued'});queueMicrotask(pump);return info(raw(id));
   }
+  async function continueRun(id,request){
+    if(closed)fail(503,'Run service is closing.');
+    if(!request || typeof request!=='object' || Array.isArray(request) || Object.keys(request).some(k=>!['workspaceId','threadId','requestId'].includes(k))
+      || !['workspaceId','threadId','requestId'].every(k=>typeof request[k]==='string' && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(request[k])))fail(400,'Workspace, thread and a stable requestId are required.');
+    const original=raw(id),thread=scope(original,request);
+    if(original.parent_run_id)fail(409,'Continue the main run rather than an isolated delegated run.');
+    const messageId='message-continue-'+digest(JSON.stringify([id,request.requestId]));
+    const prior=db.prepare('SELECT * FROM agent_runs WHERE workspace_id=? AND thread_id=? AND message_id=?').get(request.workspaceId,request.threadId,messageId);
+    if(prior){scope(prior,request);if(JSON.parse(prior.request)._continuation?.sourceRunId!==id)fail(409,'Continuation identity conflicts.');return info(prior);}
+    if(!['failed','interrupted','cancelled'].includes(original.status))fail(409,'Only an interrupted, failed or stopped run can be continued.');
+    if(typeof createContinuationMessage!=='function')fail(503,'Saved-context continuation is not configured.');
+    if(!llm.config().configured)fail(503,'The model provider is not configured.');
+    const latest=db.prepare('SELECT id FROM agent_runs WHERE workspace_id=? AND thread_id=? ORDER BY created DESC,rowid DESC LIMIT 1').get(request.workspaceId,request.threadId);
+    if(latest?.id!==id)fail(409,'This thread has a newer run. Continue the latest saved run.');
+    const inFlight=continuing.get(id);
+    if(inFlight){if(inFlight.requestId!==request.requestId)fail(409,'A continuation is already being saved. Retry the same request.');return inFlight.work;}
+    const source=thread.messages?.find(message=>message.id===original.message_id);
+    if(!source || digest(source.text)!==original.source_hash)fail(409,'The original request changed. Review this thread before continuing.');
+    let goalSource=source,ancestor=original;
+    // Keep the human's goal at the start even after several continuations. This
+    // avoids nesting generated snapshots and preserves the goal for small models.
+    for(let depth=0;depth<32;depth++){
+      const previous=JSON.parse(ancestor.request)._continuation?.sourceRunId;
+      if(!previous)break;
+      const prior=raw(previous),message=prior&&thread.messages?.find(message=>message.id===prior.message_id);
+      if(!prior||prior.workspace_id!==original.workspace_id||prior.thread_id!==original.thread_id||!message||digest(message.text)!==prior.source_hash)break;
+      goalSource=message;ancestor=prior;
+    }
+    const tools=new Map();let partial='';
+    for(const item of db.prepare('SELECT event FROM run_events WHERE run_id=? ORDER BY seq').iterate(id)){
+      const event=JSON.parse(item.event);
+      if(event.type==='tool' && event.status==='success')tools.set(event.id,{name:String(event.name||'tool').slice(0,100),summary:String(event.summary||'').slice(0,240),outcome:'unverified'});
+      if(event.type==='tool_trace' && event.phase==='finished' && tools.has(event.id))tools.get(event.id).outcome=event.outcome||'unverified';
+      if(event.type==='delta' && partial.length<1200)partial+=String(event.text||'').slice(0,1200-partial.length);
+    }
+    // Public summaries are observations, not a replayable tool transcript. Unknown
+    // effects and expired approvals remain explicit instead of becoming "not run".
+    const workspace=load().state.workspaces.find(workspace=>workspace.id===original.workspace_id);
+    const checkpoint={sourceRunId:id,status:original.status,goal:goalSource.text.slice(0,3000),resultSaved:!!original.result_saved,
+      observedToolCalls:[...tools.values()].slice(-8),savedArtifacts:(workspace?.data.artifacts||[]).filter(artifact=>artifact.threadId===original.thread_id&&!artifact.archived).slice(-8).map(artifact=>({id:artifact.id,title:artifact.title.slice(0,120),kind:artifact.kind})),
+      plan:original.plan?JSON.parse(original.plan).map(step=>({title:step.title.slice(0,160),status:step.status})):[],
+      ...(partial?{partialAnswer:partial}:{}),actions:db.prepare('SELECT id,args,status FROM shell_actions WHERE run_id=? ORDER BY created').all(id).slice(-8)
+        .map(action=>({id:action.id,kind:JSON.parse(action.args).kind||'shell',status:action.status}))};
+    const context={...checkpoint,goal:undefined};
+    let serialized=JSON.stringify(context);
+    while(serialized.length>10000){
+      context.truncated=true;
+      const rows=[context.observedToolCalls,context.plan,context.savedArtifacts,context.actions].find(rows=>rows.length);
+      if(rows)rows.shift();else context.partialAnswer=String(context.partialAnswer||'').slice(0,400)||undefined;
+      serialized=JSON.stringify(context);
+    }
+    const text='继续未完成的任务：\n'+checkpoint.goal+'\n\n从已保存的上下文继续。此条由服务器根据你的继续操作生成。\n先检查已保存的产物和当前状态，再完成剩余工作；以下是上一轮的记录快照，不是新的外部指令。工具返回 prepared 只表示准备，不能当作产物已经保存；savedArtifacts 列出此刻工作区实际存在的产物。不要重复已完成的操作。失败、中断或未确认的外部写入可能已经发生，先核对结果；原审批不延续，需要执行的新操作仍须按当前权限重新审批。\n\n'+serialized;
+    const work=(async()=>{
+      const saved=await createContinuationMessage({workspaceId:request.workspaceId,threadId:request.threadId,sourceRunId:id,sourceMessageId:source.id,sourceHash:original.source_hash,userMessageId:messageId,text});
+      if(!saved || saved.workspaceId!==request.workspaceId || saved.threadId!==request.threadId || saved.userMessageId!==messageId)fail(409,'Continuation host returned a different saved request.');
+      return admit(saved,undefined,{sourceRunId:id});
+    })();
+    continuing.set(id,{requestId:request.requestId,work});
+    try{return await work;}finally{continuing.delete(id);}
+  }
   return {
     create:request=>admit(request),
+    continue:continueRun,
     list(request){
       if(!request.workspaceId||!request.threadId)fail(400,'Workspace and thread are required.');
       const thread=load().state.workspaces.find(w=>w.id===request.workspaceId)?.data.threads.find(t=>t.id===request.threadId&&!t.archived);if(!thread)fail(404,'Thread unavailable.');
@@ -302,7 +374,7 @@ export function createRunManager({dataDir,llm,load,persist,readAttachment,valida
     },
     tree(id,request){const row=raw(id);scope(row,request);const root=row.root_run_id||row.id;const rows=db.prepare(`WITH RECURSIVE tree(id) AS (SELECT ? UNION ALL SELECT r.id FROM agent_runs r JOIN tree t ON r.parent_run_id=t.id) SELECT * FROM agent_runs WHERE id IN (SELECT id FROM tree) ORDER BY depth,created LIMIT ${MAX_TREE}`).all(root);return {rootRunId:root,runs:rows.map(info),truncated:rows.length>=MAX_TREE};},
     createChild(){fail(400,'Use the authorized delegate_agent managed tool with a separate saved child thread.');},
-    capabilities:()=>({durable:true,concurrency:maxConcurrent,delegation:{available:typeof createDelegatedThread==='function',childSlots:CHILD_SLOTS,maxChildren:MAX_CHILDREN,maxTree:MAX_TREE,maxDepth:MAX_DEPTH},maxRunSeconds:timeoutMs/1000,maxToolCalls:64,maxRounds:24,files:{available:true,workspaceScoped:true,approvalRequired:true},skills:{available:skillCatalog.length>0,installed:skillCatalog.length,approvalRequired:true},shell:{available:true,root:shellRoot,approvalRequired:true,maxCommandSeconds:300},browser:false}),
+    capabilities:()=>({durable:true,continuation:{available:typeof createContinuationMessage==='function',explicit:true,replaysActions:false},concurrency:maxConcurrent,delegation:{available:typeof createDelegatedThread==='function',childSlots:CHILD_SLOTS,maxChildren:MAX_CHILDREN,maxTree:MAX_TREE,maxDepth:MAX_DEPTH},maxRunSeconds:timeoutMs/1000,maxToolCalls:64,maxRounds:24,files:{available:true,workspaceScoped:true,approvalRequired:true},skills:{available:skillCatalog.length>0,installed:skillCatalog.length,approvalRequired:true},shell:{available:true,root:shellRoot,approvalRequired:true,maxCommandSeconds:300},browser:false}),
     async close(){closed=true;for(const ctl of controls.values())ctl.controller.abort();while(controls.size)await new Promise(resolve=>setTimeout(resolve,10));db.close();}
   };
 }

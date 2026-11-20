@@ -1,0 +1,45 @@
+{
+  "status": "passed",
+  "checks": [
+    "real-chromium-sandbox",
+    "private-and-metadata-egress-denied",
+    "file-policy",
+    "public-egress",
+    "vnc-readonly-input-rejected",
+    "vnc-write-input",
+    "download-export",
+    "two-profiles-isolated",
+    "persistent-cookies-localstorage-indexeddb",
+    "full-process-group-cleanup"
+  ],
+  "resources": [
+    {
+      "label": "idle",
+      "at": "2026-11-03T13:16:23.759Z",
+      "memoryBytes": 40218624,
+      "cpuNanos": 306857557000,
+      "tasks": 0
+    },
+    {
+      "label": "one-browser",
+      "at": "2026-11-03T13:17:05.949Z",
+      "memoryBytes": 288137216,
+      "cpuNanos": 318411338000,
+      "tasks": 213
+    },
+    {
+      "label": "two-browsers",
+      "at": "2026-11-03T13:17:11.339Z",
+      "memoryBytes": 553230336,
+      "cpuNanos": 327489980000,
+      "tasks": 426
+    },
+    {
+      "label": "closed",
+      "at": "2026-11-03T13:17:17.721Z",
+      "memoryBytes": 46051328,
+      "cpuNanos": 337054058000,
+      "tasks": 0
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "chart.png",
+    "runId": "2026-11-03T07-34-20-340Z",
+    "taskId": "fecee04f-8ffb-48c5-8ba7-b8edefb95e7a",
+    "id": "4fd9e5f6-75f7-43e1-b225-629117178b4f",
+    "format": "png",
+    "sha256": "d6b40de2dc7eea2d7e6634af0d4fa70a36d11912d34e4d9065a37015611f395d",
+    "bytes": "20161",
+    "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/d6b40de2dc7eea2d7e6634af0d4fa70a36d11912d34e4d9065a37015611f395d"
+  },
+  {
+    "name": "result.csv",
+    "runId": "2026-11-03T07-34-20-340Z",
+    "taskId": "fecee04f-8ffb-48c5-8ba7-b8edefb95e7a",
+    "id": "de5d99e3-f510-4c1e-b8a5-e5294cfae066",
+    "format": "csv",
+    "sha256": "10d1257550339fd8f33a62085583ee4a852745bce5946e29180c77483d757415",
+    "bytes": "25",
+    "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/10d1257550339fd8f33a62085583ee4a852745bce5946e29180c77483d757415"
+  }
+]

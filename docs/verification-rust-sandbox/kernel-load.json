@@ -1,0 +1,6 @@
+{
+  "sleepingThreads": 10000,
+  "rssDeltaKiB": 48,
+  "databaseConnections": 8,
+  "maxModelConcurrency": 4
+}

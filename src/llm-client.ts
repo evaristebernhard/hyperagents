@@ -2,9 +2,10 @@ import type { Artifact } from "./local-model";
 import type { FileMeta, IntegrationApproval, ToolRun, KnowledgeHints } from "./types";
 import { ApiError, authenticatedStream } from "./backend-client";
 
-export type LlmConfig = { configured: boolean; models: string[] };
+export type LlmConfig = { configured: boolean; models: string[]; provider?: string; toolCalling?: string; nativeToolCalls?: boolean; maxInputTokens?: number; allocation?: { jobId?: string; deadlineUnix: number; expired: boolean } };
 export type ArtifactPatch = { artifact: Artifact; base?: { content: string; title: string; updatedAt: string } };
-export type ChatEvent = { type: "tool_trace"; id: string; name: string; phase: "started" | "finished"; startedAt: string; finishedAt?: string; durationMs?: number; source?: string; effect?: string; outcome?: string; argumentFields?: { field: string; type: string; characters?: number; items?: number }[] } | { type: "suggestions"; followUps: string[] } | { type: "reasoning_timing"; reasoningMs: number } | { type: "knowledge_hints"; knowledgeHints: KnowledgeHints } | { type: "generated_file"; file: FileMeta } | { type: "approval"; approval: IntegrationApproval } | ({ type: "tool" } & ToolRun) | { type: "artifact"; patch: ArtifactPatch } | { type: "delta" | "reasoning"; text: string } | { type: "done"; model: string } | { type: "error"; message: string };
+export type BrowserHandoff = { type: "browser_handoff"; status: "waiting" | "resumed"; sessionId: string; epoch: number };
+export type ChatEvent = BrowserHandoff | { type: "tool_trace"; id: string; name: string; phase: "started" | "finished"; startedAt: string; finishedAt?: string; durationMs?: number; source?: string; effect?: string; outcome?: string; argumentFields?: { field: string; type: string; characters?: number; items?: number }[] } | { type: "suggestions"; followUps: string[] } | { type: "reasoning_timing"; reasoningMs: number } | { type: "knowledge_hints"; knowledgeHints: KnowledgeHints } | { type: "generated_file"; file: FileMeta } | { type: "approval"; approval: IntegrationApproval } | ({ type: "tool" } & ToolRun) | { type: "artifact"; patch: ArtifactPatch } | { type: "delta" | "reasoning"; text: string } | { type: "done"; model: string } | { type: "error"; message: string };
 export const currentModels = ["deepseek-flash", "deepseek-v4-pro"];
 export const pendingKey = (workspaceId: string, threadId: string) => "llm-pending:" + workspaceId + ":" + threadId;
 
@@ -21,6 +22,7 @@ export async function consumeChat(response: Response, onEvent: (event: ChatEvent
     if (event.type === "error") throw new Error(typeof event.message === "string" ? event.message : "Generation failed.");
     if ((event.type === "delta" || event.type === "reasoning") && typeof event.text === "string") onEvent(event);
     else if (event.type === "tool" && typeof event.id === "string" && typeof event.summary === "string") onEvent(event);
+    else if (event.type === "browser_handoff" && ["waiting", "resumed"].includes(event.status) && typeof event.sessionId === "string" && /^[A-Za-z0-9-]{1,100}$/.test(event.sessionId) && Number.isSafeInteger(event.epoch) && event.epoch >= 0) onEvent(event);
     else if (event.type === "tool_trace" && typeof event.id === "string" && typeof event.name === "string" && ["started", "finished"].includes(event.phase)) onEvent(event);
     else if (event.type === "generated_file" && typeof event.file?.id === "string") onEvent(event);
     else if (event.type === "approval" && typeof event.approval?.token === "string") onEvent(event);

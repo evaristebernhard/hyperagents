@@ -1,4 +1,11 @@
-import type { DemoAgent, DemoMemory, DemoProject, DemoThread, WorkspacePreferences, ArtifactKind } from "./types";
+import type {
+  DemoAgent,
+  DemoMemory,
+  DemoProject,
+  DemoThread,
+  WorkspacePreferences,
+  ArtifactKind,
+} from "./types";
 export type Skill = {
   id: string;
   name: string;
@@ -26,7 +33,7 @@ export type Room = {
   name: string;
   topic: string;
   agentIds: string[];
-  notes: { id: string; text: string; createdAt: string }[];
+  notes: { id: string; text: string; createdAt: string; author?: string }[];
   archived?: boolean;
 };
 export type ArtifactVersion = {

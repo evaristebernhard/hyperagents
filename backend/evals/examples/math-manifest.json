@@ -1,0 +1,21 @@
+{
+  "root": "2026-11-03T07-51-23-167Z",
+  "files": [
+    {
+      "id": "22231b0f-b536-4dc1-b175-b5323b3580b4",
+      "task_id": "b8ed82de-96cd-4926-b5c3-5c1fde6d4c01",
+      "format": "md",
+      "sha256": "c6cafddcec0fdb6df17c6db747668b4397668d18d3f719a4f4450ef9a880fe1c",
+      "bytes": "6184",
+      "storage_key": "53c026bf-cc87-4129-ba2f-03421874b9ea/c6cafddcec0fdb6df17c6db747668b4397668d18d3f719a4f4450ef9a880fe1c"
+    },
+    {
+      "id": "4d7ffe7f-28eb-4798-bda7-42f9c8241ddb",
+      "task_id": "b8ed82de-96cd-4926-b5c3-5c1fde6d4c01",
+      "format": "pdf",
+      "sha256": "c6823aab06d08e95919ab00f781414eee7fa16169475baf7650abe44aa372f56",
+      "bytes": "58894",
+      "storage_key": "53c026bf-cc87-4129-ba2f-03421874b9ea/c6823aab06d08e95919ab00f781414eee7fa16169475baf7650abe44aa372f56"
+    }
+  ]
+}

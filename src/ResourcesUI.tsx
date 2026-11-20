@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Plus,
   Search,
@@ -37,6 +37,10 @@ import { asset } from "./data";
 import "./resources-ui.css";
 import { useWorkspace } from "./workspace";
 import { uid, now } from "./local-model";
+import ElysProjectPanel from "./ElysProjectPanel";
+
+const elysDescription = "Elys 社交与智能体工作区。仓库：/home/ubuntu/elsys。保留林（user-lin）、曼（user-man）、珊（user-shan）三种身份，以及动态、私信、记忆、对齐和持久浏览器功能。";
+const elysGoal = "在项目内持续开发和验证 Elys：使用三种身份体验动态与私信，检查记忆和对齐流程，并通过浏览器接管完成登录与注册。相关任务、上下文和产物统一归入本项目。";
 const skillList = [
   {
     id: "nyt-data-viz",
@@ -151,6 +155,8 @@ export default function ResourcesUI(p: ResourceProps) {
     [installed, setInstalled] = useState<string[]>([]),
     [wikiTab, setWikiTab] = useState("Pages"),
     [showArchived, setShowArchived] = useState(false);
+  const [addingElys, setAddingElys] = useState(false);
+  const addingElysRef = useRef(false);
   useEffect(() => {
     setQuery("");
     setTab("");
@@ -237,6 +243,29 @@ export default function ResourcesUI(p: ResourceProps) {
     setProjects([...projects, item]);
     navigate("/projects/" + item.id);
     notify("Project created locally.");
+  };
+  const addElysProject = async () => {
+    if (addingElysRef.current) return;
+    addingElysRef.current = true;
+    setAddingElys(true);
+    try {
+      const existing = projects.find((item) => !item.archived && (item.application === "elys" || /^(elys|elsys)$/i.test(item.name.trim())));
+      const item = existing ? {
+        ...existing,
+        application: "elys" as const,
+        description: existing.description.includes("/home/ubuntu/elsys") ? existing.description : [existing.description, elysDescription].filter(Boolean).join("\n\n"),
+        goal: existing.goal || elysGoal,
+      } : { id: uid("project"), name: "Elys", description: elysDescription, goal: elysGoal, application: "elys" as const };
+      setProjects(existing ? projects.map((project) => project.id === existing.id ? item : project) : [...projects, item]);
+      await workspace.flush();
+      navigate("/projects/" + item.id);
+      notify(existing ? "已打开 Elys 子项目。" : "Elys 子项目已保存。");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Elys 子项目未保存，请重试。");
+    } finally {
+      addingElysRef.current = false;
+      setAddingElys(false);
+    }
   };
   const demoNoBackend = (action: string) =>
     notify(action + " is a frontend preview. No external service was called.");
@@ -708,6 +737,10 @@ export default function ResourcesUI(p: ResourceProps) {
                 />
                 Show Archived
               </label>
+              <button className="btn elys-add-project" disabled={addingElys} onClick={() => void addElysProject()}>
+                <Plus size={14} />
+                {addingElys ? "正在保存 Elys…" : "添加 Elys 子项目"}
+              </button>
               <button
                 className="btn primary"
                 onClick={() => navigate("/projects/new")}
@@ -735,6 +768,7 @@ export default function ResourcesUI(p: ResourceProps) {
                     </h3>
                     <p className="muted">{pr.description}</p>
                     <div className="actions">
+                      {pr.application === "elys" && <span className="badge">Elys 工作区</span>}
                       <span className="muted">Active today</span>
                       <span className="badge">
                         {threads.filter((t) => (t.projectId || t.project) === pr.id).length}{" "}
@@ -784,11 +818,12 @@ export default function ResourcesUI(p: ResourceProps) {
               Edit project
             </button>
           </div>
+          {pr.application === "elys" && !pr.archived && <ElysProjectPanel key={workspace.state.active + ":" + pr.id} workspaceId={workspace.state.active} projectId={pr.id} />}
           <div className="rp-project-composer">
             <Composer
               navigate={navigate}
               notify={notify}
-              onSend={(t) => onCreateThread(t, id)}
+              onSend={(text, context, clientRequestId) => onCreateThread(text, id, context, clientRequestId)}
             />
           </div>
           <div className="tabs">

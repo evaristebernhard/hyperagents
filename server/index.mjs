@@ -4,7 +4,11 @@ import { createApp } from './app.mjs';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
 import { loadLocalEnv } from '../scripts/env.mjs';
+import { loadScnetAgentConfig } from './scnet-agent-model.mjs';
+import { loadPersistentBrowserConfig } from '../../server/persistent-browser-client.mjs';
 loadLocalEnv();
+const scnetModelConfig=loadScnetAgentConfig();
+const persistentBrowserConfig=loadPersistentBrowserConfig();
 const integrationCredentials=captureIntegrationCredentials(process.env);
 const ownerPassword=process.env.APP_OWNER_PASSWORD;
 const deepseekApiKey=process.env.DEEPSEEK_API_KEY;
@@ -25,7 +29,7 @@ try {
     devOrigin:process.env.APP_DEV_ORIGIN,
     publicOrigin:process.env.APP_PUBLIC_ORIGIN,
     maxFileBytes:process.env.APP_MAX_FILE_BYTES,
-    ownerPassword,integrationCredentials,
+    ownerPassword,integrationCredentials,scnetModelConfig,persistentBrowserConfig,persistentBrowserEnabled:true,
     deepseekApiKey,openAlexApiKey,exaApiKey,publicUserAgent,skillRoot,skillCatalog,
     moliPath:process.env.MOLI_PATH, browserProvider:process.env.BROWSER_PROVIDER || 'moli', browserPath:process.env.BROWSER_PATH,
     distDir:process.env.APP_SERVE_DIST==='1' && existsSync('dist/index.html') ? path.resolve('dist') : undefined,
@@ -34,4 +38,8 @@ try {
   console.log(`Local API listening on ${address.address}:${address.port}`);
   let closing=false;
   for (const signal of ['SIGTERM','SIGINT']) process.on(signal,async()=> { if (closing) return; closing=true; await app.close(); process.exit(0); });
-} catch { console.error('API startup failed. Check Node 24+, data-directory permissions, origin/port configuration, and owner/bootstrap requirements.'); process.exitCode=1; }
+} catch (error) {
+  const code=typeof error?.code==='string'&&/^[A-Z0-9_]{1,64}$/.test(error.code)?error.code:'CONFIGURATION';
+  console.error(`API startup failed (${code}). Check Node 24+, data-directory permissions, origin/port configuration, and owner/bootstrap requirements.`);
+  process.exitCode=1;
+}

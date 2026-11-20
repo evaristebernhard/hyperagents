@@ -1,0 +1,20 @@
+{
+  "status": "passed",
+  "checks": [
+    "python",
+    "node",
+    "no-secrets",
+    "no-socket",
+    "network-off",
+    "idempotency",
+    "chinese-pdf-render",
+    "png",
+    "symlink-rejection",
+    "memory-limit",
+    "workdir-limit",
+    "pid-limit",
+    "cancellation",
+    "timeout",
+    "no-residual-containers"
+  ]
+}

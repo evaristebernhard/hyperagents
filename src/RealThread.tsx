@@ -1,6 +1,6 @@
 import { parseSlidesContent } from "./slide-preview";
 import { useEffect, useRef, useState } from "react";
-import { Star, SlidersHorizontal, Share2, GitFork, Archive, Trash2, Pencil, X, Activity, ChevronDown, Copy, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Star, SlidersHorizontal, Share2, GitFork, Archive, Trash2, Pencil, X, Activity, ChevronDown, Copy, PanelRightClose, PanelRightOpen, Monitor } from "lucide-react";
 import type { ThreadProps } from "./Thread";
 import type { MessageContext, ThreadSettings, ToolRun, KnowledgeHints } from "./types";
 import { defaultThreadSettings } from "./types";
@@ -10,8 +10,8 @@ import { useWorkspace } from "./workspace";
 import { Composer, IconButton, Modal } from "./ui";
 import { ArtifactView, exportArtifact } from "./LibraryManager";
 import { api, fileDownloadUrl } from "./backend-client";
-import { pendingKey, artifactFromAnswer, currentModels, type LlmConfig } from "./llm-client";
-import { createRun, listRuns, followRun, cancelRun, decideShellApproval, isActiveRun, type RunInfo, type RunConnection, type RuntimeEvent } from "./run-client";
+import { pendingKey, artifactFromAnswer, type LlmConfig, type BrowserHandoff } from "./llm-client";
+import { createRun, listRuns, followRun, cancelRun, continueRun, getRunEvents, decideShellApproval, isActiveRun, type RunInfo, type RunConnection, type RuntimeEvent } from "./run-client";
 import AnswerMarkdown from "./AnswerMarkdown";
 import { parseTable } from "./table-utils";
 import ArtifactCanvas from "./ArtifactCanvas";
@@ -19,6 +19,8 @@ import ProviderDiagnostics from "./ProviderDiagnostics";
 import IntegrationApprovals from "./IntegrationApprovals";
 import "./real-thread.css";
 import ToolActivity from "./ToolActivity";
+import BrowserSessionPanel from "./browser/BrowserSessionPanel";
+import { deleteThreadData } from "./thread-operations";
 
 type Share = { id: string; token: string; createdAt: string; revokedAt?: string };
 const errorText = (error: unknown) => error instanceof Error ? error.message : "The operation could not be completed.";
@@ -38,9 +40,19 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
   const [prefill, setPrefill] = useState<{ id: string; text: string }>();
   const requestPrefill = (text: string) => setPrefill({ id: uid("prefill"), text });
   const [toolRuns, setToolRuns] = useState<ToolRun[]>([]);
+  const [browserHandoff, setBrowserHandoff] = useState<BrowserHandoff | null>(null);
   // This controller owns the VIEW, never the lifetime of server execution.
   const generation = useRef<AbortController | null>(null);
   const [runInfo, setRunInfo] = useState<RunInfo | null>(null);
+  const [runHistory, setRunHistory] = useState<RunInfo[]>([]);
+  const [continuationBusy, setContinuationBusy] = useState(false);
+  const [logRun, setLogRun] = useState<RunInfo | null>(null);
+  const [logEvents, setLogEvents] = useState<{ seq: number; event: RuntimeEvent }[]>([]);
+  const [logCursor, setLogCursor] = useState(0);
+  const [logHasMore, setLogHasMore] = useState(false);
+  const [logBusy, setLogBusy] = useState(false);
+  const [logError, setLogError] = useState("");
+  const logEpoch = useRef(0);
   const runRef = useRef<RunInfo | null>(null);
   const cursor = useRef(0);
   const [checkingRuns, setCheckingRuns] = useState(true);
@@ -54,6 +66,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
   const [preparedArtifacts, setPreparedArtifacts] = useState(0);
   const [preparedApprovals, setPreparedApprovals] = useState(0);
   const [clock, setClock] = useState(Date.now());
+  const allocationExpired = !!llm?.allocation && (llm.allocation.expired || clock >= llm.allocation.deadlineUnix * 1000);
   const alive = useRef(true);
   const lifecycle = useRef(0);
   const currentView = useRef({ threadId: thread.id, workspaceId: w.state.active });
@@ -96,6 +109,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
       setCanvasOverride(null);
     } else setCanvasOverride({ threadId: thread.id, preference: thread.canvas?.collapsed, collapsed: !canvasCollapsed });
   };
+  const waitingForBrowserUser = !!runInfo && isActiveRun(runInfo) && browserHandoff?.status === "waiting";
   const pendingApproval = !!runInfo && (runInfo.status === "waiting_approval" || runInfo.approvals.some(approval => approval.status === "pending"));
   const runDetailsOpen = pendingApproval || (runDetails && runDetails.id === runInfo?.id && runDetails.status === runInfo?.status && runDetails.open);
   const sortedArtifacts = [...linked].sort((a, b) => sort === "title" ? a.title.localeCompare(b.title) : (sort === "created" ? b.createdAt.localeCompare(a.createdAt) : b.updatedAt.localeCompare(a.updatedAt)));
@@ -127,9 +141,10 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     const epoch = ++lifecycle.current;
     const controller = new AbortController();
     generation.current = controller;
-    setLlm(null); setLlmError(""); setDraft(""); setToolRuns([]); setGenerating(false);
+    setLlm(null); setLlmError(""); setDraft(""); setToolRuns([]); setBrowserHandoff(null); setGenerating(false);
     setReasoningMs(undefined); setFollowUps([]); setLiveHints(undefined); setPrefill(undefined);
     setRunInfo(null); runRef.current = null; cursor.current = 0;
+    setRunHistory([]); setContinuationBusy(false); setLogRun(null); setLogEvents([]); logEpoch.current++;
     setCheckingRuns(true); setConnection(null); setViewError("");
     setPreparedArtifacts(0); setPreparedApprovals(0); setCancelBusy(false); setApprovalBusy("");
     actionPending.current = false;
@@ -146,12 +161,16 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     return () => { alive.current = false; lifecycle.current++; controller.abort(); generation.current?.abort(); generation.current = null; };
   }, [thread.id, w.state.active]);
   useEffect(() => { if (generating) bottom.current?.scrollIntoView({ block: "nearest" }); }, [draft, generating]);
+  const lastSavedMessageId = thread.messages?.at(-1)?.id;
   useEffect(() => {
-    if (!runInfo || !isActiveRun(runInfo)) return;
+    if (!checkingRuns && !generating) bottom.current?.scrollIntoView({ block: "nearest" });
+  }, [thread.id, lastSavedMessageId, checkingRuns, generating]);
+  useEffect(() => {
+    if ((!runInfo || !isActiveRun(runInfo)) && !llm?.allocation) return;
     setClock(Date.now());
     const timer = window.setInterval(() => setClock(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [runInfo?.id, runInfo?.status]);
+  }, [runInfo?.id, runInfo?.status, llm?.allocation?.deadlineUnix]);
 
   async function answerArtifact(text: string, artifactKind: "Document" | "Webpage", epoch = lifecycle.current) {
     if (!isCurrentView(epoch)) return;
@@ -165,9 +184,11 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
 
   function showRun(run: RunInfo) {
     runRef.current = run; setRunInfo(run); setGenerating(isActiveRun(run));
+    setRunHistory(items => items.some(item => item.id === run.id) ? items.map(item => item.id === run.id ? run : item) : [run, ...items].slice(0, 20));
   }
   function receiveEvent(event: RuntimeEvent) {
     // Optional metadata uses the runtime contract; never infer time or expose reasoning text.
+    if (event.type === "browser_handoff") setBrowserHandoff(event);
     if (event.type === "reasoning_timing") setReasoningMs(event.reasoningMs);
     if (event.type === "suggestions") setFollowUps(event.followUps);
     if (event.type === "knowledge_hints") setLiveHints(event.knowledgeHints);
@@ -191,7 +212,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     if (!isCurrentView(epoch) || controller.signal.aborted) return;
     generation.current = controller; showRun(run); setCheckingRuns(false); setViewError(""); setConnection(null);
     if (replay) {
-      cursor.current = 0; setDraft(""); setReasoning(false); setReasoningMs(undefined); setFollowUps([]); setLiveHints(undefined); setToolRuns([]); setPreparedArtifacts(0); setPreparedApprovals(0);
+      cursor.current = 0; setBrowserHandoff(null); setDraft(""); setReasoning(false); setReasoningMs(undefined); setFollowUps([]); setLiveHints(undefined); setToolRuns([]); setPreparedArtifacts(0); setPreparedApprovals(0);
     }
     const viewing = () => isCurrentView(epoch) && generation.current === controller && !controller.signal.aborted;
     try {
@@ -218,6 +239,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     try {
       const runs = await listRuns({ workspaceId: w.state.active, threadId: thread.id }, controller.signal);
       if (!viewing()) return;
+      setRunHistory(runs);
       const key = pendingKey(w.state.active, thread.id), pendingId = sessionStorage.getItem(key);
       const active = runs.find(isActiveRun);
       if (active) {
@@ -269,6 +291,47 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     if (runRef.current) void watchRun(runRef.current, epoch, controller, false);
     else void discoverRuns(epoch, controller);
   }
+  async function continueSavedRun() {
+    const source = runRef.current;
+    if (!source || isActiveRun(source) || generation.current || actionPending.current || checkingRuns) return;
+    const epoch = lifecycle.current, controller = new AbortController();
+    const key = "hyperagents:continue:" + w.state.active + ":" + thread.id + ":" + source.id;
+    let requestId = sessionStorage.getItem(key);
+    if (!requestId) { requestId = crypto.randomUUID(); sessionStorage.setItem(key, requestId); }
+    actionPending.current = true; setContinuationBusy(true); setError(""); setViewError("");
+    generation.current = controller; setCheckingRuns(true);
+    try {
+      await w.flush();
+      if (!isCurrentView(epoch) || controller.signal.aborted) return;
+      // A lost response may already have admitted a new run. Discovery must look
+      // for that run, rather than reconnecting only to its old terminal source.
+      runRef.current = null; setRunInfo(null);
+      const next = await continueRun(source.id, { workspaceId: source.workspaceId, threadId: source.threadId, requestId }, controller.signal);
+      if (!isCurrentView(epoch) || controller.signal.aborted) return;
+      sessionStorage.removeItem(key);
+      await w.reload();
+      if (isCurrentView(epoch) && !controller.signal.aborted) void watchRun(next, epoch, controller);
+    } catch (problem) {
+      if (isCurrentView(epoch) && !controller.signal.aborted) {
+        generation.current = null; setCheckingRuns(false); setGenerating(false);
+        setViewError("继续请求尚未确认：" + errorText(problem) + "。请先重连查看已保存的运行，避免重复发起。");
+      }
+    } finally { if (isCurrentView(epoch)) { actionPending.current = false; setContinuationBusy(false); } }
+  }
+  async function inspectRun(id: string, more = false) {
+    const epoch = more ? logEpoch.current : ++logEpoch.current;
+    const view = lifecycle.current;
+    const candidate = runHistory.find(run => run.id === id);
+    if (!more) { setLogRun(candidate || null); setLogEvents([]); setLogCursor(0); setLogHasMore(false); setModal("run-log"); }
+    setLogBusy(true); setLogError("");
+    try {
+      const result = await getRunEvents(id, { workspaceId: candidate?.workspaceId || w.state.active, threadId: candidate?.threadId || thread.id }, more ? logCursor : 0);
+      if (!isCurrentView(view) || logEpoch.current !== epoch) return;
+      setLogRun(result.run); setLogEvents(items => more ? [...items, ...result.events] : result.events);
+      setLogCursor(result.nextCursor); setLogHasMore(result.hasMore);
+    } catch (problem) { if (isCurrentView(view) && logEpoch.current === epoch) setLogError(errorText(problem)); }
+    finally { if (isCurrentView(view) && logEpoch.current === epoch) setLogBusy(false); }
+  }
   async function stopRun() {
     const run = runRef.current;
     if (!run || !isActiveRun(run) || actionPending.current) return;
@@ -311,7 +374,7 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     finally { if (isCurrentView(epoch)) { actionPending.current = false; setApprovalBusy(""); } }
   }
   const lastMessage = thread.messages?.at(-1);
-  const canGenerate = !!llm?.configured && lastMessage?.role === "user" && !!lastMessage.id && !thread.archived && !checkingRuns && !viewError && (!runInfo || (!isActiveRun(runInfo) && runInfo.userMessageId !== lastMessage.id));
+  const canGenerate = !!llm?.configured && !allocationExpired && lastMessage?.role === "user" && !!lastMessage.id && !thread.archived && !checkingRuns && !viewError && (!runInfo || (!isActiveRun(runInfo) && runInfo.userMessageId !== lastMessage.id));
 
   async function perform(action: () => Promise<void>) {
     if (operationBusy.current) return;
@@ -327,12 +390,14 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     setError("");
     const epoch = lifecycle.current;
     const current = latest.current;
+    if (current.companionAgentId && context?.settings.agentId !== current.companionAgentId)
+      throw Error("自聊使用专属分身。请在分身页修改设定，或新建普通线程使用其他 agent。");
     const message = { id: clientRequestId || crypto.randomUUID(), role: "user" as const, text, createdAt: now(), ...(context ? { context } : {}) };
     const next = { ...current, updatedAt: now(), config: context?.settings || current.config || config, projectId: context?.projectId || current.projectId, messages: current.messages?.some(m => m.id === message.id) ? current.messages : [...(current.messages || []), message] };
     latest.current = next;
     update(next);
     try { await w.flush(); } catch (e) { setError(errorText(e)); throw e; }
-    if (llm?.configured && isCurrentView(epoch)) await generate(message.id, epoch);
+    if (llm?.configured && !allocationExpired && isCurrentView(epoch)) await generate(message.id, epoch);
   }
   async function fork() {
     const timestamp = now();
@@ -376,10 +441,14 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     return next?.role === "assistant" && next.knowledgeHints ? next.knowledgeHints : message?.id === runInfo?.userMessageId ? liveHints : undefined;
   };
   const hintCount = (hints?: KnowledgeHints) => hints ? hints.skillIds.length + hints.memoryIds.length : 0;
+  const providerName = llm?.provider || "DeepSeek";
+  const supportedModels = llm?.models || [];
   return <main className="real-thread">
     <header className="rt-header">
       <div className="rt-title"><button className="rt-title-trigger" aria-label="Open thread menu" onClick={() => { if (threadActions.current) threadActions.current.open = !threadActions.current.open; }}><h1>{thread.title}</h1><ChevronDown size={13} aria-hidden="true" /></button><IconButton label={thread.starred ? "Unstar thread" : "Star thread"} onClick={() => void perform(() => saveThread({ starred: !thread.starred }))}><Star size={15} fill={thread.starred ? "currentColor" : "none"} /></IconButton>{thread.archived && <span className="rt-badge">Archived</span>}</div>
       <div className="rt-actions">
+        {thread.companionAgentId && <button className="btn small" onClick={() => navigate("/companion")}>分身与记忆</button>}
+        <button className="btn small" onClick={() => setModal("browser")}><Monitor size={16} />浏览器接管</button>
         <IconButton label={canvasCollapsed ? "Show canvas" : "Hide canvas"} onClick={toggleCanvas}>{canvasCollapsed ? <PanelRightOpen size={17} /> : <PanelRightClose size={17} />}</IconButton>
         <button className="rt-header-model" onClick={() => navigate("/thread/" + thread.id + (settingsPanel ? "" : "?panel=settings"))} aria-label="Selected model settings">{config.model || "Choose your model"}<ChevronDown size={12} /></button>
         <IconButton label="Thread configuration" onClick={() => navigate("/thread/" + thread.id + (settingsPanel ? "" : "?panel=settings"))}><SlidersHorizontal size={17} /></IconButton>
@@ -393,13 +462,20 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
         </div></details>
       </div>
     </header>
-    <details className="rt-status"><summary>Connection & storage</summary><span>{llm?.configured ? "DeepSeek configured · Connection not verified" : llmError ? "Model status unavailable" : llm ? "DeepSeek not configured · Messages are still saved" : "Checking model connection…"}</span><span role="status">{busy ? "Saving…" : w.persistence === "saved" ? "Saved" : w.persistence}</span></details>
-    {llm && !llm.configured && <p className="rt-notice">To enable real replies, set DEEPSEEK_API_KEY in the server’s private .env or deployment environment and restart the service. Never commit a key or use a VITE_ secret. Local tools and selected public-data APIs are available when enabled. Selected configured integrations can read actual APIs. Integration writes require your per-action confirmation. Durable runs can use real shell commands only when Shell is explicitly enabled and you approve each command. Shell is not sandboxed and can modify files or access the network. Browser offers ephemeral public-HTTPS navigation, DOM observation/extraction and PNG capture when its backend is configured. Files and Skills require explicit per-action approval. Delegation runs a selected workspace agent with a read-only capability intersection. Slides uses a dedicated navigable artifact. Search has a keyless public RSS path; Find Similar requires configured Exa. Click/type, persistent logins, handoff, media and schedules remain unavailable.</p>}
+    <details className="rt-status"><summary>Connection & storage</summary><span>{allocationExpired ? "DCU 作业已结束 · 消息与任务记录仍保留" : llm?.configured ? providerName + " configured · Connection not verified" : llmError ? "Model status unavailable" : llm ? providerName + " not configured · Messages are still saved" : "Checking model connection…"}</span>{llm?.allocation && <span>DCU 作业 {llm.allocation.jobId || "当前作业"} · 有效至 {new Date(llm.allocation.deadlineUnix * 1000).toLocaleString()}</span>}<span role="status">{busy ? "Saving…" : w.persistence === "saved" ? "Saved" : w.persistence}</span></details>
+    {allocationExpired && <p className="rt-notice" role="status">DCU 作业已结束，消息、运行日志与产物仍保存在工作区。连接新的有效作业后，可从已保存上下文继续。</p>}
+    {llm && !llm.configured && !allocationExpired && <p className="rt-notice">To enable real replies, configure the selected model provider on the server and restart the service. Keep provider credentials on the server; never use a VITE_ secret. Local tools and selected public-data APIs are available when enabled. Selected configured integrations can read actual APIs. Integration writes require your per-action confirmation. Durable runs can use real shell commands only when Shell is explicitly enabled and you approve each command. Shell is not sandboxed and can modify files or access the network. The browser takeover panel connects to the configured persistent browser service. Open it to view the same browser session, take control for login, and hand control back to AI. Files and Skills require explicit per-action approval. Delegation runs a selected workspace agent with a read-only capability intersection. Slides uses a dedicated navigable artifact. Search has a keyless public RSS path; Find Similar requires configured Exa. Media and scheduled execution remain unavailable.</p>}
+    {thread.companionAgentId && <div className="rt-notice" role="status"><strong>与个人分身自聊</strong><p>已确认的相关记忆会提供给分身。可从你的原话整理候选，确认后用于之后的回答。</p><button className="btn small" onClick={() => navigate("/companion")}>管理设定与记忆</button></div>}
     {!config.tools.includes("Slides") && (String(config.outputFormat || "").toLowerCase() === "slides" || /publish_slides|幻灯片/i.test([...(thread.messages || [])].reverse().find(m => m.role === "user")?.text || "")) && <div className="rt-notice" role="status"><strong>这条线程尚未开启 Slides。</strong> 上一轮没有调用 publish_slides；Webpage 不是 Slides 产物。<button type="button" className="btn small" disabled={busy || generating || checkingRuns} onClick={() => void perform(async () => { const next = { ...config, outputFormat: "Slides", tools: [...new Set([...config.tools, "Slides"])] }; await saveThread({ config: next }); setConfig(next); setToolsText(next.tools.join(", ")); notify("Slides 已启用，请重新发送一条消息；历史运行不会重试。"); })}>启用 Slides 并保存线程配置</button></div>}
     {checkingRuns && <p className="rt-run-loading" role="status">Checking saved runs before enabling execution…</p>}
+    {(waitingForBrowserUser || (browserHandoff === null && toolRuns.some(tool => tool.name === 'browser_request_takeover' && tool.status === 'running'))) && <div className="rt-notice" role="status"><strong>等待你完成登录、注册或验证。</strong> AI 已暂停操作。请打开本任务的浏览器，点击“接管浏览器”完成操作，再点击“交还 AI”继续；关闭查看器不会交还。<button className="btn small" onClick={() => setModal('browser')}><Monitor size={15} />打开等待中的浏览器</button></div>}
     {runInfo && <section className={"rt-run-panel " + runInfo.status} aria-label="Durable run status">
-      <div className="rt-run-heading"><div><strong>{runStatusLabel(runInfo.status)}</strong><code title={runInfo.id}>Run {runInfo.id.slice(0, 8)}</code></div><div className="rt-actions">{isActiveRun(runInfo) && <button className="btn small" disabled={cancelBusy || !!approvalBusy} onClick={() => void stopRun()}>{cancelBusy ? "Stopping…" : "Stop run"}</button>}</div></div>
+      <div className="rt-run-heading"><div><strong>{waitingForBrowserUser ? "等待你操作浏览器" : runStatusLabel(runInfo.status)}</strong><code title={runInfo.id}>Run {runInfo.id.slice(0, 8)}</code></div><div className="rt-actions">{isActiveRun(runInfo) && <button className="btn small" disabled={cancelBusy || !!approvalBusy} onClick={() => void stopRun()}>{cancelBusy ? "Stopping…" : "Stop run"}</button>}</div></div>
+      <p className="rt-run-hint">工具调用 {runInfo.toolCount} · 子任务 {runInfo.childCount ?? "—"}</p>
+      {runInfo.status === "succeeded" && runInfo.toolCount === 0 && runInfo.childCount === 0 && <p className="rt-run-hint">本轮仅返回文字，未调用工具或创建子任务。</p>}
       {runInfo.error && <p className="rt-run-failure" role="alert">{runInfo.error}</p>}
+      {runInfo.continuedFromRunId && <p className="rt-run-hint">从运行 {runInfo.continuedFromRunId.slice(0, 8)} 的保存状态继续 · <button className="btn small" onClick={() => void inspectRun(runInfo.continuedFromRunId!)}>查看原运行</button></p>}
+      {!runInfo.parentRunId && ["failed", "interrupted", "cancelled"].includes(runInfo.status) && runHistory[0]?.id === runInfo.id && <div className="rt-notice"><p>可根据原目标、已保存的步骤和结果建立新一轮。已完成的操作不会由系统重放；结果不明的写入需先核对，新操作仍按当前权限审批。</p><button className="btn small" disabled={continuationBusy || checkingRuns || !!generation.current || !!viewError || !llm?.configured || allocationExpired} onClick={() => void continueSavedRun()}>{continuationBusy ? "正在建立新一轮…" : "从已保存上下文继续"}</button></div>}
       {connection?.status === "reconnecting" && <p className="rt-run-reconnecting" role="status">Reconnecting to saved events · attempt {connection.failures}/5 · retry in {Math.ceil(connection.retryInMs / 1000)}s. Execution is not restarted.<span>{connection.message}</span></p>}
       <details className="rt-run-details" open={!!runDetailsOpen} onToggle={event => {
         // Pending reviews must stay visible, even when the summary is activated.
@@ -408,12 +484,13 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
       }}><summary onClick={event => { if (pendingApproval) event.preventDefault(); }}>Execution details{pendingApproval ? " · Review required" : ""}</summary>
       <dl className="rt-run-stats"><div><dt>Elapsed</dt><dd>{elapsedLabel(runInfo, clock)}</dd></div><div><dt>Tools</dt><dd>{runInfo.toolCount.toLocaleString()}</dd></div>{runInfo.model && <div><dt>Model</dt><dd>{runInfo.model}</dd></div>}{runInfo.usage?.prompt_tokens !== undefined && <div><dt>Input tokens</dt><dd>{runInfo.usage.prompt_tokens.toLocaleString()}</dd></div>}{runInfo.usage?.completion_tokens !== undefined && <div><dt>Output tokens</dt><dd>{runInfo.usage.completion_tokens.toLocaleString()}</dd></div>}{runInfo.usage?.total_tokens !== undefined && <div><dt>Total tokens</dt><dd>{runInfo.usage.total_tokens.toLocaleString()}</dd></div>}</dl>
       {!!runInfo.childCount && <section aria-label="Delegated runs"><div className="rt-section-heading"><strong>Read-only delegated runs ({runInfo.childCount})</strong><button className="btn small" onClick={() => void refreshDelegatedRuns()}>Refresh child status</button></div>{delegatedError && <p role="alert">{delegatedError}</p>}{delegatedRuns.map(child => <div key={child.id} className="rt-run-hint"><button className="btn small" onClick={() => navigate("/thread/" + child.threadId)}>Open child thread · {child.id.slice(0,8)}</button> {runStatusLabel(child.status)}</div>)}</section>}
-      {!!runInfo.plan?.length && <ol className="rt-run-plan" aria-label="Agent task plan">{runInfo.plan.map(step => <li key={step.id} className={step.status}><span aria-hidden="true">{step.status === "completed" ? "✓" : step.status === "in_progress" ? "◌" : "○"}</span><span>{step.title}</span><small>{step.status.replace("_", " ")}</small></li>)}</ol>}
+      {!!runInfo.plan?.length && <ol className="rt-run-plan" aria-label="Agent task plan">{runInfo.plan.map(step => <li key={step.id} className={step.status}><span aria-hidden="true">{step.status === "completed" ? "✓" : step.status === "in_progress" ? "◌" : "○"}</span><span>{step.title}{!!step.dependsOn?.length && <small className="rt-plan-detail">前置步骤：{step.dependsOn.map(id => runInfo.plan?.find(item => item.id === id)?.title || id).join("、")}</small>}{step.childRunId && <small className="rt-plan-detail">{delegatedRuns.find(child => child.id === step.childRunId) ? <button className="btn small" onClick={() => navigate("/thread/" + delegatedRuns.find(child => child.id === step.childRunId)!.threadId)}>查看子任务</button> : "已关联子任务"}</small>}</span><small>{step.status.replace("_", " ")}</small></li>)}</ol>}
       {isActiveRun(runInfo) && <p className="rt-run-hint">Execution continues on the server if you leave this page. Stop run explicitly requests cancellation.</p>}
       {!isActiveRun(runInfo) && <p className="rt-run-hint">{runInfo.resultSaved ? "Result saved by the server." : "Run ended. Saving the result was not confirmed; inspect the preserved execution log."}{runInfo.status !== "succeeded" && " Send a new message if you want another execution; retry viewing never reruns the task."}</p>}
       {!!runInfo.approvals.length && <div className="rt-shell-approvals" aria-label="Execution approvals"><p className="rt-shell-warning"><strong>Review each action before execution.</strong> File changes are limited to this workspace storage. Shell and installed skill scripts run with the server user authority, not a security sandbox. Review the exact content or command, directory and timeout. No action is auto-approved.</p>{runInfo.approvals.map(approval => <section className={"rt-shell-approval " + approval.status} key={approval.id} aria-label={approval.kind === "file" ? "Workspace file review" : approval.kind === "skill" ? "Skill script review" : "Shell command review"}><div className="rt-section-heading"><strong>{approval.kind === "file" ? "Workspace file change" : approval.kind === "skill" ? "Installed skill script" : "Shell command"}</strong><span className="rt-badge">{approval.status}</span></div><pre className="rt-shell-command">{approval.command}</pre><dl><dt>Working directory</dt><dd><code>{approval.cwd}</code></dd><dt>Timeout</dt><dd>{approval.timeoutSeconds} seconds</dd></dl>{approval.status === "pending" && isActiveRun(runInfo) && <div className="rt-actions"><button className="btn primary" disabled={!!approvalBusy || cancelBusy || !!viewError} onClick={() => void approveShell(approval.id, "approve")}>{approvalBusy === approval.id ? "Submitting decision…" : approval.kind && approval.kind !== "shell" ? "Approve action" : "Approve command"}</button><button className="btn" disabled={!!approvalBusy || cancelBusy || !!viewError} onClick={() => void approveShell(approval.id, "deny")}>{approval.kind && approval.kind !== "shell" ? "Deny action" : "Deny command"}</button></div>}</section>)}</div>}
       </details>
     </section>}
+    {!!runHistory.length && <details className="rt-run-panel" aria-label="Saved run history"><summary>已保存的运行 · {runHistory.length}</summary><p className="rt-run-hint">查看日志只读取已保存事件。继续任务会建立一条关联的新运行。</p>{runHistory.map(run => <div className="rt-run-hint" key={run.id}><button className="btn small" onClick={() => void inspectRun(run.id)}>查看运行 {run.id.slice(0, 8)}</button> {runStatusLabel(run.status)} · {dateLabel(run.createdAt)}{run.continuedFromRunId && " · 续接 " + run.continuedFromRunId.slice(0, 8)}</div>)}</details>}
     {viewError && <div className="rt-run-view-error" role="alert"><p>{viewError}</p><button className="btn small" disabled={checkingRuns || !!generation.current} onClick={retryViewing}>Retry viewing</button></div>}
     {llmError && <p className="rt-error" role="alert">{llmError}</p>}
     {error && <div className="rt-error" role="alert">{error}<button className="btn small" onClick={() => setError("")}>Dismiss</button></div>}
@@ -421,19 +498,21 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
     <div className={"rt-columns" + (settingsPanel ? " has-settings" : "") + (canvasCollapsed ? " canvas-collapsed" : "")}>
       <section className="rt-conversation" aria-label="Conversation">
         <div className="rt-messages">
-          {!(thread.messages || []).length && <div className="rt-empty"><h2>No messages yet</h2><p>Ask a question or start a task. DeepSeek can use your saved conversation, selected agent instructions, skills, memories and text attachments when configured.</p></div>}
+          {!(thread.messages || []).length && <div className="rt-empty"><h2>No messages yet</h2><p>Ask a question or start a task. {providerName} can use your saved conversation, selected agent instructions, skills, memories and text attachments when configured.</p></div>}
           {(thread.messages || []).map((message, i) => <article className={"rt-message " + message.role} key={message.id || i}>
             {message.role === "assistant" && typeof message.reasoningMs === "number" && Number.isFinite(message.reasoningMs) && message.reasoningMs >= 0 && <div className="rt-reasoning-duration" title="Observed reasoning-stream interval on the server, excluding tool execution. No private reasoning text is shown.">Thought for {durationLabel(message.reasoningMs)}</div>}
             {!!message.toolRuns?.length && <ToolHistory runs={message.toolRuns} />}
-            {message.role === "assistant" ? <div className="rt-answer"><AnswerMarkdown content={message.text} /><div className="rt-answer-actions"><button className="btn small" onClick={() => void navigator.clipboard.writeText(message.text).then(() => notify("Answer copied")).catch(() => setError("Clipboard access failed. Select and copy the answer text instead."))}><Copy size={13} aria-hidden="true" />Copy answer</button><button className="btn small" disabled={busy || generating} onClick={() => void perform(() => answerArtifact(message.text, "Document"))}>Save as document</button><button className="btn small" disabled={busy || generating} onClick={() => void perform(() => answerArtifact(message.text, "Webpage"))}>Save as webpage</button></div></div> : <p>{message.text}</p>}
+            {message.role === "assistant" ? <div className="rt-answer"><AnswerMarkdown content={message.text} /><div className="rt-answer-actions"><button className="btn small" onClick={() => void navigator.clipboard.writeText(message.text).then(() => notify("Answer copied")).catch(() => setError("Clipboard access failed. Select and copy the answer text instead."))}><Copy size={13} aria-hidden="true" />Copy answer</button><button className="btn small" disabled={busy || generating} onClick={() => void perform(() => answerArtifact(message.text, "Document"))}>Save as document</button><button className="btn small" disabled={busy || generating} onClick={() => void perform(() => answerArtifact(message.text, "Webpage"))}>Save as webpage</button></div></div> : message.runContinuation ? <details className="rt-context"><summary>从已保存上下文继续 · {message.runContinuation.sourceRunId.slice(0, 8)}</summary><p>根据你的继续操作生成的上下文快照。</p><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{message.text}</pre></details> : <p>{message.text}</p>}
             {!!message.context?.attachments?.length && <ul className="rt-attachments">{message.context.attachments.map(file => <li key={file.id}><a href={fileDownloadUrl(file)} download={file.name}>{file.name}</a><span> · {file.size.toLocaleString()} bytes</span></li>)}</ul>}
             {message.createdAt && <time className={"rt-message-time " + message.role} dateTime={message.createdAt}>{dateLabel(message.createdAt)}</time>}
             {message.role === "user" && hintCount(hintsFor(i)) > 0 && <span className="rt-resolved-hints" title="Skill and memory records resolved into this run context; not proof that the model relied on them.">{hintCount(hintsFor(i))} knowledge hints</span>}
+            {message.role === "user" && !message.runContinuation && thread.companionAgentId && message.id && <button className="btn small" disabled={busy || generating} onClick={() => navigate("/companion?" + new URLSearchParams({ sourceThread: thread.id, sourceMessage: message.id! }))}>整理为记忆</button>}
+            {message.role === "assistant" && !!message.knowledgeHints?.memorySnapshots?.length && <details className="rt-context"><summary>本轮提供的分身记忆 · {message.knowledgeHints.memorySnapshots.length}</summary><p>以下是本轮传入模型的内容快照。</p>{message.knowledgeHints.memorySnapshots.map(memory => <blockquote key={memory.id}><span className="rt-badge">{memory.visibility === "private" ? "仅自聊" : "该分身的其他线程"}</span><p>{memory.content}</p></blockquote>)}</details>}
             {message.role === "assistant" && !!message.followUps?.length && <div className="rt-followups" aria-label="Suggested follow-ups"><small>Suggested follow-ups</small>{message.followUps.filter(text => typeof text === "string" && text.trim()).map((text, index) => <button type="button" key={index} disabled={generating} onClick={() => requestPrefill(text)}>{text}<span aria-hidden="true">↗</span></button>)}</div>}
             {!!message.actionRequests?.length && message.id && <IntegrationApprovals threadId={thread.id} messageId={message.id} requests={message.actionRequests} />}
             {message.context && <details className="rt-context"><summary>Saved context</summary><dl><dt>Model preference</dt><dd>{message.context.settings?.model || "Not selected"}</dd><dt>Provider preference</dt><dd>{message.context.settings?.provider || "Not selected"}</dd><dt>Skills</dt><dd>{(message.context.skillIds || []).map(id => w.data.skills.find(s => s.id === id)?.name || id).join(", ") || "None"}</dd><dt>Memories</dt><dd>{(message.context.memoryIds || []).length}</dd><dt>Artifacts</dt><dd>{(message.context.artifactIds || []).map(id => w.data.artifacts.find(a => a.id === id)?.title || id).join(", ") || "None"}</dd><dt>Integrations</dt><dd>{(message.context.integrationIds || []).map(id => w.data.connections.find(c => c.id === id)?.label || id).join(", ") || "None"}</dd></dl></details>}
           </article>)}
-          {(generating || (!!viewError && !!draft)) && <article className="rt-message assistant" aria-label="Streaming answer"><div className="rt-message-meta"><span role="status">{viewError ? "Viewing paused" : runInfo?.status === "waiting_approval" ? "Awaiting approval" : connection?.status === "reconnecting" ? "Reconnecting…" : draft ? "Writing…" : reasoning ? "Reasoning…" : "Working…"}</span></div>{typeof reasoningMs === "number" && <div className="rt-reasoning-duration" title="Observed reasoning-stream interval on the server, excluding tool execution. No private reasoning text is shown.">Thought for {durationLabel(reasoningMs)}</div>}{!!toolRuns.length && <ToolHistory runs={toolRuns} />}{draft && <div className="rt-answer"><AnswerMarkdown content={draft} /></div>}{!!preparedArtifacts && <p className="rt-run-hint">{preparedArtifacts} artifact update(s) prepared. The server saves final artifact versions.</p>}{!!preparedApprovals && <p className="rt-run-hint">Integration review prepared. Review the saved action below the final answer when the run finishes.</p>}</article>}
+          {(generating || (!!viewError && !!draft)) && <article className="rt-message assistant" aria-label="Streaming answer"><div className="rt-message-meta"><span role="status">{viewError ? "Viewing paused" : waitingForBrowserUser ? "等待你操作浏览器" : runInfo?.status === "waiting_approval" ? "Awaiting approval" : connection?.status === "reconnecting" ? "Reconnecting…" : draft ? "Writing…" : reasoning ? "Reasoning…" : "Working…"}</span></div>{typeof reasoningMs === "number" && <div className="rt-reasoning-duration" title="Observed reasoning-stream interval on the server, excluding tool execution. No private reasoning text is shown.">Thought for {durationLabel(reasoningMs)}</div>}{!!toolRuns.length && <ToolHistory runs={toolRuns} />}{draft && <div className="rt-answer"><AnswerMarkdown content={draft} /></div>}{!!preparedArtifacts && <p className="rt-run-hint">{preparedArtifacts} artifact update(s) prepared. The server saves final artifact versions.</p>}{!!preparedApprovals && <p className="rt-run-hint">Integration review prepared. Review the saved action below the final answer when the run finishes.</p>}</article>}
           {!generating && !viewError && !!followUps.length && <div className="rt-followups" aria-label="Suggested follow-ups"><small>Suggested follow-ups</small>{followUps.map((text, index) => <button type="button" key={index} onClick={() => requestPrefill(text)}>{text}<span aria-hidden="true">↗</span></button>)}</div>}
           {!generating && canGenerate && <button className="btn" onClick={() => void generate(lastMessage!.id!)}>Generate reply</button>}
           <div ref={bottom} />
@@ -453,14 +532,14 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
         </div> : !!linked.length && <p className="rt-empty">Select an artifact to preview, edit, download, or restore a version.</p>}
         </ArtifactCanvas>
       </section>}
-      {settingsPanel && <aside className="rt-settings" aria-label="Thread configuration"><div className="rt-section-heading"><h2>Configuration</h2><IconButton label="Close configuration" onClick={() => navigate("/thread/" + thread.id)}><X size={16} /></IconButton></div><p className="rt-notice">DeepSeek uses the selected agent prompt and saved context. Only the supported models below execute. Enable Thread Search, Documents, Webpages and Tables for local tool calls. Enable Web Fetch for read-only public HTTPS Markdown retrieval through local Moli. World Bank / Weather / configured OpenAlex are read-only API tools. Selected integrations execute actual API reads; writes are confirmation-gated. Durable server runs can use Shell only after you enable it and explicitly approve each command. Shell has full server authority, not sandbox isolation, and can modify files or contact the network. Leaving this page does not stop a run. Browser supports ephemeral sessions, public HTTPS navigation, DOM observation/extraction and PNG capture when configured. Files and Skills require explicit per-action approval. Delegation runs a selected workspace agent with a read-only capability intersection. Slides uses a dedicated navigable artifact. Search has a keyless public RSS path; Find Similar requires configured Exa. Click/type, persistent logins, handoff, media and schedules remain unavailable.</p>
+      {settingsPanel && <aside className="rt-settings" aria-label="Thread configuration"><div className="rt-section-heading"><h2>Configuration</h2><IconButton label="Close configuration" onClick={() => navigate("/thread/" + thread.id)}><X size={16} /></IconButton></div><p className="rt-notice">{providerName} uses the selected agent prompt and saved context. Only the supported models below execute. Enable Thread Search, Documents, Webpages and Tables for local tool calls. Enable Web Fetch for read-only public HTTPS Markdown retrieval through local Moli. World Bank / Weather / configured OpenAlex are read-only API tools. Selected integrations execute actual API reads; writes are confirmation-gated. Durable server runs can use Shell only after you enable it and explicitly approve each command. Shell has full server authority, not sandbox isolation, and can modify files or contact the network. Leaving this page does not stop a run. The browser takeover panel provides persistent sessions, live screenshots and human input when its service is configured. Taking over pauses AI control until you hand it back. Files and Skills require explicit per-action approval. Delegation runs a selected workspace agent with a read-only capability intersection. Slides uses a dedicated navigable artifact. Search has a keyless public RSS path; Find Similar requires configured Exa. Media and scheduled execution remain unavailable.</p>
         <label>Project<select aria-label="Thread project" value={thread.projectId || ""} onChange={e => void perform(() => saveThread({ projectId: e.target.value || undefined, project: undefined }))}><option value="">No project</option>{w.data.projects.filter(p => !p.archived || p.id === thread.projectId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
         <form onSubmit={e => { e.preventDefault(); void perform(() => saveThread({ config })); }}>
-          <label>Provider<select value="DeepSeek" disabled><option>DeepSeek</option></select></label>
-          <label>Model<select aria-label="DeepSeek model" value={currentModels.includes(config.model) ? config.model : ""} onChange={e => setConfig({ ...config, model: e.target.value, provider: "DeepSeek" })}><option value="">Default · DeepSeek Flash</option>{currentModels.map(model => <option key={model}>{model}</option>)}</select></label>
+          <label>Provider<select aria-label="Model provider" value={providerName} disabled><option>{providerName}</option></select></label>
+          <label>Model<select aria-label={providerName + " model"} disabled={!llm || !supportedModels.length} value={supportedModels.includes(config.model) ? config.model : ""} onChange={e => setConfig({ ...config, model: e.target.value, provider: providerName })}><option value="">Default{supportedModels[0] ? " · " + supportedModels[0] : ""}</option>{supportedModels.map(model => <option key={model}>{model}</option>)}</select></label>
           <label>Reasoning preference<input value={config.reasoning} onChange={e => setConfig({ ...config, reasoning: e.target.value })} /></label>
           <label>Mode preference<select value={config.mode} onChange={e => setConfig({ ...config, mode: e.target.value })}>{Array.from(new Set([config.mode, "Execute", "Plan", "Ask"])).map(m => <option key={m}>{m}</option>)}</select></label>
-          <label>Agent preference<select value={config.agentId || ""} onChange={e => setConfig({ ...config, agentId: e.target.value || undefined, starterAgentName: undefined })}><option value="">No agent</option>{w.data.agents.filter(a => !a.archived || a.id === config.agentId).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+          <label>Agent preference<select disabled={!!thread.companionAgentId} value={config.agentId || ""} onChange={e => setConfig({ ...config, agentId: e.target.value || undefined, starterAgentName: undefined })}><option value="">No agent</option>{w.data.agents.filter(a => !a.archived || a.id === config.agentId).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
           <label>Tools preference (comma-separated)<input value={toolsText} onChange={e => { setToolsText(e.target.value); setConfig({ ...config, tools: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }); }} /></label>
           <div className="rt-shell-config"><strong>Real shell execution</strong><p>Enable Shell for future runs only if you intend to grant real server shell access. Every proposed command still requires Approve or Deny. Enabling this tool does not approve any command.</p><button type="button" className="btn small" disabled={busy || config.tools.some(tool => tool.toLowerCase() === "shell")} onClick={() => void perform(async () => { const next = { ...config, tools: [...config.tools, "Shell"] }; setConfig(next); setToolsText(next.tools.join(", ")); await saveThread({ config: next }); })}>{config.tools.some(tool => tool.toLowerCase() === "shell") ? "Shell enabled in configuration" : "Enable Shell & save configuration"}</button></div>
           <div className="rt-shell-config"><strong>Managed tools</strong><p>Files use private workspace storage; writes require approval. Skills only run explicitly installed server scripts and require approval. Delegation uses existing workspace agents and a read-only permission intersection; it never creates an agent for you.</p>{["Files", "Skills", "Delegation"].map(name => <button key={name} type="button" className="btn small" disabled={busy || config.tools.includes(name)} onClick={() => void perform(async () => { const next = { ...config, tools: [...new Set([...config.tools, name])] }; await saveThread({ config: next }); setConfig(next); setToolsText(next.tools.join(", ")); })}>{config.tools.includes(name) ? name + " selected" : "Enable " + name + " & save"}</button>)}<p>Skills additionally requires a server APP_SKILL_CATALOG. Selection alone does not install code or credentials.</p></div>
@@ -472,8 +551,17 @@ export default function RealThread({ thread, update, navigate, notify, settingsP
       </aside>}
     </div>
     {modal === "diagnostics" && <Modal title="AI provider & system status" onClose={() => setModal("")} wide><ProviderDiagnostics /></Modal>}
+    {modal === "run-log" && <Modal title="已保存的运行日志" onClose={() => { logEpoch.current++; setLogBusy(false); setModal(""); }} wide>
+      {logRun && <><p><code>{logRun.id}</code> · {runStatusLabel(logRun.status)}</p><p className="rt-run-hint">{logRun.resultSaved ? "回答已保存到线程。" : "以下输出保存在事件日志中，未确认保存为最终回答。"} 查看日志不会执行工具或重新运行任务。</p>{logRun.error && <p role="alert" className="rt-error">{logRun.error}</p>}</>}
+      {logBusy && <p role="status">正在读取已保存事件…</p>}
+      {logError && <p role="alert" className="rt-error">{logError}</p>}
+      <ol className="rt-run-plan" aria-label="Saved execution events">{logEvents.filter(({ event }) => ["tool", "run_status", "plan", "shell_result", "error"].includes(event.type)).slice(-400).map(({ seq, event }) => <li key={seq}><span>#{seq}</span><span>{event.type === "tool" ? `${event.name} · ${event.status} · ${event.summary}` : event.type === "run_status" ? runStatusLabel(event.status) : event.type === "plan" ? event.steps.map(step => step.title + " (" + step.status + ")").join(" · ") : event.type === "error" ? event.message : "审批操作的结果已记录"}</span></li>)}</ol>
+      {!!logEvents.some(({ event }) => event.type === "delta") && <section aria-label="Saved run output"><h3>保存的输出</h3><AnswerMarkdown content={logEvents.map(({ event }) => event.type === "delta" ? event.text : "").join("").slice(0, 40000)} /></section>}
+      {logHasMore && logRun && <button className="btn small" disabled={logBusy} onClick={() => void inspectRun(logRun.id, true)}>读取更多保存的事件</button>}
+    </Modal>}
+    {modal === "browser" && <Modal title="持久浏览器 · 接管与交还 AI" onClose={() => setModal("")} wide><BrowserSessionPanel key={w.state.active + ":" + thread.id} apiBase="/api/browser" workspaceId={w.state.active} threadId={thread.id} initialSessionId={browserHandoff?.sessionId} requestJson={(path, options) => api(path, options)} /></Modal>}
     {modal === "rename" && <Modal title="Rename thread" onClose={() => setModal("")}><form className="rt-dialog-form" onSubmit={e => { e.preventDefault(); if (title.trim()) void perform(async () => { await saveThread({ title: title.trim() }); setModal(""); }); }}><label>Thread title<input aria-label="Thread title" required autoFocus value={title} onChange={e => setTitle(e.target.value)} /></label>{error && <p className="rt-error" role="alert">{error}</p>}<button className="btn primary" disabled={busy || !title.trim()}>Save name</button></form></Modal>}
-    {modal === "delete" && <Modal title="Delete thread?" onClose={() => setModal("")}><p>This permanently removes “{thread.title}” and its messages. Artifacts remain in the Library, unlinked from this thread. All active public snapshots of this thread will also be revoked. This cannot be undone.</p>{error && <p className="rt-error" role="alert">{error}</p>}<div className="rt-actions"><button className="btn" onClick={() => setModal("")}>Cancel</button><button className="btn danger" disabled={busy} onClick={() => void perform(async () => { await w.flush(); const result = await api<{ shares: Share[] }>("/api/shares?workspaceId=" + encodeURIComponent(w.state.active) + "&threadId=" + encodeURIComponent(thread.id)); for (const share of result.shares.filter(s => !s.revokedAt)) await api("/api/shares/" + encodeURIComponent(share.id), { method: "DELETE" }); w.set("threads", items => items.filter(t => t.id !== thread.id)); w.set("artifacts", items => items.map(a => a.threadId === thread.id ? { ...a, threadId: undefined } : a)); await w.flush(); navigate("/threads"); })}>Delete permanently</button></div></Modal>}
+    {modal === "delete" && <Modal title="Delete thread?" onClose={() => setModal("")}><p>{thread.companionAgentId ? `这会删除“${thread.title}”、全部消息和该自聊的产物。记忆中保存的原话快照保留，所有公开分享会撤销。此操作无法撤销。` : `This permanently removes “${thread.title}” and its messages. Artifacts remain in the Library, unlinked from this thread. All active public snapshots of this thread will also be revoked. This cannot be undone.`}</p>{error && <p className="rt-error" role="alert">{error}</p>}<div className="rt-actions"><button className="btn" onClick={() => setModal("")}>Cancel</button><button className="btn danger" disabled={busy} onClick={() => void perform(async () => { await deleteThreadData(w, thread.id); navigate("/threads"); })}>Delete permanently</button></div></Modal>}
     {modal === "share" && <Modal title="Share thread snapshot" onClose={() => setModal("")} wide><div className="rt-share"><p>Publishing creates an immutable public snapshot of the thread title, message text and attachment filenames. Only artifacts you select below are included. Private attachment bytes, context, settings, and workspace data are never public.</p><p>Anyone with the link can read the snapshot. Review message text and artifact contents for sensitive information before publishing.</p><fieldset><legend>Artifacts to include</legend>{linked.length ? linked.map(a => <label className="rt-checkbox" key={a.id}><input type="checkbox" checked={shareIds.includes(a.id)} onChange={e => setShareIds(ids => e.target.checked ? [...ids, a.id] : ids.filter(id => id !== a.id))} />{a.title} ({a.kind})</label>) : <p>No linked artifacts.</p>}</fieldset><label className="rt-checkbox"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />I confirm the message text and selected artifact snapshots may be public.</label><button className="btn primary" disabled={busy || !confirmed} onClick={() => void perform(publish)}>Publish snapshot</button>{error && <p role="alert" className="rt-error">{error}</p>}<div className="rt-section-heading"><h3>Published snapshots</h3><button className="btn small" disabled={shareLoading} onClick={() => void loadShares()}>Refresh</button></div>{shareLoading && <p role="status">Loading snapshots…</p>}{shareError && <p role="alert" className="rt-error">{shareError}</p>}{!shareLoading && !shareError && !shares.length && <p>No published snapshots.</p>}{shares.map(share => <div className="rt-share-row" key={share.id}><div><time>{dateLabel(share.createdAt)}</time>{share.revokedAt ? <p>Revoked</p> : <a href={"/share/" + encodeURIComponent(share.token)} target="_blank" rel="noopener noreferrer">{window.location.origin}/share/{share.token}</a>}</div>{!share.revokedAt && <button className="btn small" disabled={busy} onClick={() => void perform(async () => { await api("/api/shares/" + encodeURIComponent(share.id), { method: "DELETE" }); setShares(items => items.map(s => s.id === share.id ? { ...s, revokedAt: now() } : s)); })}>Revoke</button>}</div>)}</div></Modal>}
   </main>;
 }

@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "checks": [
+    "rust-streaming-provider",
+    "atomic-outbox",
+    "real-browser",
+    "human-control-transition",
+    "fresh-handback-observation",
+    "download-artifact",
+    "direct-runsc",
+    "versioned-output-delivery"
+  ]
+}

@@ -1,3 +1,5 @@
+import { backendV1, submitTask } from "./v1-client";
+import { defaultThreadSettings } from "./types";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -55,6 +57,39 @@ export default function Rooms({ path, navigate, notify }: PageProps) {
   );
   return (
     <div className="standard-page local-rooms">
+      {backendV1 && room && (
+        <div className="actions">
+          <button
+            className="btn primary"
+            disabled={w.role === "viewer"}
+            onClick={async () => {
+              try {
+                await w.flush();
+                const task = await submitTask(
+                  room.topic || "Help our team work on " + room.name,
+                  {
+                    settings: defaultThreadSettings,
+                    skillIds: [],
+                    memoryIds: [],
+                    artifactIds: [],
+                    integrationIds: [],
+                    attachments: [],
+                    roomId: room.id,
+                  },
+                );
+                navigate("/thread/" + task.conversationId);
+              } catch (e) {
+                notify(e instanceof Error ? e.message : "Could not start task");
+              }
+            }}
+          >
+            Start work in this room
+          </button>
+          <button className="btn" onClick={() => navigate("/workspaces")}>
+            Manage team members
+          </button>
+        </div>
+      )}
       {!id ? (
         <>
           <div className="page-header">
@@ -133,8 +168,9 @@ export default function Rooms({ path, navigate, notify }: PageProps) {
           <div className="room-content">
             <h2>A shared room for this work.</h2>
             <p className="muted">
-              Keep local notes, agents, schedules, and threads together. No
-              multiplayer server or model is connected.
+              {backendV1
+                ? "Keep shared discussions, agents, schedules and threads together. Team workspace members can access this room."
+                : "Keep local notes, agents, schedules, and threads together."}
             </p>
             <label className="field">
               Room name
@@ -166,7 +202,7 @@ export default function Rooms({ path, navigate, notify }: PageProps) {
               <span className="avatar">D</span>
               <div>
                 <strong>You</strong>
-                <p className="muted">Room manager · local workspace</p>
+                <p className="muted">Room manager · workspace</p>
               </div>
             </div>
             {members.map((agentId) => (
@@ -188,7 +224,11 @@ export default function Rooms({ path, navigate, notify }: PageProps) {
             ))}
             <div className="empty-state small">
               <h3>{members.length ? "Your room team" : "Just you so far"}</h3>
-              <p>Agents are local saved identities, not running workers.</p>
+              <p>
+                {backendV1
+                  ? "Agent instructions are applied when you start work in this room."
+                  : "Agents are local saved identities."}
+              </p>
             </div>
             <div className="grid3">
               {["Talk together", "Work in threads", "Move it forward"].map(
@@ -267,14 +307,16 @@ export default function Rooms({ path, navigate, notify }: PageProps) {
           {tab === "Discussion" ? (
             <div className="local-room-discussion">
               <p className="demo-note">
-                Local discussion notes only. No LLM response or invitation is
-                sent.
+                {backendV1
+                  ? "Shared discussion notes. Use Start work to ask the room agents to act on the goal and notes."
+                  : "Local discussion notes only. No invitation is sent."}
               </p>
               {room.notes.map((n) => (
                 <article className="card" key={n.id}>
                   <div className="page-header">
                     <small className="muted">
-                      You · {new Date(n.createdAt).toLocaleString()}
+                      {n.author || "You"} ·{" "}
+                      {new Date(n.createdAt).toLocaleString()}
                     </small>
                     <IconButton
                       label="Delete note"

@@ -1,0 +1,1647 @@
+{
+  "runId": "2026-11-03T07-34-20-340Z",
+  "caseVersion": "research-delivery-1.0.0",
+  "graderVersion": "1.1.0",
+  "model": "deepseek-chat",
+  "root": "/home/ubuntu/hyperagents/backend/.data-v1/evaluations/2026-11-03T07-34-20-340Z",
+  "total": 36,
+  "passed": 31,
+  "blocked": 0,
+  "passRate": 0.8611111111111112,
+  "gatePassed": false,
+  "capabilities": {
+    "models": [
+      {
+        "provider": "deepseek",
+        "model": "deepseek-chat",
+        "configured": true
+      }
+    ],
+    "search": {
+      "provider": "public-bing-rss",
+      "degraded": true
+    },
+    "sandbox": {
+      "available": true
+    },
+    "formats": [
+      "txt",
+      "md",
+      "csv",
+      "json",
+      "html",
+      "png",
+      "pdf"
+    ],
+    "externalActions": false,
+    "limits": {
+      "taskMs": 1200000,
+      "codeMs": 120000,
+      "modelCalls": 32,
+      "toolCalls": 64,
+      "tokens": 200000,
+      "outputTokens": 32768,
+      "transferBytes": 8388608,
+      "fileBytes": 20971520,
+      "artifactBytes": 104857600,
+      "contextChars": 180000,
+      "children": 2,
+      "globalTasks": 2
+    }
+  },
+  "results": [
+    {
+      "caseId": "math-document-revision",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "49814020-f153-4645-a1d2-48346c0a576c",
+      "checks": {
+        "content": false,
+        "files": false,
+        "execution": false,
+        "versions": false
+      },
+      "status": "failed",
+      "reason": "INTERNAL_ERROR",
+      "usage": [
+        {
+          "id": "49814020-f153-4645-a1d2-48346c0a576c",
+          "model_calls": 3,
+          "tool_calls": 3,
+          "tokens": "24676",
+          "transfer_bytes": "2242879",
+          "artifact_bytes": "65768"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "134874f0-6a1d-4646-992b-5d2c6471f5f6",
+          "name": "一元一次方程专项练习.md",
+          "format": "md",
+          "sha256": "14fe78a26ba2699f7c3759e63cf3d9ff570e682f2ede602358f9db5fa9c96605",
+          "bytes": "5956",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/14fe78a26ba2699f7c3759e63cf3d9ff570e682f2ede602358f9db5fa9c96605"
+        },
+        {
+          "id": "26d059c0-03b1-4ad7-b875-fb676b72a640",
+          "name": "一元一次方程专项练习.md",
+          "format": "md",
+          "sha256": "ffa3730db7f2de65154c269ab9668117ea08ac0266b0b96e6e8ead217f260e38",
+          "bytes": "5957",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/ffa3730db7f2de65154c269ab9668117ea08ac0266b0b96e6e8ead217f260e38"
+        },
+        {
+          "id": "52e2ebb1-3a5a-49dc-82d5-f25c005ad965",
+          "name": "yiyuanyici_practice.pdf",
+          "format": "pdf",
+          "sha256": "ae47b351469117ae30e6f2087e6078e8186a888085a2a05992588069537ffb47",
+          "bytes": "53855",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/ae47b351469117ae30e6f2087e6078e8186a888085a2a05992588069537ffb47"
+        }
+      ],
+      "elapsedMs": 37832
+    },
+    {
+      "caseId": "math-document-revision",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "989325db-778c-47b5-b6af-c90c8bf148e1",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": false
+      },
+      "revisionTaskId": "ac47771e-2caf-436a-88e5-90ed66b27509",
+      "status": "failed",
+      "usage": [
+        {
+          "id": "ac47771e-2caf-436a-88e5-90ed66b27509",
+          "model_calls": 3,
+          "tool_calls": 3,
+          "tokens": "25490",
+          "transfer_bytes": "1635169",
+          "artifact_bytes": "71394"
+        },
+        {
+          "id": "989325db-778c-47b5-b6af-c90c8bf148e1",
+          "model_calls": 10,
+          "tool_calls": 9,
+          "tokens": "97680",
+          "transfer_bytes": "3672257",
+          "artifact_bytes": "62734"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "aa809eeb-6430-4b15-9f62-0c6106766447",
+          "name": "一元一次方程练习.md",
+          "format": "md",
+          "sha256": "8858064ea368329d03bed82f1e3d8bb4b5df817dc10131f47c42ae04ed456633",
+          "bytes": "5562",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/8858064ea368329d03bed82f1e3d8bb4b5df817dc10131f47c42ae04ed456633"
+        },
+        {
+          "id": "2dfb04d4-948f-429f-a487-fe50c7954ae5",
+          "name": "一元一次方程练习.md",
+          "format": "md",
+          "sha256": "3a30ff95d553784fcdff8d628ec79012d8efd50bc1d4893767ce45273ec9ee91",
+          "bytes": "5577",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/3a30ff95d553784fcdff8d628ec79012d8efd50bc1d4893767ce45273ec9ee91"
+        },
+        {
+          "id": "9b55997c-1257-45df-b9bc-e8a549c037af",
+          "name": "yiyuanyici_practice.pdf",
+          "format": "pdf",
+          "sha256": "bbc69a88608d9c320d39cccf68d2e27dd348383cca4f4668bb3722b27f70abeb",
+          "bytes": "51595",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/bbc69a88608d9c320d39cccf68d2e27dd348383cca4f4668bb3722b27f70abeb"
+        },
+        {
+          "id": "c3f74418-6427-4842-9bef-d84378f7363a",
+          "name": "一元一次方程练习.md",
+          "format": "md",
+          "sha256": "7dff9b32a2483768c5875a90246fa115d12b901422f050bfebcbb37bc6d536b7",
+          "bytes": "6668",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/7dff9b32a2483768c5875a90246fa115d12b901422f050bfebcbb37bc6d536b7"
+        },
+        {
+          "id": "66e94afa-d140-4f50-bca4-c58ae5f65f6f",
+          "name": "yiyuanyici_practice.pdf",
+          "format": "pdf",
+          "sha256": "985f3120f055900b5ae4cd9a7b9e56f0254e692e423af61290189e45753cbe8b",
+          "bytes": "64726",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/985f3120f055900b5ae4cd9a7b9e56f0254e692e423af61290189e45753cbe8b"
+        }
+      ],
+      "reason": "GRADING_FAILED",
+      "elapsedMs": 95882
+    },
+    {
+      "caseId": "math-document-revision",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "0ad9bd79-51cb-4075-89af-c281aedf26f5",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "revisionTaskId": "6aef3739-9180-4632-b3b6-9be7d026b591",
+      "status": "passed",
+      "usage": [
+        {
+          "id": "6aef3739-9180-4632-b3b6-9be7d026b591",
+          "model_calls": 6,
+          "tool_calls": 5,
+          "tokens": "55553",
+          "transfer_bytes": "2566419",
+          "artifact_bytes": "66484"
+        },
+        {
+          "id": "0ad9bd79-51cb-4075-89af-c281aedf26f5",
+          "model_calls": 8,
+          "tool_calls": 7,
+          "tokens": "91447",
+          "transfer_bytes": "5045063",
+          "artifact_bytes": "65391"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "a3f0463d-5bcf-4165-881f-44976ca26668",
+          "name": "一元一次方程练习.md",
+          "format": "md",
+          "sha256": "cf3a1b9a82b06eecf43f357cfd90cc4bbc980277992019331370088edcf712e1",
+          "bytes": "4599",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/cf3a1b9a82b06eecf43f357cfd90cc4bbc980277992019331370088edcf712e1"
+        },
+        {
+          "id": "b7a7ec9d-8219-4921-8fdd-143228cbf0bf",
+          "name": "一元一次方程练习.md",
+          "format": "md",
+          "sha256": "abdbef6d46ee73a47cea34f05d3ceea5b27af71d0bb4a570c4f4507c8687657a",
+          "bytes": "4743",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/abdbef6d46ee73a47cea34f05d3ceea5b27af71d0bb4a570c4f4507c8687657a"
+        },
+        {
+          "id": "edc29367-82dd-4398-9ee3-407debc2b47b",
+          "name": "一元一次方程练习.md",
+          "format": "md",
+          "sha256": "677f8fc30ee1c274bdacdab26380e70cc4ee29c6af56a3ceb04ea5c17478100f",
+          "bytes": "4863",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/677f8fc30ee1c274bdacdab26380e70cc4ee29c6af56a3ceb04ea5c17478100f"
+        },
+        {
+          "id": "5308fbbd-a2fc-469a-b751-df27180cd5c1",
+          "name": "exercise.pdf",
+          "format": "pdf",
+          "sha256": "0a8e8c65bfb4e19ed562042f8fae4e4e6cfb527e179eec37de036b1a9031d598",
+          "bytes": "51186",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/0a8e8c65bfb4e19ed562042f8fae4e4e6cfb527e179eec37de036b1a9031d598"
+        },
+        {
+          "id": "f05c47d9-c1dc-4e0e-adbb-5f3304660818",
+          "name": "一元一次方程练习.md",
+          "format": "md",
+          "sha256": "9e8e5f8123ff22aab23b2a220b78b421caa13641aa11f40042ca98f163bc8f94",
+          "bytes": "6197",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/9e8e5f8123ff22aab23b2a220b78b421caa13641aa11f40042ca98f163bc8f94"
+        },
+        {
+          "id": "7167580f-659a-488d-8983-7e0814979412",
+          "name": "exercise.pdf",
+          "format": "pdf",
+          "sha256": "459e07f31d188f8a2b5d57d96bed24e3990b920021510e56b66865a29a644a1e",
+          "bytes": "60287",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/459e07f31d188f8a2b5d57d96bed24e3990b920021510e56b66865a29a644a1e"
+        }
+      ],
+      "elapsedMs": 100825
+    },
+    {
+      "caseId": "research-databases",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "3b61a789-1b57-4520-964f-4cb79385e673",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "3b61a789-1b57-4520-964f-4cb79385e673",
+          "model_calls": 9,
+          "tool_calls": 14,
+          "tokens": "81922",
+          "transfer_bytes": "1733498",
+          "artifact_bytes": "16949"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "50afbda6-08fc-4295-bb2e-fa70bdc8b34d",
+          "name": "postgresql-vs-sqlite-tasksystem-zh.md",
+          "format": "md",
+          "sha256": "9dc93ef256a0ab3662be8350658b785da60a510e67a08b4ca6f6af03a6da0cc7",
+          "bytes": "16949",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/9dc93ef256a0ab3662be8350658b785da60a510e67a08b4ca6f6af03a6da0cc7"
+        }
+      ],
+      "elapsedMs": 87465
+    },
+    {
+      "caseId": "research-databases",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "6f7d8722-c30e-4837-bd86-9e747eae9b55",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "6f7d8722-c30e-4837-bd86-9e747eae9b55",
+          "model_calls": 9,
+          "tool_calls": 14,
+          "tokens": "83454",
+          "transfer_bytes": "1669258",
+          "artifact_bytes": "16565"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "9f6e443a-d606-4687-b2b7-323ff1d59379",
+          "name": "PostgreSQL-vs-SQLite-并发写入与事务取舍.md",
+          "format": "md",
+          "sha256": "18ff947b5533724d12939dcbb35c239dd796e8c3db4e0b6979906f28063fd9b6",
+          "bytes": "16565",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/18ff947b5533724d12939dcbb35c239dd796e8c3db4e0b6979906f28063fd9b6"
+        }
+      ],
+      "elapsedMs": 58482
+    },
+    {
+      "caseId": "research-databases",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "56e830a7-3876-445e-844e-58964dc7ef70",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "56e830a7-3876-445e-844e-58964dc7ef70",
+          "model_calls": 9,
+          "tool_calls": 14,
+          "tokens": "93955",
+          "transfer_bytes": "2342544",
+          "artifact_bytes": "25584"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "4bb31823-d54b-4f2a-aaae-9c926f2e57e3",
+          "name": "PostgreSQL与SQLite并发写入与事务对比报告.md",
+          "format": "md",
+          "sha256": "9fc6c10052c6a4c72aeba584681ea1ac447ab9a016dac6ac700a632f908d8bd6",
+          "bytes": "25584",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/9fc6c10052c6a4c72aeba584681ea1ac447ab9a016dac6ac700a632f908d8bd6"
+        }
+      ],
+      "elapsedMs": 74139
+    },
+    {
+      "caseId": "data-analysis-chart",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "fecee04f-8ffb-48c5-8ba7-b8edefb95e7a",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "fecee04f-8ffb-48c5-8ba7-b8edefb95e7a",
+          "model_calls": 4,
+          "tool_calls": 3,
+          "tokens": "10280",
+          "transfer_bytes": "220824",
+          "artifact_bytes": "20186"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "de5d99e3-f510-4c1e-b8a5-e5294cfae066",
+          "name": "result.csv",
+          "format": "csv",
+          "sha256": "10d1257550339fd8f33a62085583ee4a852745bce5946e29180c77483d757415",
+          "bytes": "25",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/10d1257550339fd8f33a62085583ee4a852745bce5946e29180c77483d757415"
+        },
+        {
+          "id": "4fd9e5f6-75f7-43e1-b225-629117178b4f",
+          "name": "chart.png",
+          "format": "png",
+          "sha256": "d6b40de2dc7eea2d7e6634af0d4fa70a36d11912d34e4d9065a37015611f395d",
+          "bytes": "20161",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/d6b40de2dc7eea2d7e6634af0d4fa70a36d11912d34e4d9065a37015611f395d"
+        }
+      ],
+      "elapsedMs": 12168
+    },
+    {
+      "caseId": "data-analysis-chart",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "6290820c-1629-447c-896a-e0c4c50cdad5",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "6290820c-1629-447c-896a-e0c4c50cdad5",
+          "model_calls": 4,
+          "tool_calls": 3,
+          "tokens": "10112",
+          "transfer_bytes": "191791",
+          "artifact_bytes": "19671"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "eda5d468-8289-49a5-9928-1d5360932cf8",
+          "name": "result.csv",
+          "format": "csv",
+          "sha256": "10d1257550339fd8f33a62085583ee4a852745bce5946e29180c77483d757415",
+          "bytes": "25",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/10d1257550339fd8f33a62085583ee4a852745bce5946e29180c77483d757415"
+        },
+        {
+          "id": "29ae7b83-8781-424a-9653-697b603e89bb",
+          "name": "chart.png",
+          "format": "png",
+          "sha256": "25044a60a789b2368a8c2cd29adaa0408b7ed8e1ae327d6d33ee139fe46ab9f2",
+          "bytes": "19646",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/25044a60a789b2368a8c2cd29adaa0408b7ed8e1ae327d6d33ee139fe46ab9f2"
+        }
+      ],
+      "elapsedMs": 13024
+    },
+    {
+      "caseId": "data-analysis-chart",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "75aa9fe9-35c5-4a6c-a206-ca330923f7d4",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "75aa9fe9-35c5-4a6c-a206-ca330923f7d4",
+          "model_calls": 4,
+          "tool_calls": 3,
+          "tokens": "10111",
+          "transfer_bytes": "186678",
+          "artifact_bytes": "19140"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "7dbe7d66-9b4f-4511-a896-0345a9dc420f",
+          "name": "result.csv",
+          "format": "csv",
+          "sha256": "10d1257550339fd8f33a62085583ee4a852745bce5946e29180c77483d757415",
+          "bytes": "25",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/10d1257550339fd8f33a62085583ee4a852745bce5946e29180c77483d757415"
+        },
+        {
+          "id": "4ac2674b-782d-4568-9c19-f518242e9c67",
+          "name": "chart.png",
+          "format": "png",
+          "sha256": "717789a3be531532c292b00ba0781d00f2d1b3551a638aebe23245ac38d0064c",
+          "bytes": "19115",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/717789a3be531532c292b00ba0781d00f2d1b3551a638aebe23245ac38d0064c"
+        }
+      ],
+      "elapsedMs": 14173
+    },
+    {
+      "caseId": "markdown-brief",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "695eaab5-adfb-49ba-b86f-5523512f089d",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "695eaab5-adfb-49ba-b86f-5523512f089d",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "19114",
+          "transfer_bytes": "1600342",
+          "artifact_bytes": "12145"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "7c6e23a7-fc7a-4546-a85c-3d3129c181ee",
+          "name": "代数学习计划.md",
+          "format": "md",
+          "sha256": "f941592a63fc0586b23ca26ca86d7fa2be68ea346fe10efceeb82290a6689fc7",
+          "bytes": "12145",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/f941592a63fc0586b23ca26ca86d7fa2be68ea346fe10efceeb82290a6689fc7"
+        }
+      ],
+      "elapsedMs": 28084
+    },
+    {
+      "caseId": "markdown-brief",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "d79bc9ab-e9b5-46ca-afdb-487917cd2816",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "d79bc9ab-e9b5-46ca-afdb-487917cd2816",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "20174",
+          "transfer_bytes": "1655310",
+          "artifact_bytes": "13537"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "d7ca5ea1-76f0-432d-9970-2d67f96c7301",
+          "name": "代数学习计划.md",
+          "format": "md",
+          "sha256": "bd7a4d5eb66b93656351884caf189f04ee9bc4c7d545da543c8e217651e693f9",
+          "bytes": "13537",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/bd7a4d5eb66b93656351884caf189f04ee9bc4c7d545da543c8e217651e693f9"
+        }
+      ],
+      "elapsedMs": 27256
+    },
+    {
+      "caseId": "markdown-brief",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "bec9c26b-47de-4ce1-b1d0-684f9b98a914",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "bec9c26b-47de-4ce1-b1d0-684f9b98a914",
+          "model_calls": 6,
+          "tool_calls": 4,
+          "tokens": "57809",
+          "transfer_bytes": "3917848",
+          "artifact_bytes": "28855"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "ca409782-c01e-4a89-a1f3-23d424adb051",
+          "name": "代数学习计划.md",
+          "format": "md",
+          "sha256": "ca7258233fe0383e0709bc0b2ab1916f666636fb6d254934861c19f1bc21afef",
+          "bytes": "14135",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/ca7258233fe0383e0709bc0b2ab1916f666636fb6d254934861c19f1bc21afef"
+        },
+        {
+          "id": "5fb34e31-ff0d-4c63-88c9-395fdc9ef39f",
+          "name": "代数学习计划.md",
+          "format": "md",
+          "sha256": "546c38373272e8c24fda3a6cb76b274048dde2f769ad79403c62ae90c72a3539",
+          "bytes": "14720",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/546c38373272e8c24fda3a6cb76b274048dde2f769ad79403c62ae90c72a3539"
+        }
+      ],
+      "elapsedMs": 58281
+    },
+    {
+      "caseId": "html-study-guide",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "21e309d4-c0cd-4129-8604-a4e19b5b24fa",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "21e309d4-c0cd-4129-8604-a4e19b5b24fa",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "9360",
+          "transfer_bytes": "652236",
+          "artifact_bytes": "4829"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "859dbc7b-1eeb-40da-a2c2-d15736d2b950",
+          "name": "方程复习卡.html",
+          "format": "html",
+          "sha256": "8f740eb60157cb7dc5501dcdf5929c232005da17c128432d35ad7d17686b4394",
+          "bytes": "4829",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/8f740eb60157cb7dc5501dcdf5929c232005da17c128432d35ad7d17686b4394"
+        }
+      ],
+      "elapsedMs": 12203
+    },
+    {
+      "caseId": "html-study-guide",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "536ee715-b7b2-40c3-af4f-02f4abc215e5",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "536ee715-b7b2-40c3-af4f-02f4abc215e5",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "10642",
+          "transfer_bytes": "825617",
+          "artifact_bytes": "6390"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "5ac9606b-763c-4c8e-90f9-331befdf87a9",
+          "name": "方程复习卡.html",
+          "format": "html",
+          "sha256": "4a55736ed49d76e70d974f8261a32716bd16f8b465e737d39496cf9f9165fdae",
+          "bytes": "6390",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/4a55736ed49d76e70d974f8261a32716bd16f8b465e737d39496cf9f9165fdae"
+        }
+      ],
+      "elapsedMs": 16078
+    },
+    {
+      "caseId": "html-study-guide",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "569395b7-4928-4ae2-b4ca-582133fcfc39",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "569395b7-4928-4ae2-b4ca-582133fcfc39",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "8466",
+          "transfer_bytes": "522065",
+          "artifact_bytes": "3718"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "c65bc6cf-87e3-4043-a1c8-ef3581cff284",
+          "name": "方程复习卡.html",
+          "format": "html",
+          "sha256": "79dddda2695396a8b6634df9e2f5db3a9c8721ee732737e677f3b76094db9dcd",
+          "bytes": "3718",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/79dddda2695396a8b6634df9e2f5db3a9c8721ee732737e677f3b76094db9dcd"
+        }
+      ],
+      "elapsedMs": 8956
+    },
+    {
+      "caseId": "csv-cleaning",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "0fb9bf69-ab3f-4726-981c-6c0857c0a635",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "usage": [
+        {
+          "id": "0fb9bf69-ab3f-4726-981c-6c0857c0a635",
+          "model_calls": 4,
+          "tool_calls": 3,
+          "tokens": "9503",
+          "transfer_bytes": "130611",
+          "artifact_bytes": "28"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "f52f1478-aa77-4601-8739-5bd5659af84f",
+          "name": "totals.csv",
+          "format": "csv",
+          "sha256": "e965d720d08380b20e6585c1621f93b6231a0f8a1a7c63340b8fd3fb60bf0af6",
+          "bytes": "28",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/e965d720d08380b20e6585c1621f93b6231a0f8a1a7c63340b8fd3fb60bf0af6"
+        }
+      ],
+      "reason": "GRADING_FAILED",
+      "elapsedMs": 14146
+    },
+    {
+      "caseId": "csv-cleaning",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "f899e5c3-1e35-4418-8da7-7d2313774bbf",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "usage": [
+        {
+          "id": "f899e5c3-1e35-4418-8da7-7d2313774bbf",
+          "model_calls": 4,
+          "tool_calls": 3,
+          "tokens": "9338",
+          "transfer_bytes": "102153",
+          "artifact_bytes": "28"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "1fda0a15-bbf6-4c07-bd63-f75fe8960122",
+          "name": "totals.csv",
+          "format": "csv",
+          "sha256": "e965d720d08380b20e6585c1621f93b6231a0f8a1a7c63340b8fd3fb60bf0af6",
+          "bytes": "28",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/e965d720d08380b20e6585c1621f93b6231a0f8a1a7c63340b8fd3fb60bf0af6"
+        }
+      ],
+      "reason": "GRADING_FAILED",
+      "elapsedMs": 16116
+    },
+    {
+      "caseId": "csv-cleaning",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "c5a65036-fb3f-42b3-a63c-7d62e5a0bde1",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "usage": [
+        {
+          "id": "c5a65036-fb3f-42b3-a63c-7d62e5a0bde1",
+          "model_calls": 4,
+          "tool_calls": 3,
+          "tokens": "9307",
+          "transfer_bytes": "98219",
+          "artifact_bytes": "28"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "8c7a6f25-5746-423e-b1ec-f49c1116ed31",
+          "name": "totals.csv",
+          "format": "csv",
+          "sha256": "e965d720d08380b20e6585c1621f93b6231a0f8a1a7c63340b8fd3fb60bf0af6",
+          "bytes": "28",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/e965d720d08380b20e6585c1621f93b6231a0f8a1a7c63340b8fd3fb60bf0af6"
+        }
+      ],
+      "reason": "GRADING_FAILED",
+      "elapsedMs": 9242
+    },
+    {
+      "caseId": "json-structure",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "3d8691b2-f9af-4ac0-82de-641e23e16611",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "3d8691b2-f9af-4ac0-82de-641e23e16611",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "5687",
+          "transfer_bytes": "97066",
+          "artifact_bytes": "518"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "b941e1ec-528d-48fa-8f5d-b626b4469ac2",
+          "name": "study_plan.json",
+          "format": "json",
+          "sha256": "433caf67f8aa06366c1a52c2673998cc0600bdbd16af63fb34c1d92b198de339",
+          "bytes": "518",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/433caf67f8aa06366c1a52c2673998cc0600bdbd16af63fb34c1d92b198de339"
+        }
+      ],
+      "elapsedMs": 6045
+    },
+    {
+      "caseId": "json-structure",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "298c2b8d-abd1-47d8-8fcd-9490e1dc12ef",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "298c2b8d-abd1-47d8-8fcd-9490e1dc12ef",
+          "model_calls": 3,
+          "tool_calls": 3,
+          "tokens": "7006",
+          "transfer_bytes": "231091",
+          "artifact_bytes": "1019"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "f260b69b-f9eb-4d3d-ac62-df6642a9f7ed",
+          "name": "xuexijihua.json",
+          "format": "json",
+          "sha256": "5db84a632fd63874d2fc57024bf14821c156f71297eea253441e17086e194fc0",
+          "bytes": "509",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/5db84a632fd63874d2fc57024bf14821c156f71297eea253441e17086e194fc0"
+        },
+        {
+          "id": "682592bc-bcfc-403c-9c32-b9c025db9599",
+          "name": "学习计划.json",
+          "format": "json",
+          "sha256": "93bddac433e034abeeafbe6a7203c50dfc786494011a909983c6087ab363dfd0",
+          "bytes": "510",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/93bddac433e034abeeafbe6a7203c50dfc786494011a909983c6087ab363dfd0"
+        }
+      ],
+      "elapsedMs": 9237
+    },
+    {
+      "caseId": "json-structure",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "b2083bad-9c50-47a9-b668-439875b55182",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "b2083bad-9c50-47a9-b668-439875b55182",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "5874",
+          "transfer_bytes": "124270",
+          "artifact_bytes": "568"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "bd08c6af-dc66-4489-9c5d-e04db476b1b0",
+          "name": "study_plan.json",
+          "format": "json",
+          "sha256": "6079d79a90fc6a4290b2b91a0fbc0ebaf57a0ac932f77281cd462338c5bb120f",
+          "bytes": "568",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/6079d79a90fc6a4290b2b91a0fbc0ebaf57a0ac932f77281cd462338c5bb120f"
+        }
+      ],
+      "elapsedMs": 8070
+    },
+    {
+      "caseId": "document-version",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "dae92493-1df8-4065-8469-11b53ccb4fd3",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "revisionTaskId": "baa555b0-2082-45f6-8e25-7934dfeeb62a",
+      "status": "passed",
+      "usage": [
+        {
+          "id": "dae92493-1df8-4065-8469-11b53ccb4fd3",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "7155",
+          "transfer_bytes": "259434",
+          "artifact_bytes": "2502"
+        },
+        {
+          "id": "baa555b0-2082-45f6-8e25-7934dfeeb62a",
+          "model_calls": 4,
+          "tool_calls": 3,
+          "tokens": "13816",
+          "transfer_bytes": "362505",
+          "artifact_bytes": "3219"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "0fe12900-8494-491d-88fd-c52858621e3b",
+          "name": "实验记录.md",
+          "format": "md",
+          "sha256": "0d6800b458e3116463003cbbc0d46de638644d725f52e310d56886ff7b329528",
+          "bytes": "3219",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/0d6800b458e3116463003cbbc0d46de638644d725f52e310d56886ff7b329528"
+        },
+        {
+          "id": "66502be3-751a-455f-b032-3cbde26b619c",
+          "name": "实验记录.md",
+          "format": "md",
+          "sha256": "d13e9be5984a1e3d0fcf9ad1a37da7a82cf14ee3657be31ce1a93ccad481115c",
+          "bytes": "2502",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/d13e9be5984a1e3d0fcf9ad1a37da7a82cf14ee3657be31ce1a93ccad481115c"
+        }
+      ],
+      "elapsedMs": 22077
+    },
+    {
+      "caseId": "document-version",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "857b1b18-eac3-4fd9-bf1e-d1c11ad86a33",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "revisionTaskId": "2fc236e2-9761-46d6-b797-16f5df9e179e",
+      "status": "passed",
+      "usage": [
+        {
+          "id": "857b1b18-eac3-4fd9-bf1e-d1c11ad86a33",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "6372",
+          "transfer_bytes": "174741",
+          "artifact_bytes": "1726"
+        },
+        {
+          "id": "2fc236e2-9761-46d6-b797-16f5df9e179e",
+          "model_calls": 4,
+          "tool_calls": 3,
+          "tokens": "12168",
+          "transfer_bytes": "250764",
+          "artifact_bytes": "2256"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "242d56aa-b7a8-4db1-a53b-69707225c690",
+          "name": "实验记录.md",
+          "format": "md",
+          "sha256": "23826452278691de25ed29ead38afe83607d004290f8abf3dc9e3010f86c8459",
+          "bytes": "1726",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/23826452278691de25ed29ead38afe83607d004290f8abf3dc9e3010f86c8459"
+        },
+        {
+          "id": "87c13742-60e8-4469-bcef-fac2facb75ad",
+          "name": "实验记录.md",
+          "format": "md",
+          "sha256": "5f37fc333586d2d8b10c2503033c6c8a5c3f1be41fbae541edeb4e6f660ac697",
+          "bytes": "2256",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/5f37fc333586d2d8b10c2503033c6c8a5c3f1be41fbae541edeb4e6f660ac697"
+        }
+      ],
+      "elapsedMs": 16074
+    },
+    {
+      "caseId": "document-version",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "55ded41b-b172-4676-b892-ac83dad6ac36",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "revisionTaskId": "c369af4d-d4ea-46e6-b948-32b68f9addae",
+      "status": "passed",
+      "usage": [
+        {
+          "id": "c369af4d-d4ea-46e6-b948-32b68f9addae",
+          "model_calls": 4,
+          "tool_calls": 3,
+          "tokens": "12335",
+          "transfer_bytes": "265873",
+          "artifact_bytes": "2098"
+        },
+        {
+          "id": "55ded41b-b172-4676-b892-ac83dad6ac36",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "6410",
+          "transfer_bytes": "177688",
+          "artifact_bytes": "1688"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "cdba9192-34a7-49ed-8228-0c032807d988",
+          "name": "实验记录.md",
+          "format": "md",
+          "sha256": "fefc65d8ac969fb344b7a2beb0aaca75a69b38bf3b106f83b213b3ca7c389478",
+          "bytes": "1688",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/fefc65d8ac969fb344b7a2beb0aaca75a69b38bf3b106f83b213b3ca7c389478"
+        },
+        {
+          "id": "1d9f8ee5-da4d-49a4-9217-bcb70dd5616b",
+          "name": "实验记录.md",
+          "format": "md",
+          "sha256": "51530fbf7a78b6c85c442e8c434277645504ddc98e25c2113b70b690b8688e3d",
+          "bytes": "2098",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/51530fbf7a78b6c85c442e8c434277645504ddc98e25c2113b70b690b8688e3d"
+        }
+      ],
+      "elapsedMs": 15130
+    },
+    {
+      "caseId": "independent-research",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "1306dfea-6553-4e08-9fbb-5d21fa391e5d",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "1306dfea-6553-4e08-9fbb-5d21fa391e5d",
+          "model_calls": 11,
+          "tool_calls": 16,
+          "tokens": "117342",
+          "transfer_bytes": "2117533",
+          "artifact_bytes": "16834"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "2b8ba830-24f3-411b-97d8-4d7964087d00",
+          "name": "csv_vs_pandas_comparison.csv",
+          "format": "csv",
+          "sha256": "5061372894d9f6d8cb55ae7f3eb010096997476f0fbfd60483c86fb849327dca",
+          "bytes": "3495",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/5061372894d9f6d8cb55ae7f3eb010096997476f0fbfd60483c86fb849327dca"
+        },
+        {
+          "id": "b8b7d5cf-43d1-4661-a92a-b11985de8646",
+          "name": "python_csv_vs_pandas_read_csv.md",
+          "format": "md",
+          "sha256": "6680f9ae509f70c7f56249b1561a0696645b5d941a306d64ac660b4d71903288",
+          "bytes": "13339",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/6680f9ae509f70c7f56249b1561a0696645b5d941a306d64ac660b4d71903288"
+        }
+      ],
+      "elapsedMs": 73678
+    },
+    {
+      "caseId": "independent-research",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "7606b497-039c-49f6-ba2b-e3f0f7da2710",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "7606b497-039c-49f6-ba2b-e3f0f7da2710",
+          "model_calls": 12,
+          "tool_calls": 16,
+          "tokens": "116155",
+          "transfer_bytes": "2454357",
+          "artifact_bytes": "16513"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "0bb2ae39-a886-4a6a-bc82-9cccb1268d0c",
+          "name": "csv_stdlib_vs_pandas_read_csv_中文报告.md",
+          "format": "md",
+          "sha256": "00caa9dbefdf2ad4cece8fbf1c7ac2d27df318810c76d17048b3bd109fcae507",
+          "bytes": "13470",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/00caa9dbefdf2ad4cece8fbf1c7ac2d27df318810c76d17048b3bd109fcae507"
+        },
+        {
+          "id": "146d86cc-7536-4fda-807a-56fc20ad981e",
+          "name": "engine_comparison.csv",
+          "format": "csv",
+          "sha256": "257c8c52f28a37abd97224b48afdd5f11173c9b7072af855c6eb813432a3dbd8",
+          "bytes": "3043",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/257c8c52f28a37abd97224b48afdd5f11173c9b7072af855c6eb813432a3dbd8"
+        }
+      ],
+      "elapsedMs": 80650
+    },
+    {
+      "caseId": "independent-research",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "73cd49ad-cc96-4665-917a-9417a1c2705d",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "73cd49ad-cc96-4665-917a-9417a1c2705d",
+          "model_calls": 15,
+          "tool_calls": 18,
+          "tokens": "152470",
+          "transfer_bytes": "3742254",
+          "artifact_bytes": "25753"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "c377a1e2-6961-45b9-b1f6-6f9e91d6c6f0",
+          "name": "python-csv-vs-pandas-read_csv.md",
+          "format": "md",
+          "sha256": "893398662f1957375744e0e049c67a5954525a943030ce1d1cc26c1e075d7b89",
+          "bytes": "21704",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/893398662f1957375744e0e049c67a5954525a943030ce1d1cc26c1e075d7b89"
+        },
+        {
+          "id": "beda57d2-c0c3-4e0b-8325-fc0fff0f937c",
+          "name": "csv_vs_pandas_matrix.csv",
+          "format": "csv",
+          "sha256": "5a0bd132b8dc0ea4191b83d75b678f1a7c78c5d810d3ae98d40dac455aea2a80",
+          "bytes": "4049",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/5a0bd132b8dc0ea4191b83d75b678f1a7c78c5d810d3ae98d40dac455aea2a80"
+        }
+      ],
+      "elapsedMs": 133060
+    },
+    {
+      "caseId": "printable-pdf",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "fe97f67b-ef20-4d95-98e9-9c7e6891e1d1",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "fe97f67b-ef20-4d95-98e9-9c7e6891e1d1",
+          "model_calls": 4,
+          "tool_calls": 3,
+          "tokens": "18667",
+          "transfer_bytes": "1353260",
+          "artifact_bytes": "81008"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "19577347-a294-4a37-a57f-df881424cbec",
+          "name": "data_checklist_zh.pdf",
+          "format": "pdf",
+          "sha256": "f97a475d7b26030b085c82314c44aaaa6f19ad99b61ccf7ae0ff37c9a96a7aae",
+          "bytes": "81008",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/f97a475d7b26030b085c82314c44aaaa6f19ad99b61ccf7ae0ff37c9a96a7aae"
+        }
+      ],
+      "elapsedMs": 40276
+    },
+    {
+      "caseId": "printable-pdf",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "4ffc7bac-3440-48bb-a6e5-c26b8f864f51",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "4ffc7bac-3440-48bb-a6e5-c26b8f864f51",
+          "model_calls": 5,
+          "tool_calls": 4,
+          "tokens": "26370",
+          "transfer_bytes": "1730941",
+          "artifact_bytes": "64695"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "a14fd41e-5663-4cae-ae71-6926ca6f4676",
+          "name": "checklist.pdf",
+          "format": "pdf",
+          "sha256": "7cd4883e646119e758028eab95c50375c64e192fbbf6c865e9d6232351579537",
+          "bytes": "64695",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/7cd4883e646119e758028eab95c50375c64e192fbbf6c865e9d6232351579537"
+        }
+      ],
+      "elapsedMs": 37343
+    },
+    {
+      "caseId": "printable-pdf",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "8568d954-a498-4374-beab-c0c9517ccd7e",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "8568d954-a498-4374-beab-c0c9517ccd7e",
+          "model_calls": 5,
+          "tool_calls": 4,
+          "tokens": "28784",
+          "transfer_bytes": "1996194",
+          "artifact_bytes": "71556"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "0f3b2760-02db-4fc2-ac68-e7df0d1296e7",
+          "name": "checklist.pdf",
+          "format": "pdf",
+          "sha256": "0c16eabc720e82b6c56289a9b2716f2be98b5484d8a64756042a204183fe68b5",
+          "bytes": "71556",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/0c16eabc720e82b6c56289a9b2716f2be98b5484d8a64756042a204183fe68b5"
+        }
+      ],
+      "elapsedMs": 57734
+    },
+    {
+      "caseId": "two-artifact-delivery",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "668bcf07-8168-4a4c-be01-f41cb42d87e6",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "668bcf07-8168-4a4c-be01-f41cb42d87e6",
+          "model_calls": 3,
+          "tool_calls": 3,
+          "tokens": "6981",
+          "transfer_bytes": "205781",
+          "artifact_bytes": "1349"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "0885a561-a0f9-421d-93a0-1f65d797125f",
+          "name": "prices.csv",
+          "format": "csv",
+          "sha256": "b90ff7b4926e1f75ccecd5e5735d9f3648fc04667ee06adf8093800ab6ea39f6",
+          "bytes": "33",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/b90ff7b4926e1f75ccecd5e5735d9f3648fc04667ee06adf8093800ab6ea39f6"
+        },
+        {
+          "id": "8c5a6250-518e-4591-a2d0-ef02245a70d3",
+          "name": "采购比较.md",
+          "format": "md",
+          "sha256": "3c36b87c9427081b989f5527c3ad600be870f4456053b6b51521056010cfbcab",
+          "bytes": "1316",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/3c36b87c9427081b989f5527c3ad600be870f4456053b6b51521056010cfbcab"
+        }
+      ],
+      "elapsedMs": 8046
+    },
+    {
+      "caseId": "two-artifact-delivery",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "7bd6962e-3e8a-4fe0-ba4e-f69a01af1715",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "7bd6962e-3e8a-4fe0-ba4e-f69a01af1715",
+          "model_calls": 3,
+          "tool_calls": 3,
+          "tokens": "6395",
+          "transfer_bytes": "138591",
+          "artifact_bytes": "746"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "94108b1f-1c53-4213-969a-584fbd32fe8f",
+          "name": "采购比较.md",
+          "format": "md",
+          "sha256": "ff6449d97e68dd810e733b3001dafd0ff0abba98c24fdaf70721ed2f098e9fe7",
+          "bytes": "714",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/ff6449d97e68dd810e733b3001dafd0ff0abba98c24fdaf70721ed2f098e9fe7"
+        },
+        {
+          "id": "3b275839-b7d5-4e66-85d3-4d7483b74a4a",
+          "name": "prices.csv",
+          "format": "csv",
+          "sha256": "1b9fb0bf22880441238a8b8bfdf984536d0ebc192d2d602f2debac06ade10389",
+          "bytes": "32",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/1b9fb0bf22880441238a8b8bfdf984536d0ebc192d2d602f2debac06ade10389"
+        }
+      ],
+      "elapsedMs": 8342
+    },
+    {
+      "caseId": "two-artifact-delivery",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "98e3bd61-bb90-42c1-bdaa-1777469b591b",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "98e3bd61-bb90-42c1-bdaa-1777469b591b",
+          "model_calls": 3,
+          "tool_calls": 3,
+          "tokens": "6402",
+          "transfer_bytes": "140977",
+          "artifact_bytes": "816"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "9fa48dcd-dcfa-4e22-8cc6-360f0507a853",
+          "name": "prices.csv",
+          "format": "csv",
+          "sha256": "85b41dfccdc80b56e032676d055751ab1535df97c7326670a56979a7da5a3b35",
+          "bytes": "37",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/85b41dfccdc80b56e032676d055751ab1535df97c7326670a56979a7da5a3b35"
+        },
+        {
+          "id": "bfe36f74-de54-4f44-bfc6-0388b0610015",
+          "name": "采购比较.md",
+          "format": "md",
+          "sha256": "bef513592ee6c113702b3461378dad9f1a73125bfc03e7982817f8db145c9344",
+          "bytes": "779",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/bef513592ee6c113702b3461378dad9f1a73125bfc03e7982817f8db145c9344"
+        }
+      ],
+      "elapsedMs": 6649
+    },
+    {
+      "caseId": "answer-order",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "8df4aa2d-ece1-4dfc-ae35-398c0fe67733",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "8df4aa2d-ece1-4dfc-ae35-398c0fe67733",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "6230",
+          "transfer_bytes": "130645",
+          "artifact_bytes": "435"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "25705610-28cc-4dfa-9451-710e1179cb0d",
+          "name": "分数计算练习.md",
+          "format": "md",
+          "sha256": "23225a818b4be80e03cb57c9d6b9c1b2c4b4aad5f2a7f00aaf4dfa67245dbe59",
+          "bytes": "435",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/23225a818b4be80e03cb57c9d6b9c1b2c4b4aad5f2a7f00aaf4dfa67245dbe59"
+        }
+      ],
+      "elapsedMs": 6112
+    },
+    {
+      "caseId": "answer-order",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "ad3fe433-d590-4577-afe7-f907a3d957e6",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "ad3fe433-d590-4577-afe7-f907a3d957e6",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "6057",
+          "transfer_bytes": "110152",
+          "artifact_bytes": "345"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "58166b95-dc2b-41f4-88ec-5acf11d548b4",
+          "name": "分数计算练习.md",
+          "format": "md",
+          "sha256": "f52c8247a13b715771a7a5af315a4f0373c0d6b2430871fbef7e44ec81bf3f16",
+          "bytes": "345",
+          "storage_key": "6b6f6114-43d5-414e-9217-2ff7dff2d9d8/f52c8247a13b715771a7a5af315a4f0373c0d6b2430871fbef7e44ec81bf3f16"
+        }
+      ],
+      "elapsedMs": 6032
+    },
+    {
+      "caseId": "answer-order",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.3.0",
+      "toolVersion": "1.3.1",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "8a4bfa5a-d3ce-47c1-a86c-66fe359f7f01",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "8a4bfa5a-d3ce-47c1-a86c-66fe359f7f01",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "5867",
+          "transfer_bytes": "92047",
+          "artifact_bytes": "234"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "170abb06-4782-4003-8549-dabde594c25b",
+          "name": "fraction_practice.md",
+          "format": "md",
+          "sha256": "65a613edd15e4b612a0e3c1e171695fc8dd9ad7232939872ca7734bbd676fded",
+          "bytes": "234",
+          "storage_key": "11b0ab0f-a9d3-439c-b01c-6c012c6542d9/65a613edd15e4b612a0e3c1e171695fc8dd9ad7232939872ca7734bbd676fded"
+        }
+      ],
+      "elapsedMs": 5169
+    }
+  ],
+  "audit": {
+    "attempts": 202,
+    "actual_input": "1160642",
+    "actual_output": "152294",
+    "unknown_usage_attempts": 0,
+    "budget_charged_tokens": "1312936",
+    "transfer_bytes": "47166945",
+    "artifact_bytes": "815302",
+    "artifactFileCount": 61,
+    "auditedAt": "2026-11-03T07:58:57.298Z"
+  }
+}

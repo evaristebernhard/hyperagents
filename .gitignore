@@ -16,6 +16,7 @@ test-results/
 /OpenMausBot/
 /browser/
 /macro/
+/infinity/
 
 # Local implementation snapshots; keep on disk, exclude from commits
 /.runtime-v1-backup-*/
@@ -23,3 +24,11 @@ test-results/
 /vite.config.ts.backup-*
 /docs/PARITY-WEBPAGE-20261029-0854/LibraryManager.before-preview-fix.txt
 /docs/TOOL-FOUNDATION-20261029/*.before.txt
+
+# Browser profiles contain authentication data.
+.browser-profiles/
+**/.browser-profiles/**
+
+# Rust build outputs and runtime bundle staging
+**/target/
+**/__pycache__/

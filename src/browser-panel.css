@@ -1,0 +1,91 @@
+.browser-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  min-width: 0;
+  min-height: 480px;
+  background: var(--bg, #fff);
+  color: var(--text, #252525);
+}
+.browser-heading,
+.browser-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.browser-heading {
+  justify-content: space-between;
+}
+.browser-panel p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.browser-address {
+  overflow-wrap: anywhere;
+  font-family: monospace;
+  background: #f4f4f5;
+  padding: 8px;
+  border-radius: 6px;
+}
+.browser-screen {
+  min-height: 320px;
+  flex: 1;
+  background: #202124;
+  overflow: hidden;
+  border-radius: 8px;
+}
+.browser-screen > div {
+  min-height: 320px;
+}
+.browser-expanded {
+  position: fixed;
+  inset: 20px;
+  z-index: 1000;
+  box-shadow: 0 0 0 24px #0008;
+}
+.browser-expanded .browser-screen {
+  height: calc(100vh - 270px);
+}
+.browser-panel input,
+.browser-profiles input:not([type="checkbox"]) {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  width: 100%;
+  margin-top: 6px;
+}
+.browser-profiles {
+  display: grid;
+  gap: 14px;
+}
+.browser-profiles form {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+}
+.browser-profiles fieldset {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+.browser-profiles label {
+  font-size: 13px;
+}
+.browser-pane-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+}
+.browser-profile-select {
+  max-width: 220px;
+  margin: 8px 0;
+  padding: 6px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+}

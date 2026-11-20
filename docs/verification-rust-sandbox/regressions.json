@@ -1,0 +1,30 @@
+{
+  "verifiedAt": "2026-11-03",
+  "v1Backend": {"passed": 97, "failed": 0},
+  "kernelAfterLongerScanCheck": {"passed": 15, "failed": 0},
+  "legacyBackend": {"passed": 414, "failed": 0},
+  "infinityCore": {"passed": 108, "failed": 0, "ignoredDoctests": 1},
+  "legacyUiFixture": {
+    "total": 90,
+    "initialPassed": 87,
+    "initialFailures": {"pageLoadTimeout": 2, "focusAssertion": 1},
+    "targetedRetryPassed": 3,
+    "retryTimeoutMs": 90000,
+    "retryWorkers": 1
+  },
+  "legacyUiBackendFlow": {
+    "total": 38,
+    "initialPassed": 36,
+    "initialTimeouts": 2,
+    "targetedRetryPassed": 2,
+    "retryTimeoutMs": 90000
+  },
+  "browserUiContract": "passed",
+  "typescriptBackendAndUi": "passed",
+  "uiV1Build": "passed",
+  "rustFmtCheckClippy": "passed",
+  "realProviderQualityAcceptance": "pending",
+  "realWebsiteManualLoginAcceptance": "pending",
+  "rustNewTasksDefault": false,
+  "browserEnabledDefault": false
+}

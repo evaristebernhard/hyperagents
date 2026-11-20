@@ -1,0 +1,1129 @@
+{
+  "runId": "2026-11-03T06-19-19-793Z",
+  "caseVersion": "research-delivery-1.0.0",
+  "model": "deepseek-chat",
+  "root": "/home/ubuntu/hyperagents/backend/.data-v1/evaluations/2026-11-03T06-19-19-793Z",
+  "total": 36,
+  "passed": 14,
+  "blocked": 9,
+  "passRate": 0.3888888888888889,
+  "gatePassed": false,
+  "capabilities": {
+    "models": [
+      {
+        "provider": "deepseek",
+        "model": "deepseek-chat",
+        "configured": true
+      }
+    ],
+    "search": {
+      "provider": "public-bing-rss",
+      "degraded": true
+    },
+    "sandbox": {
+      "available": false,
+      "reason": "RUNNER_NOT_CONFIGURED"
+    },
+    "formats": [
+      "txt",
+      "md",
+      "csv",
+      "json",
+      "html",
+      "png",
+      "pdf"
+    ],
+    "externalActions": false,
+    "limits": {
+      "taskMs": 1200000,
+      "codeMs": 120000,
+      "modelCalls": 32,
+      "toolCalls": 64,
+      "tokens": 200000,
+      "outputTokens": 32768,
+      "transferBytes": 8388608,
+      "fileBytes": 20971520,
+      "artifactBytes": 104857600,
+      "contextChars": 180000,
+      "children": 2,
+      "globalTasks": 2
+    }
+  },
+  "results": [
+    {
+      "caseId": "math-document-revision",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "status": "blocked",
+      "reason": "GVISOR_UNAVAILABLE",
+      "elapsedMs": 0
+    },
+    {
+      "caseId": "math-document-revision",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "status": "blocked",
+      "reason": "GVISOR_UNAVAILABLE",
+      "elapsedMs": 0
+    },
+    {
+      "caseId": "math-document-revision",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "status": "blocked",
+      "reason": "GVISOR_UNAVAILABLE",
+      "elapsedMs": 0
+    },
+    {
+      "caseId": "research-databases",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "f2e7b439-b711-4470-bc36-caf920185722",
+      "checks": {
+        "content": false,
+        "files": false,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "reason": "MODEL_BUDGET",
+      "usage": [
+        {
+          "id": "f2e7b439-b711-4470-bc36-caf920185722",
+          "model_calls": 16,
+          "tool_calls": 22,
+          "tokens": "165775",
+          "transfer_bytes": "3687823",
+          "artifact_bytes": "19601"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "ca031923-67ef-4949-b3aa-943c643fedda",
+          "name": "postgresql-vs-sqlite-concurrency-report.md",
+          "format": "md",
+          "sha256": "3da7dfbc408d5ee30b443da4e707e37f05a52cb464ad110610e10559be17c9f8",
+          "bytes": "19601",
+          "storage_key": "c8f485f9-2b74-4233-a019-0b6c43b0f244/3da7dfbc408d5ee30b443da4e707e37f05a52cb464ad110610e10559be17c9f8"
+        }
+      ],
+      "elapsedMs": 94811
+    },
+    {
+      "caseId": "research-databases",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "721867e6-574a-48f4-8caf-461e55c63121",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "usage": [
+        {
+          "id": "721867e6-574a-48f4-8caf-461e55c63121",
+          "model_calls": 9,
+          "tool_calls": 14,
+          "tokens": "96185",
+          "transfer_bytes": "1998361",
+          "artifact_bytes": "19800"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "22a4b339-19ce-46b8-bd44-7fc07d6a59d5",
+          "name": "postgresql_vs_sqlite_task_system.md",
+          "format": "md",
+          "sha256": "9e6f70f935fb272ad71afba5e77756f26a7dd20611f4933b3c83ff3b15efdea1",
+          "bytes": "19800",
+          "storage_key": "2c03c95e-86b5-4e7a-afc3-8ee907cda5e7/9e6f70f935fb272ad71afba5e77756f26a7dd20611f4933b3c83ff3b15efdea1"
+        }
+      ],
+      "reason": "GRADING_FAILED",
+      "elapsedMs": 78262
+    },
+    {
+      "caseId": "research-databases",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "379560c0-383d-4523-9fd6-10e54510baa9",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "usage": [
+        {
+          "id": "379560c0-383d-4523-9fd6-10e54510baa9",
+          "model_calls": 10,
+          "tool_calls": 14,
+          "tokens": "107741",
+          "transfer_bytes": "1947846",
+          "artifact_bytes": "19600"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "acc8f336-2310-478b-97a8-3fb990d0f8b9",
+          "name": "postgresql-vs-sqlite-concurrency-zh.md",
+          "format": "md",
+          "sha256": "ff424b799e1b1315d9800b1339625d19ee62d616b2eae76a4fa01b5f20de74bb",
+          "bytes": "19600",
+          "storage_key": "2c03c95e-86b5-4e7a-afc3-8ee907cda5e7/ff424b799e1b1315d9800b1339625d19ee62d616b2eae76a4fa01b5f20de74bb"
+        }
+      ],
+      "reason": "GRADING_FAILED",
+      "elapsedMs": 85518
+    },
+    {
+      "caseId": "data-analysis-chart",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "status": "blocked",
+      "reason": "GVISOR_UNAVAILABLE",
+      "elapsedMs": 0
+    },
+    {
+      "caseId": "data-analysis-chart",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "status": "blocked",
+      "reason": "GVISOR_UNAVAILABLE",
+      "elapsedMs": 0
+    },
+    {
+      "caseId": "data-analysis-chart",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "status": "blocked",
+      "reason": "GVISOR_UNAVAILABLE",
+      "elapsedMs": 0
+    },
+    {
+      "caseId": "markdown-brief",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "885592de-18f9-4919-b98c-e319dc82c5b7",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "885592de-18f9-4919-b98c-e319dc82c5b7",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "17192",
+          "transfer_bytes": "1104678",
+          "artifact_bytes": "9100"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "b69ab6eb-00a9-4449-9b32-560e2a257b03",
+          "name": "代数学习计划.md",
+          "format": "md",
+          "sha256": "878c9dd2b80d91e7476a0285d76a6db18a46787ecb77f70f98fb0382ff4028d9",
+          "bytes": "9100",
+          "storage_key": "c8f485f9-2b74-4233-a019-0b6c43b0f244/878c9dd2b80d91e7476a0285d76a6db18a46787ecb77f70f98fb0382ff4028d9"
+        }
+      ],
+      "elapsedMs": 23201
+    },
+    {
+      "caseId": "markdown-brief",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "7eaab7c0-d8b9-4a09-861b-f819f1d32842",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "7eaab7c0-d8b9-4a09-861b-f819f1d32842",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "18695",
+          "transfer_bytes": "1269783",
+          "artifact_bytes": "10052"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "49925c8f-71d6-429e-b6e8-a8e9062cc569",
+          "name": "代数学习计划.md",
+          "format": "md",
+          "sha256": "7c80f66839f3fdd65afd141e03e88b22de9820a6b54b28a8a1b3ce598bc09c5b",
+          "bytes": "10052",
+          "storage_key": "c8f485f9-2b74-4233-a019-0b6c43b0f244/7c80f66839f3fdd65afd141e03e88b22de9820a6b54b28a8a1b3ce598bc09c5b"
+        }
+      ],
+      "elapsedMs": 24288
+    },
+    {
+      "caseId": "markdown-brief",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "e20c8a04-f089-437b-8bd1-33ed033db402",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "e20c8a04-f089-437b-8bd1-33ed033db402",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "20833",
+          "transfer_bytes": "1567168",
+          "artifact_bytes": "12287"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "328a20a9-2340-4ea6-94aa-fcd99834b414",
+          "name": "代数学习计划.md",
+          "format": "md",
+          "sha256": "2ca9c53984d00329e54ef313e81cbc00b8c322e0b3f2abdf6348a7d085742dd3",
+          "bytes": "12287",
+          "storage_key": "c8f485f9-2b74-4233-a019-0b6c43b0f244/2ca9c53984d00329e54ef313e81cbc00b8c322e0b3f2abdf6348a7d085742dd3"
+        }
+      ],
+      "elapsedMs": 28485
+    },
+    {
+      "caseId": "html-study-guide",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "eda1d059-c415-48c7-b119-1a5437d76e2b",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "eda1d059-c415-48c7-b119-1a5437d76e2b",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "13177",
+          "transfer_bytes": "895251",
+          "artifact_bytes": "6715"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "f88c82c0-4e68-4970-b87e-1d0e8f25caff",
+          "name": "方程复习卡.html",
+          "format": "html",
+          "sha256": "d5f0a6c5cdab2c446bb2f72e311f9083e1c4e3d841d51239135089397a1233d0",
+          "bytes": "6715",
+          "storage_key": "2c03c95e-86b5-4e7a-afc3-8ee907cda5e7/d5f0a6c5cdab2c446bb2f72e311f9083e1c4e3d841d51239135089397a1233d0"
+        }
+      ],
+      "elapsedMs": 12625
+    },
+    {
+      "caseId": "html-study-guide",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "9e77fd7d-a107-4bb1-b1f4-bca5b08e015e",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "9e77fd7d-a107-4bb1-b1f4-bca5b08e015e",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "12280",
+          "transfer_bytes": "761493",
+          "artifact_bytes": "5862"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "764b0cb7-7418-4399-a5fc-d4d7c1a4317b",
+          "name": "方程复习卡.html",
+          "format": "html",
+          "sha256": "de44f5db929f44e00146fad44c5a113225bace83a37e18a5683c054429f52bb9",
+          "bytes": "5862",
+          "storage_key": "c8f485f9-2b74-4233-a019-0b6c43b0f244/de44f5db929f44e00146fad44c5a113225bace83a37e18a5683c054429f52bb9"
+        }
+      ],
+      "elapsedMs": 14299
+    },
+    {
+      "caseId": "html-study-guide",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "f89cfe90-0bd9-4b64-8982-5092a0050271",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "f89cfe90-0bd9-4b64-8982-5092a0050271",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "14780",
+          "transfer_bytes": "1103119",
+          "artifact_bytes": "9152"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "a8faef9f-37cb-4978-80ed-242080a5e4d1",
+          "name": "equation-review-card.html",
+          "format": "html",
+          "sha256": "7e0ba90508e8fdf6da93d2bd9e10d092ff18a2e7927a7e0c1f0044997280f96e",
+          "bytes": "9152",
+          "storage_key": "2c03c95e-86b5-4e7a-afc3-8ee907cda5e7/7e0ba90508e8fdf6da93d2bd9e10d092ff18a2e7927a7e0c1f0044997280f96e"
+        }
+      ],
+      "elapsedMs": 18543
+    },
+    {
+      "caseId": "csv-cleaning",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "159ef081-088d-4576-a01e-58f9dcb1cb5d",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "159ef081-088d-4576-a01e-58f9dcb1cb5d",
+          "model_calls": 5,
+          "tool_calls": 4,
+          "tokens": "15488",
+          "transfer_bytes": "139053",
+          "artifact_bytes": "28"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "c484a0ec-dbb4-496b-b611-399f098dd047",
+          "name": "totals.csv",
+          "format": "csv",
+          "sha256": "e965d720d08380b20e6585c1621f93b6231a0f8a1a7c63340b8fd3fb60bf0af6",
+          "bytes": "28",
+          "storage_key": "c8f485f9-2b74-4233-a019-0b6c43b0f244/e965d720d08380b20e6585c1621f93b6231a0f8a1a7c63340b8fd3fb60bf0af6"
+        }
+      ],
+      "elapsedMs": 9881
+    },
+    {
+      "caseId": "csv-cleaning",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "009f2dc2-70fb-43aa-824e-50848d5ae099",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "009f2dc2-70fb-43aa-824e-50848d5ae099",
+          "model_calls": 4,
+          "tool_calls": 3,
+          "tokens": "11077",
+          "transfer_bytes": "57663",
+          "artifact_bytes": "28"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "8ba611f7-5ba7-4a89-ab6c-d80ab510ecbe",
+          "name": "totals.csv",
+          "format": "csv",
+          "sha256": "e965d720d08380b20e6585c1621f93b6231a0f8a1a7c63340b8fd3fb60bf0af6",
+          "bytes": "28",
+          "storage_key": "2c03c95e-86b5-4e7a-afc3-8ee907cda5e7/e965d720d08380b20e6585c1621f93b6231a0f8a1a7c63340b8fd3fb60bf0af6"
+        }
+      ],
+      "elapsedMs": 8246
+    },
+    {
+      "caseId": "csv-cleaning",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "fa11ef87-cf67-43f1-9552-8d8b9260160b",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "fa11ef87-cf67-43f1-9552-8d8b9260160b",
+          "model_calls": 5,
+          "tool_calls": 4,
+          "tokens": "15574",
+          "transfer_bytes": "150608",
+          "artifact_bytes": "28"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "77df1008-d09a-4705-8afb-80068891cbb1",
+          "name": "totals.csv",
+          "format": "csv",
+          "sha256": "e965d720d08380b20e6585c1621f93b6231a0f8a1a7c63340b8fd3fb60bf0af6",
+          "bytes": "28",
+          "storage_key": "c8f485f9-2b74-4233-a019-0b6c43b0f244/e965d720d08380b20e6585c1621f93b6231a0f8a1a7c63340b8fd3fb60bf0af6"
+        }
+      ],
+      "elapsedMs": 10238
+    },
+    {
+      "caseId": "json-structure",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "a79302b8-4182-4ace-b2bd-eff79bdfb668",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "a79302b8-4182-4ace-b2bd-eff79bdfb668",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "7902",
+          "transfer_bytes": "108772",
+          "artifact_bytes": "544"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "73a2ca9f-eeaa-4dc6-99a9-9da844c714f0",
+          "name": "study_plan.json",
+          "format": "json",
+          "sha256": "9456b0442ed3b3912b246c98182a6b61a91810bb8fe33ddce632a53216d5f068",
+          "bytes": "544",
+          "storage_key": "2c03c95e-86b5-4e7a-afc3-8ee907cda5e7/9456b0442ed3b3912b246c98182a6b61a91810bb8fe33ddce632a53216d5f068"
+        }
+      ],
+      "elapsedMs": 6195
+    },
+    {
+      "caseId": "json-structure",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "2e109ff9-9cbf-43e3-ad52-18f48df805d2",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "2e109ff9-9cbf-43e3-ad52-18f48df805d2",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "7995",
+          "transfer_bytes": "121971",
+          "artifact_bytes": "628"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "2a781d00-b729-4633-81ac-0b389ee0213b",
+          "name": "study_plan.json",
+          "format": "json",
+          "sha256": "faad15fa0e88f4925b68926944cf909ac19f70fd6c0cd2bf21e721303763268d",
+          "bytes": "628",
+          "storage_key": "c8f485f9-2b74-4233-a019-0b6c43b0f244/faad15fa0e88f4925b68926944cf909ac19f70fd6c0cd2bf21e721303763268d"
+        }
+      ],
+      "elapsedMs": 6056
+    },
+    {
+      "caseId": "json-structure",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "624d82c6-fec2-406f-a1b7-8596741606df",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "status": "passed",
+      "usage": [
+        {
+          "id": "624d82c6-fec2-406f-a1b7-8596741606df",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "7897",
+          "transfer_bytes": "107331",
+          "artifact_bytes": "535"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "e6c2dfa1-6bf9-4cf2-af15-37bc59be9b42",
+          "name": "study_plan.json",
+          "format": "json",
+          "sha256": "9c28b0b88c591f9491f23ee4c249099e909a5d0e24f2c70848b8b967256d52f5",
+          "bytes": "535",
+          "storage_key": "2c03c95e-86b5-4e7a-afc3-8ee907cda5e7/9c28b0b88c591f9491f23ee4c249099e909a5d0e24f2c70848b8b967256d52f5"
+        }
+      ],
+      "elapsedMs": 6127
+    },
+    {
+      "caseId": "document-version",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "b9e51615-01a8-419d-bc37-6ba61b8dc662",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "revisionTaskId": "4958128c-27a9-48be-9498-78b6e1b7e12d",
+      "status": "passed",
+      "usage": [
+        {
+          "id": "b9e51615-01a8-419d-bc37-6ba61b8dc662",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "8719",
+          "transfer_bytes": "196003",
+          "artifact_bytes": "2116"
+        },
+        {
+          "id": "4958128c-27a9-48be-9498-78b6e1b7e12d",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "8301",
+          "transfer_bytes": "112888",
+          "artifact_bytes": "647"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "e1327ead-4e81-44c8-a3ff-dc42cb4f441b",
+          "name": "实验记录.md",
+          "format": "md",
+          "sha256": "d59ba8f86f5343e0cf70047d1bacfdee8348896bcac1b9280e1028703571d059",
+          "bytes": "2116",
+          "storage_key": "c8f485f9-2b74-4233-a019-0b6c43b0f244/d59ba8f86f5343e0cf70047d1bacfdee8348896bcac1b9280e1028703571d059"
+        },
+        {
+          "id": "b07500db-564f-4b40-a8cd-7872032c8978",
+          "name": "实验记录.md",
+          "format": "md",
+          "sha256": "2e4cd59d05d68843e2a429c0239c4e3fcfbf6b9e331c9b99707d52430e94b354",
+          "bytes": "647",
+          "storage_key": "c8f485f9-2b74-4233-a019-0b6c43b0f244/2e4cd59d05d68843e2a429c0239c4e3fcfbf6b9e331c9b99707d52430e94b354"
+        }
+      ],
+      "elapsedMs": 18198
+    },
+    {
+      "caseId": "document-version",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "78f88f75-4138-43a0-8ac5-dbc99705f2ec",
+      "checks": {
+        "content": true,
+        "files": true,
+        "execution": true,
+        "versions": true
+      },
+      "revisionTaskId": "0ee73ea9-111d-46f8-b33d-394158dd364e",
+      "status": "passed",
+      "usage": [
+        {
+          "id": "78f88f75-4138-43a0-8ac5-dbc99705f2ec",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "8289",
+          "transfer_bytes": "150197",
+          "artifact_bytes": "1424"
+        },
+        {
+          "id": "0ee73ea9-111d-46f8-b33d-394158dd364e",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "8480",
+          "transfer_bytes": "129370",
+          "artifact_bytes": "759"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "aadaa4fc-838f-4520-9f3c-445f06af775e",
+          "name": "实验记录.md",
+          "format": "md",
+          "sha256": "a564becc64b385aea32e21b4de3665dab7421a37102c04f0f3d24233fec7279c",
+          "bytes": "1424",
+          "storage_key": "2c03c95e-86b5-4e7a-afc3-8ee907cda5e7/a564becc64b385aea32e21b4de3665dab7421a37102c04f0f3d24233fec7279c"
+        },
+        {
+          "id": "2900e23f-e8ba-4e3f-ba54-97cf987dc5e8",
+          "name": "实验记录.md",
+          "format": "md",
+          "sha256": "a38be0e2d39cfeb53578aa07f0c381a3383e1a3ce5f629e07f37fab732107959",
+          "bytes": "759",
+          "storage_key": "2c03c95e-86b5-4e7a-afc3-8ee907cda5e7/a38be0e2d39cfeb53578aa07f0c381a3383e1a3ce5f629e07f37fab732107959"
+        }
+      ],
+      "elapsedMs": 16097
+    },
+    {
+      "caseId": "document-version",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "a7932af2-f892-42e3-9a4a-a2dbf82678e9",
+      "checks": {
+        "content": false,
+        "files": false,
+        "execution": false,
+        "versions": false
+      },
+      "status": "failed",
+      "reason": "MODEL_REQUEST",
+      "usage": [
+        {
+          "id": "a7932af2-f892-42e3-9a4a-a2dbf82678e9",
+          "model_calls": 3,
+          "tool_calls": 2,
+          "tokens": "13128",
+          "transfer_bytes": "189150",
+          "artifact_bytes": "1712"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "c958ad37-331a-4f1d-a11b-07033a26d8bc",
+          "name": "实验记录.md",
+          "format": "md",
+          "sha256": "fadec6eb7f798c4427be4c4fe119178099e062776ed62d8d09c762192123ec8c",
+          "bytes": "1712",
+          "storage_key": "c8f485f9-2b74-4233-a019-0b6c43b0f244/fadec6eb7f798c4427be4c4fe119178099e062776ed62d8d09c762192123ec8c"
+        }
+      ],
+      "elapsedMs": 8050
+    },
+    {
+      "caseId": "independent-research",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "73450be0-dc1b-4f86-a9d4-3b09bad5c5b7",
+      "checks": {
+        "content": false,
+        "files": false,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "reason": "MODEL_REQUEST",
+      "usage": [
+        {
+          "id": "73450be0-dc1b-4f86-a9d4-3b09bad5c5b7",
+          "model_calls": 2,
+          "tool_calls": 2,
+          "tokens": "47299",
+          "transfer_bytes": "18139",
+          "artifact_bytes": "0"
+        }
+      ],
+      "artifacts": [],
+      "elapsedMs": 6654
+    },
+    {
+      "caseId": "independent-research",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "87918246-7fdb-4f7c-af98-7ae33094b23a",
+      "checks": {
+        "content": false,
+        "files": false,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "reason": "MODEL_REQUEST",
+      "usage": [
+        {
+          "id": "87918246-7fdb-4f7c-af98-7ae33094b23a",
+          "model_calls": 1,
+          "tool_calls": 0,
+          "tokens": "40449",
+          "transfer_bytes": "0",
+          "artifact_bytes": "0"
+        }
+      ],
+      "artifacts": [],
+      "elapsedMs": 2722
+    },
+    {
+      "caseId": "independent-research",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "f7f047b2-2cc5-4881-a50c-15b0d2230d58",
+      "checks": {
+        "content": false,
+        "files": false,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "reason": "MODEL_REQUEST",
+      "usage": [
+        {
+          "id": "f7f047b2-2cc5-4881-a50c-15b0d2230d58",
+          "model_calls": 1,
+          "tool_calls": 0,
+          "tokens": "40449",
+          "transfer_bytes": "0",
+          "artifact_bytes": "0"
+        }
+      ],
+      "artifacts": [],
+      "elapsedMs": 2018
+    },
+    {
+      "caseId": "printable-pdf",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "status": "blocked",
+      "reason": "GVISOR_UNAVAILABLE",
+      "elapsedMs": 0
+    },
+    {
+      "caseId": "printable-pdf",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "status": "blocked",
+      "reason": "GVISOR_UNAVAILABLE",
+      "elapsedMs": 0
+    },
+    {
+      "caseId": "printable-pdf",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "status": "blocked",
+      "reason": "GVISOR_UNAVAILABLE",
+      "elapsedMs": 0
+    },
+    {
+      "caseId": "two-artifact-delivery",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "7bfdb03f-a191-4cf8-a0d8-c7aa7c4acbdc",
+      "checks": {
+        "content": false,
+        "files": false,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "reason": "MODEL_REQUEST",
+      "usage": [
+        {
+          "id": "7bfdb03f-a191-4cf8-a0d8-c7aa7c4acbdc",
+          "model_calls": 1,
+          "tool_calls": 0,
+          "tokens": "40417",
+          "transfer_bytes": "0",
+          "artifact_bytes": "0"
+        }
+      ],
+      "artifacts": [],
+      "elapsedMs": 2028
+    },
+    {
+      "caseId": "two-artifact-delivery",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "b36c83ac-dbe3-4e5c-af69-fce806ef78e3",
+      "checks": {
+        "content": false,
+        "files": false,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "reason": "MODEL_REQUEST",
+      "usage": [
+        {
+          "id": "b36c83ac-dbe3-4e5c-af69-fce806ef78e3",
+          "model_calls": 1,
+          "tool_calls": 0,
+          "tokens": "40417",
+          "transfer_bytes": "0",
+          "artifact_bytes": "0"
+        }
+      ],
+      "artifacts": [],
+      "elapsedMs": 2028
+    },
+    {
+      "caseId": "two-artifact-delivery",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "657515e9-66bc-414e-a67e-a73beedd1fec",
+      "checks": {
+        "content": false,
+        "files": false,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "reason": "MODEL_REQUEST",
+      "usage": [
+        {
+          "id": "657515e9-66bc-414e-a67e-a73beedd1fec",
+          "model_calls": 1,
+          "tool_calls": 0,
+          "tokens": "40417",
+          "transfer_bytes": "0",
+          "artifact_bytes": "0"
+        }
+      ],
+      "artifacts": [],
+      "elapsedMs": 2027
+    },
+    {
+      "caseId": "answer-order",
+      "repeat": 1,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "b56dbd78-3a7d-4a75-a135-7af9e5d05390",
+      "checks": {
+        "content": false,
+        "files": false,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "reason": "MODEL_REQUEST",
+      "usage": [
+        {
+          "id": "b56dbd78-3a7d-4a75-a135-7af9e5d05390",
+          "model_calls": 1,
+          "tool_calls": 0,
+          "tokens": "40475",
+          "transfer_bytes": "0",
+          "artifact_bytes": "0"
+        }
+      ],
+      "artifacts": [],
+      "elapsedMs": 2018
+    },
+    {
+      "caseId": "answer-order",
+      "repeat": 2,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "4f75c858-2693-4b1b-8a33-a91e6d1eea12",
+      "checks": {
+        "content": false,
+        "files": false,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "reason": "MODEL_REQUEST",
+      "usage": [
+        {
+          "id": "4f75c858-2693-4b1b-8a33-a91e6d1eea12",
+          "model_calls": 1,
+          "tool_calls": 0,
+          "tokens": "40475",
+          "transfer_bytes": "0",
+          "artifact_bytes": "0"
+        }
+      ],
+      "artifacts": [],
+      "elapsedMs": 2020
+    },
+    {
+      "caseId": "answer-order",
+      "repeat": 3,
+      "model": "deepseek-chat",
+      "promptVersion": "v1.1.0",
+      "toolVersion": "1.1.0",
+      "caseVersion": "research-delivery-1.0.0",
+      "taskId": "20c32a73-1ac1-4764-8edb-d105539cdcac",
+      "checks": {
+        "content": false,
+        "files": false,
+        "execution": false,
+        "versions": true
+      },
+      "status": "failed",
+      "reason": "MODEL_REQUEST",
+      "usage": [
+        {
+          "id": "20c32a73-1ac1-4764-8edb-d105539cdcac",
+          "model_calls": 1,
+          "tool_calls": 0,
+          "tokens": "40475",
+          "transfer_bytes": "0",
+          "artifact_bytes": "0"
+        }
+      ],
+      "artifacts": [],
+      "elapsedMs": 1108
+    }
+  ],
+  "audit": {
+    "attempts": 101,
+    "actual_input": "525925",
+    "actual_output": "51736",
+    "unknown_usage_attempts": 10,
+    "budget_charged_tokens": "950381",
+    "transfer_bytes": "15816667",
+    "artifact_bytes": "120618",
+    "artifactFileCount": 20,
+    "auditedAt": "2026-11-03T07:58:57.637Z"
+  }
+}

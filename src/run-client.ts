@@ -22,6 +22,7 @@ export type RunInfo = {
   model?: string;
   error?: string;
   parentRunId?: string;
+  continuedFromRunId?: string;
   rootRunId?: string;
   depth?: number;
   childCount?: number;
@@ -29,7 +30,7 @@ export type RunInfo = {
   usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
   approvals: ShellApproval[];
   resultSaved?: boolean;
-  plan?: { id: string; title: string; status: "pending" | "in_progress" | "completed" }[];
+  plan?: { id: string; title: string; status: "pending" | "in_progress" | "completed"; dependsOn?: string[]; childRunId?: string }[];
 };
 export type RuntimeEvent = ChatEvent
   | { type: "shell_approval"; actionId: string; kind?: "shell" | "skill" | "file"; command: string; cwd: string; timeoutSeconds: number }
@@ -71,6 +72,12 @@ export async function listRuns(scope: RunScope, signal?: AbortSignal) {
 }
 export async function cancelRun(id: string, scope: RunScope) {
   return (await api<{ run: RunInfo }>("/api/runs/" + encodeURIComponent(id) + "/cancel", { method: "POST", body: scope })).run;
+}
+export async function continueRun(id: string, scope: RunScope & { requestId: string }, signal?: AbortSignal) {
+  return (await viewingRequest(() => api<{ run: RunInfo }>("/api/runs/" + encodeURIComponent(id) + "/continue", { method: "POST", body: scope }), signal)).run;
+}
+export async function getRunEvents(id: string, scope: RunScope, after = 0) {
+  return viewingRequest(() => api<RunEvents>("/api/runs/" + encodeURIComponent(id) + "/events?" + scopeQuery(scope) + "&after=" + after));
 }
 export async function decideShellApproval(id: string, actionId: string, scope: RunScope, decision: "approve" | "deny") {
   return (await api<{ run: RunInfo }>("/api/runs/" + encodeURIComponent(id) + "/approvals/" + encodeURIComponent(actionId), { method: "POST", body: { ...scope, decision } })).run;

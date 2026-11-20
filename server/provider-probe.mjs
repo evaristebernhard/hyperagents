@@ -12,14 +12,16 @@ function untilAborted(promise, signal) {
   });
 }
 // This is an explicit, tiny paid request, never a page-load health check.
-export function createProviderProbe({ apiKey, fetchImpl = globalThis.fetch, timeoutMs = 15000, cooldownMs = 30000, clock = Date.now }) {
+export function createProviderProbe({ apiKey, fetchImpl = globalThis.fetch, timeoutMs = 15000, cooldownMs = 30000, clock = Date.now, scnetConfig }) {
+  const endpoint=scnetConfig?scnetConfig.baseUrl.replace(/\/$/,'')+'/chat/completions':ENDPOINT;
+  if(scnetConfig)apiKey=scnetConfig.apiKey;
   const cache = new Map();
   let busy = false;
   return async function probe(body) {
     if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(k => !['model', 'confirmed'].includes(k)) || body.confirmed !== true) throw new ApiError(400, 'Confirm the small provider test request.', 'PROBE_CONFIRMATION');
     const model = body.model;
-    if (!MODELS.includes(model)) throw new ApiError(422, 'Unsupported model.', 'PROBE_MODEL');
-    if (typeof apiKey !== 'string' || !apiKey.trim()) throw new ApiError(503, 'DeepSeek is not configured on the server.', 'LLM_NOT_CONFIGURED');
+    if (!(scnetConfig?[scnetConfig.model]:MODELS).includes(model)) throw new ApiError(422, 'Unsupported model.', 'PROBE_MODEL');
+    if (typeof apiKey !== 'string' || !apiKey.trim()) throw new ApiError(503, 'The model provider is not configured on the server.', 'LLM_NOT_CONFIGURED');
     const previous = cache.get(model);
     if (previous && clock() - previous.time < cooldownMs) return { ...previous.result, cached: true };
     if (busy) throw new ApiError(409, 'A provider test is already running.', 'PROBE_BUSY');
@@ -28,10 +30,10 @@ export function createProviderProbe({ apiKey, fetchImpl = globalThis.fetch, time
     const timer = setTimeout(() => controller.abort(), timeoutMs); timer.unref();
     let reader, result;
     try {
-      const response = await untilAborted(fetchImpl(ENDPOINT, {
+      const response = await untilAborted(fetchImpl(endpoint, {
         method: 'POST', redirect: 'error', signal: controller.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model, messages: [{ role: 'user', content: 'Reply with OK only.' }], max_tokens: 16, stream: false, thinking: { type: 'disabled' } }),
+        body: JSON.stringify({ model, messages: [{ role: 'user', content: 'Reply with OK only.' }], max_tokens: 16, stream: false, ...(scnetConfig?{}:{thinking:{type:'disabled'}}) }),
       }), controller.signal);
       if (!response.ok) {
         void response.body?.cancel().catch(() => {});
@@ -59,7 +61,7 @@ export function createProviderProbe({ apiKey, fetchImpl = globalThis.fetch, time
       clearTimeout(timer); void reader?.cancel().catch(() => {}); busy = false;
     }
     // Never return provider bodies, headers, URLs, exceptions or credentials.
-    result = { ...result, model, checkedAt: new Date(clock()).toISOString(), latencyMs: Math.max(0, clock() - start), cached: false };
+    result = { ...result, model, ...(scnetConfig?{provider:'SCNet DCU'}:{}), checkedAt: new Date(clock()).toISOString(), latencyMs: Math.max(0, clock() - start), cached: false };
     cache.set(model, { time: clock(), result });
     return result;
   };

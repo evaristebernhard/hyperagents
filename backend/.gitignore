@@ -1,0 +1,7 @@
+.data-v1/
+.test-data/
+evals/results/*.json
+!evals/results/verification.json
+!evals/results/2026-*.json
+!evals/results/deterministic-tests.log
+!evals/results/ui-verification.json

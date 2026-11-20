@@ -1,0 +1,21 @@
+FROM node:24-bookworm-slim AS build
+WORKDIR /app
+COPY package*.json tsconfig.base.json ./
+COPY packages ./packages
+COPY apps ./apps
+RUN npm ci --ignore-scripts && npm run build
+FROM node:24-bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends chromium xvfb x11vnc openbox xauth bubblewrap ca-certificates fonts-noto-cjk poppler-utils tini && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=build /app /app
+COPY browser-service ./browser-service
+# System Chromium loads these mandatory policies before any page or native input.
+# Disable local-file navigation, developer tools and extensions in human sessions.
+COPY deploy/browser-policy.json /etc/chromium/policies/managed/hyperagents.json
+COPY deploy/openbox.xml /etc/xdg/openbox/rc.xml
+RUN mkdir -p /profiles /data /home/node/.config/openbox && chown -R node:node /profiles /data /home/node && chmod 700 /profiles
+RUN chmod 755 /app/browser-service/chromium-isolated.sh
+ENV BROWSER_CONTAINER=1 BROWSER_EXECUTABLE=/app/browser-service/chromium-isolated.sh
+USER node
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["node", "browser-service/index.mjs"]

@@ -178,6 +178,9 @@ test('simultaneous duplicate requests resolving real attachments admit exactly o
   const admitted = await Promise.all(Array.from({ length: 6 }, () => h.create()));
   assert.equal(new Set(admitted.map(r => r.id)).size, 1, 'same source must have one run even across concurrent admission');
   assert.equal((await json(await h.call('/api/runs?' + new URLSearchParams(scope)))).runs.length, 1);
+  // A durable 202 confirms admission, not completion of async attachment loading
+  // or entry into the provider. Wait for that independent observable boundary.
+  await poll(() => provider.calls.length, n => n === 1, 'one provider call after durable admission');
   assert.equal(provider.calls.length, 1);
 });
 

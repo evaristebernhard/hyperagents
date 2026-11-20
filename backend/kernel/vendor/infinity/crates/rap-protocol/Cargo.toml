@@ -1,0 +1,22 @@
+[package]
+workspace = "../.."
+name = "rap-protocol"
+publish = true
+version = "0.2.0"
+documentation = "https://docs.rs/rap-protocol/"
+description = "Core types and server scaffolding for the Reactive Agent Protocol (RAP)."
+edition = "2024"
+repository = { workspace = true }
+license = "Apache-2.0"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+reqwest = { workspace = true }
+tracing = { workspace = true }
+futures-util = { workspace = true }
+strkind = { workspace = true }
+
+[lints]
+workspace = true

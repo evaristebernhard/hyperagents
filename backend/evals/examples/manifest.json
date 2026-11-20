@@ -1,0 +1,30 @@
+[
+  {
+    "file": "study-plan.md",
+    "caseId": "markdown-brief",
+    "taskId": "885592de-18f9-4919-b98c-e319dc82c5b7",
+    "runId": "2026-11-03T06-19-19-793Z",
+    "sha256": "878c9dd2b80d91e7476a0285d76a6db18a46787ecb77f70f98fb0382ff4028d9"
+  },
+  {
+    "file": "equation.html",
+    "caseId": "html-study-guide",
+    "taskId": "eda1d059-c415-48c7-b119-1a5437d76e2b",
+    "runId": "2026-11-03T06-19-19-793Z",
+    "sha256": "d5f0a6c5cdab2c446bb2f72e311f9083e1c4e3d841d51239135089397a1233d0"
+  },
+  {
+    "file": "totals.csv",
+    "caseId": "csv-cleaning",
+    "taskId": "159ef081-088d-4576-a01e-58f9dcb1cb5d",
+    "runId": "2026-11-03T06-19-19-793Z",
+    "sha256": "e965d720d08380b20e6585c1621f93b6231a0f8a1a7c63340b8fd3fb60bf0af6"
+  },
+  {
+    "file": "plan.json",
+    "caseId": "json-structure",
+    "taskId": "a79302b8-4182-4ace-b2bd-eff79bdfb668",
+    "runId": "2026-11-03T06-19-19-793Z",
+    "sha256": "9456b0442ed3b3912b246c98182a6b61a91810bb8fe33ddce632a53216d5f068"
+  }
+]

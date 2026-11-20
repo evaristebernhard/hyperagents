@@ -1,0 +1,97 @@
+{
+  "verifiedAt": "2026-11-03T08:32:05.132Z",
+  "origin": "http://localhost:5174",
+  "status": "passed",
+  "checks": [
+    "login with original auth style",
+    "main sidebar, homepage and actual capabilities",
+    "upload, task submission and running instruction",
+    "refresh restores conversation and running task",
+    "math Markdown and PDF generated and downloaded",
+    "follow-up revision preserves artifact IDs and historical downloads",
+    "cancel task from original conversation",
+    "expired session unmounts private UI and reauthentication works",
+    "second user cannot list or access conversations, tasks, events, files or artifacts",
+    "private files denied on both old and new development ports",
+    "no browser exceptions or legacy API requests"
+  ],
+  "before": [
+    {
+      "id": "aa0331d7-8f2d-4d65-b5b1-ca41fe9c5f60",
+      "url": "/api/v1/files/83078fb8-1d44-472b-94f3-7e5c7880a3b0/download",
+      "name": "yiyuan_yici_fangcheng_lianxi.md\nFile",
+      "bytes": 1521,
+      "versions": [
+        {
+          "version": 1,
+          "fileId": "83078fb8-1d44-472b-94f3-7e5c7880a3b0"
+        }
+      ]
+    },
+    {
+      "id": "dac2e78e-ecde-4316-82ba-aad0f841c3ef",
+      "url": "/api/v1/files/93cb1498-54c8-4aa9-a957-ef190809a00c/download",
+      "name": "fangcheng.pdf\nFile",
+      "bytes": 25523,
+      "versions": [
+        {
+          "version": 1,
+          "fileId": "93cb1498-54c8-4aa9-a957-ef190809a00c"
+        }
+      ]
+    }
+  ],
+  "after": [
+    {
+      "id": "aa0331d7-8f2d-4d65-b5b1-ca41fe9c5f60",
+      "url": "/api/v1/files/2776d6f4-2bd2-448d-9e6a-54f976de38f7/download",
+      "name": "yiyuan_yici_fangcheng_lianxi.md\nFile",
+      "bytes": 1859,
+      "versions": [
+        {
+          "version": 2,
+          "fileId": "2776d6f4-2bd2-448d-9e6a-54f976de38f7"
+        },
+        {
+          "version": 1,
+          "fileId": "83078fb8-1d44-472b-94f3-7e5c7880a3b0"
+        }
+      ]
+    },
+    {
+      "id": "dac2e78e-ecde-4316-82ba-aad0f841c3ef",
+      "url": "/api/v1/files/d04e6ba7-e82e-45a6-b44f-87b7599074ad/download",
+      "name": "fangcheng.pdf\nFile",
+      "bytes": 33681,
+      "versions": [
+        {
+          "version": 2,
+          "fileId": "d04e6ba7-e82e-45a6-b44f-87b7599074ad"
+        },
+        {
+          "version": 1,
+          "fileId": "93cb1498-54c8-4aa9-a957-ef190809a00c"
+        }
+      ]
+    }
+  ],
+  "consoleErrors": [],
+  "legacyRequests": [],
+  "restartVerification": {
+    "status": "passed",
+    "accountPreserved": true,
+    "artifactVersionsPreserved": true,
+    "downloads": [
+      {
+        "id": "aa0331d7-8f2d-4d65-b5b1-ca41fe9c5f60",
+        "sha256": "377ae37474c281d4401c80d9b126adf3a83f5aaa5bede9d88eff3218ded9d6c4"
+      },
+      {
+        "id": "dac2e78e-ecde-4316-82ba-aad0f841c3ef",
+        "sha256": "0c92dce01ecaff44c3454c345017b18992d777516c4e0d867600d70dacb42d0f"
+      }
+    ],
+    "pdfTextChecked": true,
+    "unexpectedConsoleErrors": []
+  }
+}

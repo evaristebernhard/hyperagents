@@ -1,6 +1,7 @@
 import { SLIDES_PARAMETERS_SCHEMA, serializeSlides, parseSlidesContent } from './slides.mjs';
 import { randomUUID } from 'node:crypto';
 import { createResourceReadAdapter } from './resource-read-adapter.mjs';
+import { canReadCompanionMemory, canReadCompanionThread } from './companion-memory.mjs';
 
 const TYPES = ['thread', 'project', 'skill', 'memory', 'artifact', 'file'];
 const LOCAL = ['Thread Search', 'Documents', 'Webpages', 'Tables', 'Slides'];
@@ -53,6 +54,18 @@ export function createWorkspaceTools({ state, workspaceId, threadId, readAttachm
   const threads = (data.threads || []).filter(t => t.id === threadId);
   if (threads.length !== 1) fail('Workspace or thread not found.');
   const thread = threads[0];
+  // Resolve identity from this run's saved final-message settings, never from
+  // the workspace's active view or a requested resource's owner.
+  const context = thread.messages?.at(-1)?.context || {};
+  const settings = context.settings || thread.config || data.preferences?.defaultThreadSettings || {};
+  const selectedAgentId = settings.agentId;
+  const agent = (data.agents || []).find(a => a.id === selectedAgentId && !a.archived);
+  const companionScope = { agent, thread, selectedAgentId, selectedMemoryIds: context.memoryIds || [] };
+  const visibleThread = target => canReadCompanionThread(target, companionScope);
+  const visibleArtifact = artifact => {
+    const ownerThread = (data.threads || []).find(t => t.id === artifact.threadId);
+    return !ownerThread || visibleThread(ownerThread);
+  };
   const permissions = new Set(Array.isArray(enabled) ? enabled.filter(n => LOCAL.includes(n)) : []);
   const canRead = permissions.size > 0;
   const canKind = kind => permissions.has({ Document: 'Documents', Webpage: 'Webpages', Table: 'Tables', Slides: 'Slides' }[kind]);
@@ -98,12 +111,16 @@ export function createWorkspaceTools({ state, workspaceId, threadId, readAttachm
   function resources(type) {
     if (type === 'file') {
       const files = new Map();
-      for (const t of data.threads || []) for (const m of t.messages || []) for (const f of m.context?.attachments || []) {
+      for (const t of (data.threads || []).filter(visibleThread)) for (const m of t.messages || []) for (const f of m.context?.attachments || []) {
         if (f.workspaceId === workspaceId && !files.has(f.id)) files.set(f.id, f);
       }
       return [...files.values()];
     }
-    return data[{ thread: 'threads', project: 'projects', skill: 'skills', memory: 'memories', artifact: 'artifacts' }[type]] || [];
+    const items = data[{ thread: 'threads', project: 'projects', skill: 'skills', memory: 'memories', artifact: 'artifacts' }[type]] || [];
+    if (type === 'memory') return items.filter(memory => canReadCompanionMemory(memory, companionScope));
+    if (type === 'thread') return items.filter(visibleThread);
+    if (type === 'artifact') return items.filter(visibleArtifact);
+    return items;
   }
   const titleFor = (type, item) => String(item.title || item.name || (type === 'memory' ? item.content : type)).slice(0, 512);
   function prepare(artifact, previous) {

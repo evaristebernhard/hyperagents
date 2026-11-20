@@ -13,7 +13,7 @@ export default function ComposerContextPicker({ kind, close, choose, navigate }:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const items = kind === "skills" ? w.data.skills.filter(s => !s.archived).map(s => ({ id: s.id, label: s.name }))
-    : kind === "memories" ? w.data.memories.map(m => ({ id: m.id, label: m.content }))
+    : kind === "memories" ? w.data.memories.filter(m => !m.companion).map(m => ({ id: m.id, label: m.content }))
     : kind === "assets" ? w.data.artifacts.filter(a => !a.archived).map(a => ({ id: a.id, label: a.title }))
     : kind === "integrations" ? w.data.connections.filter(c => c.enabled).map(c => ({ id: c.id, label: c.label || c.provider }))
     : w.data.projects.filter(p => !p.archived).map(p => ({ id: p.id, label: p.name }));
@@ -22,6 +22,7 @@ export default function ComposerContextPicker({ kind, close, choose, navigate }:
     <input autoFocus aria-label={"Search " + kind} placeholder={"Search " + kind} value={query} onChange={e => setQuery(e.target.value)} />
     {filtered.map(item => <button key={item.id} onClick={() => { choose(item.id); close(); }}>{item.label}</button>)}
     {!filtered.length && <p className="empty-state">{items.length ? "No matching items" : "No " + kind + " available"}</p>}
+    {kind === "memories" && <small>分身记忆由所选分身按确认状态与可见范围检索。<button onClick={() => { close(); navigate("/companion"); }}>管理分身记忆</button></small>}
     {kind === "integrations" && <><small>Select a server-configured integration for real API reads. Writes require a separate approval card. Unsupported metadata entries cannot execute.</small><button onClick={() => { close(); navigate(location.pathname + "?settings=integrations"); }}>Add other integrations</button></>}
     {kind === "projects" && !creating && <button onClick={() => setCreating(true)}>Create new project…</button>}
     {kind === "projects" && creating && <form onSubmit={async e => {

@@ -245,6 +245,16 @@
 
 /* Resolved metadata reflects a specific run, never guessed counters. */
 .rt-resolved-hints { display:block; text-align:right; font-size:10px; color:var(--muted,#888); margin:4px 3px 0; }
+@media (max-width: 600px) {
+  .real-thread .rt-header { height: auto; min-height: 48px; padding: 8px 10px; flex-wrap: wrap; }
+  .real-thread .rt-header .rt-title { flex: 1 0 100%; min-width: 0; }
+  .real-thread .rt-header > .rt-actions { flex: 1 1 100%; min-width: 0; max-width: 100%; margin-left: 0; flex-wrap: wrap; }
+  .real-thread .server-composer .composer-bar { flex-wrap: wrap; gap: 8px; }
+  .real-thread .server-composer .composer-bar-left { flex: 1 1 100%; min-width: 0; width: 100%; }
+  .real-thread .server-composer .composer-bar-right { margin-left: auto; flex-shrink: 0; }
+  .real-thread .server-composer .composer-bar-left [aria-label="Model settings"] { width: auto; max-width: calc(100% - 48px); height: 32px; padding: 0 8px; }
+  .real-thread .server-composer .composer-bar-left .model-chip-label { display: inline; max-width: 145px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 .rt-followups { flex-direction:row; flex-wrap:wrap; gap:7px; }
 .rt-followups > small { flex-basis:100%; font-size:11px; color:var(--muted,#888); margin-bottom:2px; }
 .rt-followups button { border-radius:999px; padding:6px 11px; gap:10px; }
@@ -253,3 +263,5 @@
 .rt-messages > * { flex-shrink:0; }
 .rt-messages > :first-child { margin-top:auto; }
 @media(max-width:600px) { .real-thread { margin:4px; height:calc(100% - 8px); } }
+
+.rt-run-plan .rt-plan-detail { display: block; overflow-wrap: anywhere; margin-top: 3px; font-size: 11px; color: var(--text-secondary, #737373); }

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>浏览器接管演示 · Hyperagent</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; padding: 56px 20px; font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; color: #263c64; background: #f1f5fb; }
+      main { width: min(100%, 620px); margin: 0 auto; padding: 36px; border: 1px solid #dbe3ef; border-radius: 18px; background: #fff; }
+      .eyebrow { margin: 0 0 14px; color: #627693; font-size: 12px; letter-spacing: .08em; }
+      h1 { margin: 0 0 16px; font-size: 28px; letter-spacing: -.04em; }
+      p { font-size: 14px; line-height: 1.8; }
+      .notice { margin: 24px 0 28px; padding: 16px 18px; border-left: 3px solid #6b89b4; border-radius: 0 8px 8px 0; background: #f2f6fc; }
+      .notice p { margin: 0; }
+      .notice p + p { margin-top: 7px; color: #66748a; }
+      label { display: block; margin-bottom: 9px; font-size: 14px; font-weight: 600; }
+      input { width: 100%; min-height: 46px; padding: 11px 13px; border: 1px solid #b9c8dd; border-radius: 7px; color: #263c64; font: inherit; }
+      input:focus-visible, button:focus-visible { outline: 3px solid #bdd2ee; outline-offset: 3px; }
+      button { min-height: 44px; margin-top: 18px; padding: 11px 19px; border: 0; border-radius: 7px; background: #395f9b; color: white; font: inherit; font-size: 14px; cursor: pointer; }
+      button:disabled { opacity: .5; cursor: default; }
+      .hint { margin: 10px 0 0; color: #66748a; font-size: 12px; }
+      #result { margin-top: 26px; padding: 22px; border: 1px solid #bddccf; border-radius: 10px; background: #f0f8f4; color: #23654d; }
+      #result h2 { margin: 0; font-size: 20px; overflow-wrap: anywhere; }
+      #result p { margin-bottom: 0; }
+      #reset-demo { margin-top: 12px; background: transparent; border: 1px solid #cbd6e4; color: #526985; }
+      footer { margin-top: 27px; padding-top: 19px; border-top: 1px solid #e8edf4; color: #7c899c; font-size: 12px; line-height: 1.8; }
+      [hidden] { display: none !important; }
+      @media (max-width: 520px) { body { padding: 24px 14px; } main { padding: 25px 22px; } h1 { font-size: 24px; } }
+    </style>
+    <script src="/browser-handoff-demo.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">HYPERAGENT / 浏览器接管演示</p>
+      <h1>让 AI 等你完成一步</h1>
+      <p>在浏览器面板点击“接管浏览器”，填写一个测试昵称并完成演示，再点击“交还 AI”。AI 会读取此页显示的完成状态。</p>
+      <aside class="notice" aria-label="演示说明">
+        <p><strong>这是自有测试页，不会创建外部真实账号。</strong></p>
+        <p>只使用测试昵称。不要输入密码、验证码或真实个人资料。表单内容不发送到服务器，仅保存在当前标签页的 sessionStorage。</p>
+      </aside>
+      <form id="registration-demo" autocomplete="off">
+        <label for="nickname">测试昵称</label>
+        <input id="nickname" name="nickname" type="text" maxlength="32" required autocomplete="off" placeholder="例如：小林测试" aria-describedby="nickname-hint" />
+        <p class="hint" id="nickname-hint">最多 32 个字符，随便取一个演示用名字即可。</p>
+        <button id="complete-demo" type="submit">完成演示注册</button>
+      </form>
+      <section id="result" role="status" aria-live="polite" hidden>
+        <h2 id="completion-message"></h2>
+        <p>演示已完成。请在浏览器面板点击“交还 AI”，让任务继续。</p>
+      </section>
+      <button id="reset-demo" type="button" hidden>重置演示</button>
+      <noscript><p role="alert">此演示需要 JavaScript 才能在当前标签页显示完成状态，请启用后刷新。</p></noscript>
+      <footer>此页仅验证浏览器接管与交还流程。刷新同一标签页可保留演示结果，关闭标签页后演示状态结束。</footer>
+    </main>
+  </body>
+</html>
